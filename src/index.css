@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,137 +6,119 @@
 
 @layer base {
   :root {
-    /* Obsidian base */
-    --background: 240 15% 5%;
-    --foreground: 0 0% 95%;
+    /* [RAYO CERO CORE] - Obsidian Naval Base */
+    --background: 210 30% 3%;     /* #02060a */
+    --foreground: 210 10% 98%;    /* White/98 */
 
-    --card: 240 12% 8%;
-    --card-foreground: 0 0% 95%;
+    /* [RAYO CERO ACCENT] - Electric Cyan */
+    --primary: 195 100% 50%;      /* #00bfff - Cyan Principal */
+    --primary-foreground: 210 30% 3%;
 
-    --popover: 240 12% 8%;
-    --popover-foreground: 0 0% 95%;
+    --card: 210 30% 6%;           /* Un tono arriba del fondo */
+    --card-foreground: 0 0% 98%;
 
-    /* Electric Violet */
-    --primary: 270 85% 60%;
-    --primary-foreground: 0 0% 100%;
+    --popover: 210 30% 5%;
+    --popover-foreground: 0 0% 98%;
 
-    --secondary: 240 10% 14%;
-    --secondary-foreground: 0 0% 90%;
+    --secondary: 210 20% 12%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 240 10% 14%;
-    --muted-foreground: 240 5% 55%;
+    --muted: 210 20% 12%;
+    --muted-foreground: 210 10% 60%;
 
-    --accent: 280 70% 50%;
+    --accent: 195 100% 40%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 240 10% 18%;
-    --input: 240 10% 18%;
-    --ring: 270 85% 60%;
+    --border: 210 20% 14%;
+    --input: 210 20% 14%;
+    --ring: 195 100% 50%;
 
-    --radius: 1rem;
+    --radius: 1.25rem; /* Bordes más suaves, estilo App Apple */
 
-    /* Custom tokens */
-    --glass-bg: 240 15% 10%;
-    --glass-border: 240 10% 22%;
-    --glow-violet: 270 85% 60%;
-    --glow-cyan: 185 80% 55%;
-    --success: 145 70% 50%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 90% 55%;
-    --warning-foreground: 0 0% 5%;
-
-    --sidebar-background: 240 15% 5%;
-    --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 270 85% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 10% 14%;
-    --sidebar-accent-foreground: 0 0% 90%;
-    --sidebar-border: 240 10% 18%;
-    --sidebar-ring: 270 85% 60%;
+    /* Tokens de Diseño Premium */
+    --glass-bg: 210 30% 8%;
+    --glass-border: 210 20% 25%;
+    --glow-cyan: 195 100% 50%;
+    --success: 150 80% 50%;
   }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border selection:bg-primary/30 selection:text-white;
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    @apply bg-background text-foreground antialiased;
+    /* [MIA TYPOGRAPHY] - Inter Variable con ajustes de espaciado de diseñador */
+    font-family: 'Inter', -apple-system, sans-serif;
+    letter-spacing: -0.015em;
+    font-feature-settings: "ss01", "ss03", "cv08", "tnum"; 
+  }
+
+  /* Títulos de Alto Rendimiento */
+  h1, h2, h3, h4 {
+    @apply font-black italic tracking-tighter uppercase;
+    line-height: 0.9;
   }
 }
 
 @layer components {
-  /* Liquid Glass Surface */
-  .glass {
-    @apply relative rounded-2xl border;
-    background: linear-gradient(
-      135deg,
-      hsl(var(--glass-bg) / 0.6),
-      hsl(var(--glass-bg) / 0.3)
+  /* [MIA UI] - Botón con Simetría Perfecta y Glow sutil */
+  .btn-primary {
+    @apply relative flex items-center justify-center gap-3 px-8 py-4 
+           rounded-2xl font-black text-sm uppercase tracking-widest
+           bg-primary text-primary-foreground transition-all duration-300
+           hover:scale-[1.02] active:scale-[0.98]
+           shadow-[0_0_20px_rgba(0,191,255,0.25)];
+  }
+
+  .btn-secondary {
+    @apply flex items-center justify-center gap-3 px-8 py-4 
+           rounded-2xl font-black text-sm uppercase tracking-widest
+           bg-white/5 border border-white/10 text-white backdrop-blur-xl
+           transition-all duration-300 hover:bg-white/10 active:scale-[0.98];
+  }
+
+  /* [MIA UI] - Liquid Glass (Perfeccionado) */
+  .glass-card {
+    @apply relative rounded-[2.5rem] border border-white/10 overflow-hidden;
+    background: radial-gradient(
+      circle at top left,
+      hsla(var(--glass-bg), 0.7),
+      hsla(var(--glass-bg), 0.3)
     );
-    border-color: hsl(var(--glass-border) / 0.4);
-    backdrop-filter: blur(24px) saturate(1.5) contrast(1.05);
-    -webkit-backdrop-filter: blur(24px) saturate(1.5) contrast(1.05);
+    backdrop-filter: blur(30px) saturate(1.8);
     box-shadow: 
-      0 0 0 1px hsl(var(--glass-border) / 0.1),
-      0 8px 32px hsl(240 15% 0% / 0.4),
-      inset 0 1px 0 hsl(0 0% 100% / 0.05);
+      0 20px 50px rgba(0,0,0,0.4),
+      inset 0 1px 1px rgba(255,255,255,0.05);
   }
 
-  .glass-light {
-    @apply relative rounded-2xl border;
-    background: linear-gradient(
-      135deg,
-      hsl(var(--glass-bg) / 0.4),
-      hsl(var(--glass-bg) / 0.15)
-    );
-    border-color: hsl(var(--glass-border) / 0.3);
-    backdrop-filter: blur(16px) saturate(1.3);
-    -webkit-backdrop-filter: blur(16px) saturate(1.3);
-  }
-
-  /* Glow effects */
-  .glow-violet {
-    box-shadow: 
-      0 0 20px hsl(var(--glow-violet) / 0.3),
-      0 0 60px hsl(var(--glow-violet) / 0.1);
-  }
-
-  .glow-border-success {
-    border-color: hsl(var(--success) / 0.5);
-    box-shadow: 0 0 15px hsl(var(--success) / 0.2);
-  }
-
-  .glow-border-warning {
-    border-color: hsl(var(--warning) / 0.5);
-    box-shadow: 0 0 15px hsl(var(--warning) / 0.2);
-  }
-
-  /* Mesh gradient background */
+  /* Mesh Gradient: Ahora con la paleta Cyan/Naval */
   .mesh-gradient {
     background: 
-      radial-gradient(ellipse at 20% 50%, hsl(270 85% 60% / 0.15) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 20%, hsl(185 80% 55% / 0.1) 0%, transparent 50%),
-      radial-gradient(ellipse at 50% 80%, hsl(280 70% 50% / 0.08) 0%, transparent 50%),
+      radial-gradient(circle at 10% 10%, hsla(195, 100%, 50%, 0.12) 0%, transparent 40%),
+      radial-gradient(circle at 90% 90%, hsla(195, 100%, 50%, 0.08) 0%, transparent 40%),
+      radial-gradient(circle at 50% 50%, hsla(210, 30%, 5%, 1) 0%, transparent 100%),
       hsl(var(--background));
   }
 
-  /* Text gradient */
-  .text-gradient {
-    background: linear-gradient(135deg, hsl(270 85% 65%), hsl(185 80% 55%));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  /* Gradiente de Texto Rayo Cero */
+  .text-rayo-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-b from-white to-white/40;
   }
 }
 
 @layer utilities {
-  .tracking-tight-custom {
-    letter-spacing: -0.02em;
+  .text-glow-cyan {
+    text-shadow: 0 0 15px hsla(var(--glow-cyan), 0.4);
+  }
+  
+  /* Simetría de Contenedor */
+  .container-tight {
+    @apply max-w-6xl mx-auto px-6;
   }
 }
