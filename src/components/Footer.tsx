@@ -47,7 +47,7 @@ const Footer = () => (
       {/* BLOQUE DERECHO: Legal y Telemetría */}
       <div className="flex flex-col items-center md:items-end gap-3">
         <p className="text-[8px] md:text-[9px] font-bold text-white/30 uppercase tracking-[0.2em] text-center md:text-right">
-          © {new Date().getFullYear()} Rayo Cero. Todos los derechos reservados.
+          © {new Date().getFullYear()} Rayocero. Todos los derechos reservados.
         </p>
       </div>
 
