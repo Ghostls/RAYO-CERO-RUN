@@ -1,8 +1,10 @@
 /**
- * RAYO CERO — HOME CORE MODULE (STABLE V6 - LIQUID GLASS EDITION)
+ * RAYO CERO — HOME CORE MODULE (STABLE V7 - AURORA KINETIC EDITION)
  * Senior Dev: MIA (Valkyron Group)
+ * CEO: Lualdo Sciscioli
  * Grado: Diseñador / Operativo
  * * REGLA DE ORO: Evolución estructural sin omisiones. Integración de logos oficiales.
+ * * FIX: Implementación de Aurora Boreal ultra sutil (Framer Motion) en capa base (Z-0).
  */
 
 import { motion } from "framer-motion";
@@ -20,8 +22,41 @@ import logoPowerade from "@/assets/logo2.png";
 const Index = () => {
   return (
     // Sincronización estricta con el fondo Obsidian Naval del resto del ecosistema
-    <div className="min-h-screen bg-[#03070b] flex flex-col overflow-x-hidden font-sans text-white">
+    <div className="relative min-h-screen bg-[#03070b] flex flex-col overflow-x-hidden font-sans text-white z-0">
       
+      {/* ─── EFECTO AURORA BOREAL (ULTRA SUTIL) ─── */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        {/* Nodo Norte - Cyan */}
+        <motion.div
+          animate={{
+            x: [0, 100, 0, -100, 0],
+            y: [0, 50, 100, 50, 0],
+            scale: [1, 1.1, 1, 1.05, 1],
+          }}
+          transition={{
+            duration: 25,
+            repeat: Infinity,
+            ease: "linear"
+          }}
+          className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-cyan-500/5 blur-[150px] rounded-full mix-blend-screen"
+        />
+        {/* Nodo Sur - Deep Blue */}
+        <motion.div
+          animate={{
+            x: [0, -120, 0, 120, 0],
+            y: [0, -80, 0, 80, 0],
+            scale: [1, 1.2, 1, 1.1, 1],
+          }}
+          transition={{
+            duration: 30,
+            repeat: Infinity,
+            ease: "linear"
+          }}
+          className="absolute top-[40%] -right-[10%] w-[60%] h-[60%] bg-blue-600/5 blur-[150px] rounded-full mix-blend-screen"
+        />
+      </div>
+      {/* ────────────────────────────────────────── */}
+
       {/* 1. MÓDULO HERO: Portal de Entrada (Se mantiene intacto) */}
       <HeroSection />
 
@@ -32,17 +67,19 @@ const Index = () => {
             Partners Operativos & Patrocinantes
           </p>
           <div className="flex flex-wrap justify-center items-center gap-12 md:gap-24 opacity-40 grayscale hover:grayscale-0 transition-all duration-700">
-             {/* Logo 2: Powerade */}
-             <img src={logoPowerade} alt="Powerade" className="h-12 md:h-20 w-auto object-contain drop-shadow-xl" />
+             {/* Logo 2: Valkyron */}
+             <img src={logoValkyron} alt="Valkyron Group" className="h-12 md:h-20 w-auto object-contain drop-shadow-xl" />             
              
-             {/* Logo 1: Valkyron */}
-             <img src={logoValkyron} alt="Valkyron Group" className="h-12 md:h-20 w-auto object-contain drop-shadow-xl" />
+             {/* Logo 1: powerade */}
+             <img src={logoPowerade} alt="Powerade" className="h-8 md:h-12 w-auto object-contain drop-shadow-xl" />
           </div>
         </div>
       </div>
 
       {/* 2. MÓDULO DE CARRERAS: Calendario Operativo */}
-      <RacesSection />
+      <div className="relative z-10">
+        <RacesSection />
+      </div>
 
       {/* 3. MANIFIESTO Y MÉTRICAS DE ALTO RENDIMIENTO */}
       <section className="py-24 px-6 max-w-7xl mx-auto w-full relative z-10">
@@ -71,17 +108,17 @@ const Index = () => {
             initial={{ opacity: 0, x: 30 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}
             className="grid grid-cols-1 sm:grid-cols-2 gap-4"
           >
-            <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[2rem] backdrop-blur-xl hover:border-cyan-500/30 transition-colors">
+            <div className="bg-[#03070b]/60 border border-white/5 p-8 rounded-[2rem] backdrop-blur-2xl hover:border-cyan-500/30 transition-colors shadow-2xl">
                <Crosshair className="h-6 w-6 text-cyan-400 mb-6" />
                <h4 className="text-3xl font-black italic tracking-tighter mb-2">UHF RFID</h4>
                <p className="text-[10px] font-bold text-white/40 tracking-widest uppercase">Cronometraje de Precisión</p>
             </div>
-            <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[2rem] backdrop-blur-xl hover:border-cyan-500/30 transition-colors">
+            <div className="bg-[#03070b]/60 border border-white/5 p-8 rounded-[2rem] backdrop-blur-2xl hover:border-cyan-500/30 transition-colors shadow-2xl">
                <Zap className="h-6 w-6 text-cyan-400 mb-6" />
                <h4 className="text-3xl font-black italic tracking-tighter mb-2">LIVE DATA</h4>
                <p className="text-[10px] font-bold text-white/40 tracking-widest uppercase">Resultados en Tiempo Real</p>
             </div>
-            <div className="bg-white/[0.02] border border-white/5 p-8 rounded-[2rem] backdrop-blur-xl hover:border-cyan-500/30 transition-colors sm:col-span-2">
+            <div className="bg-[#03070b]/60 border border-white/5 p-8 rounded-[2rem] backdrop-blur-2xl hover:border-cyan-500/30 transition-colors sm:col-span-2 shadow-2xl">
                <Map className="h-6 w-6 text-cyan-400 mb-6" />
                <h4 className="text-3xl font-black italic tracking-tighter mb-2">RUTAS CERTIFICADAS</h4>
                <p className="text-[10px] font-bold text-white/40 tracking-widest uppercase max-w-xs">Circuitos blindados con seguridad operativa, hidratación estratégica y puntos de control.</p>
@@ -110,7 +147,7 @@ const Index = () => {
             <motion.div 
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
-              className="w-full bg-white/[0.02] border border-white/5 rounded-[2.5rem] p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-2xl hover:bg-cyan-500/5 hover:border-cyan-500/30 transition-all duration-500 shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
+              className="w-full bg-[#03070b]/60 border border-white/5 rounded-[2.5rem] p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-3xl hover:bg-cyan-500/5 hover:border-cyan-500/30 transition-all duration-500 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
             >
               <div className="flex items-center gap-6 md:gap-8 w-full md:w-auto text-center md:text-left">
                 <div className="p-5 bg-white/[0.03] border border-white/10 rounded-2xl group-hover:bg-cyan-400 group-hover:text-black transition-colors duration-500 shrink-0 mx-auto md:mx-0">
@@ -136,7 +173,7 @@ const Index = () => {
             <motion.div 
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
-              className="w-full bg-white/[0.02] border border-white/5 rounded-[2.5rem] p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-2xl hover:bg-cyan-500/5 hover:border-cyan-500/30 transition-all duration-500 shadow-[0_20px_40px_rgba(0,0,0,0.3)]"
+              className="w-full bg-[#03070b]/60 border border-white/5 rounded-[2.5rem] p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-3xl hover:bg-cyan-500/5 hover:border-cyan-500/30 transition-all duration-500 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
             >
               <div className="flex items-center gap-6 md:gap-8 w-full md:w-auto text-center md:text-left">
                 <div className="p-5 bg-white/[0.03] border border-white/10 rounded-2xl group-hover:bg-cyan-400 group-hover:text-black transition-colors duration-500 shrink-0 mx-auto md:mx-0">
@@ -164,10 +201,10 @@ const Index = () => {
           <div className="h-[1px] w-24 bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
           <div className="flex flex-col items-center opacity-30 hover:opacity-100 transition-opacity duration-700">
             <Zap className="h-6 w-6 text-cyan-400 mb-3 animate-pulse fill-current" />
-            <p className="text-[9px] font-black tracking-[0.8em] uppercase text-white">
+            <p className="text-[9px] font-black tracking-[0.8em] uppercase text-white text-center">
               RAYO CERO DIGITAL ECOSYSTEM
             </p>
-            <p className="text-[7px] font-bold tracking-[0.4em] uppercase text-white/50 mt-2">
+            <p className="text-[7px] font-bold tracking-[0.4em] uppercase text-white/50 mt-2 text-center">
               High Performance Computing & Precision Timing
             </p>
           </div>

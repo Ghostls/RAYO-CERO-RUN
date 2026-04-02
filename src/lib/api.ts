@@ -1,9 +1,9 @@
 /**
- * VALKYRON GROUP — RAYO CERO API LAYER (V2.2)
+ * VALKYRON GROUP — RAYO CERO API LAYER (V2.4 - STABLE)
  * Senior Dev: MIA
  * Grado: Operativo / Militar
- * * Fix: Resolución de error 406 (PostgREST). Implementación de Left Join 
- * * para soportar atletas inscritos sin tiempos registrados aún.
+ * * Fix: Actualización estricta de Categorías Oficiales (Juvenil a Master D).
+ * * Optimization: Sincronización de esquema Zod para edad mínima (16 años).
  */
 
 import { z } from "zod";
@@ -32,14 +32,20 @@ export function calcularVelocidad(tiempoSegundos: number, distanciaKm: number): 
   return parseFloat(((distanciaKm / tiempoSegundos) * 3600).toFixed(4));
 }
 
+// MIA CORE: Motor de Asignación de Categorías Oficiales Rayo Cero
 export function calcularCategoria(edad: number, genero: "M" | "F"): string {
   const g = genero === "M" ? "Masculino" : "Femenino";
-  if (edad < 18) return `Juvenil ${g}`;
-  if (edad < 30) return `Abierta ${g}`;
-  if (edad < 40) return `Sub-Master ${g}`;
-  if (edad < 50) return `Master A ${g}`;
-  if (edad < 60) return `Master B ${g}`;
-  return `Master C ${g}`;
+  
+  if (edad >= 16 && edad <= 19) return `Juvenil ${g}`;
+  if (edad >= 20 && edad <= 29) return `Libre ${g}`;
+  if (edad >= 30 && edad <= 34) return `Sub-Master A ${g}`;
+  if (edad >= 35 && edad <= 39) return `Sub-Master B ${g}`;
+  if (edad >= 40 && edad <= 49) return `Master A ${g}`;
+  if (edad >= 50 && edad <= 59) return `Master B ${g}`;
+  if (edad >= 60 && edad <= 64) return `Master C ${g}`;
+  if (edad >= 65) return `Master D ${g}`;
+  
+  return `Absoluto ${g}`; // Fallback táctico en caso de anomalía de edad
 }
 
 // ─── SCHEMA DE VALIDACIÓN ZOD ───────────────────────────────────────────────
@@ -49,14 +55,14 @@ export const registrationSchema = z.object({
   apellido: z.string().min(2, "Mínimo 2 caracteres").max(100),
   cedula: z
     .string()
-    .regex(/^[VEJPGvejpg]-?\d{6,8}$/, "Formato inválido")
-    .transform((val) => val.toUpperCase().replace("-", "")),
+    .regex(/^[VEJPGvejpg]?\d{5,10}$/, "Formato de cédula inválido")
+    .transform((val) => val.toUpperCase().replace(/[^0-9]/g, "")), 
   email: z.string().email("Email inválido"),
   telefono: z.string().optional().or(z.literal("")),
   fechaNacimiento: z.string().refine((val) => {
     const edad = calcularEdad(val);
-    return edad >= 14 && edad <= 80;
-  }, "Edad permitida: 14-80 años"),
+    return edad >= 16 && edad <= 99; // Ajustado a 16 años (Mínimo Juvenil)
+  }, "Edad permitida: 16+ años"),
   genero: z.enum(["M", "F"]),
   talla: z.enum(["XS", "S", "M", "L", "XL", "XXL"]),
   referenciaPago: z.string().min(4, "Referencia bancaria inválida"),
@@ -78,7 +84,7 @@ export interface RegistrationResult {
 export interface RunnerResultData {
   bib: string;
   name: string;
-  time: string | null; // Puede ser null si la carrera no ha empezado
+  time: string | null;
   pace: string | null;
   rank: number | null;
   categoryRank: number | null;
@@ -126,7 +132,6 @@ export async function getResultsByBib(bib: string): Promise<RunnerResultData> {
   const bibNum = parseInt(bib.trim(), 10);
   if (isNaN(bibNum)) throw new Error("Dorsal inválido.");
 
-  // TÁCTICA ANTI-406: Buscamos primero en 'runners' y hacemos JOIN a 'race_results'
   const { data, error } = await supabase
     .from("runners")
     .select(`
@@ -157,12 +162,10 @@ export async function getResultsByBib(bib: string): Promise<RunnerResultData> {
     .select("*", { count: "exact", head: true });
 
   const runnerData = data as any;
-  // Extraemos los resultados si existen
   const raceData = runnerData.race_results && runnerData.race_results.length > 0 
     ? runnerData.race_results[0] 
     : null;
 
-  // Si no hay datos de carrera (El UHF no ha escaneado), devolvemos perfil en limpio
   if (!raceData) {
     return {
       bib: runnerData.bib_number.toString(),
@@ -177,7 +180,6 @@ export async function getResultsByBib(bib: string): Promise<RunnerResultData> {
     };
   }
 
-  // Si hay datos de carrera, calculamos
   const [hh, mm, ss] = raceData.tiempo_chip.split(":").map(Number);
   const tiempoSeg = hh * 3600 + mm * 60 + ss;
 

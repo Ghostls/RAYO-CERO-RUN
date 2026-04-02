@@ -258,7 +258,7 @@ const RaceDetail = () => {
                   </div>
                   <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full border border-[#3b82f6] flex items-center justify-center text-[10px] font-black text-[#3b82f6]">P</div>
-                      <span className="text-[10px] font-bold text-white/60">HIDRATA</span>
+                      <span className="text-[10px] font-bold text-white/60">HIDRATACIÓN</span>
                   </div>
                   <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full border border-[#a855f7] flex items-center justify-center text-[10px] font-black text-[#a855f7]">♪</div>
