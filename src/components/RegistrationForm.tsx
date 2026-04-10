@@ -1,10 +1,10 @@
 /**
- * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V17.7 - RESPONSIVE ARMOR)
+ * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V17.8 - FINANCIAL HUD INJECTION)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Militar / Operativo / Diseñador
  * REGLA DE ORO: Código completo sin omisiones. 
- * FIX: Reingeniería profunda de Flexbox y CSS Print. Escalado proporcional en móviles y purga de fondo negro en PDF.
+ * FIX: Inyección de módulo HUD financiero ($40 + Tasa BCV) en la fase de Pago Operativo.
  */
 
 import { useState } from "react";
@@ -280,6 +280,23 @@ const RegistrationForm = () => {
                 <Banknote className="h-32 w-32 text-cyan-400" />
             </div>
             
+            {/* ─── HUD DE INVERSIÓN OPERATIVA (NUEVO) ─── */}
+            <div className="mb-8 p-5 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10 shadow-[0_0_20px_rgba(0,242,255,0.1)]">
+              <div className="flex items-center gap-4 w-full sm:w-auto">
+                <div className="h-12 w-12 rounded-xl bg-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0">
+                  <Banknote className="h-6 w-6" />
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-400">Inversión Operativa</span>
+                  <span className="text-[8px] text-white/60 uppercase tracking-widest mt-1 leading-tight">Pagos en Bs a Tasa Oficial del <br className="sm:hidden"/>Banco Central de Venezuela (BCV)</span>
+                </div>
+              </div>
+              <div className="text-4xl font-black italic tracking-tighter text-white drop-shadow-[0_0_15px_rgba(0,242,255,0.4)] shrink-0">
+                $40<span className="text-cyan-400 text-xl">.00</span>
+              </div>
+            </div>
+            {/* ────────────────────────────────────────── */}
+
             <div className="flex items-center gap-3 mb-6 border-b border-cyan-500/20 pb-4 relative z-10">
               <Zap className="h-4 w-4 text-cyan-400" />
               <h4 className="text-xs font-black text-white uppercase tracking-[0.3em]">Coordenadas Bancarias</h4>
