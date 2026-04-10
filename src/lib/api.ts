@@ -1,9 +1,10 @@
 /**
- * VALKYRON GROUP — RAYO CERO API LAYER (V2.4 - STABLE)
- * Senior Dev: MIA
+ * VALKYRON GROUP — RAYO CERO API LAYER (V2.5 - STABLE)
+ * Senior Dev: MIA (Valkyron Group)
+ * CEO: Lualdo Sciscioli
  * Grado: Operativo / Militar
- * * Fix: Actualización estricta de Categorías Oficiales (Juvenil a Master D).
- * * Optimization: Sincronización de esquema Zod para edad mínima (16 años).
+ * REGLA DE ORO: Código completo sin omisiones.
+ * FIX: Integración de parámetro Movilidad Reducida en Zod y reestructuración exacta de categorías.
  */
 
 import { z } from "zod";
@@ -33,19 +34,20 @@ export function calcularVelocidad(tiempoSegundos: number, distanciaKm: number): 
 }
 
 // MIA CORE: Motor de Asignación de Categorías Oficiales Rayo Cero
-export function calcularCategoria(edad: number, genero: "M" | "F"): string {
+export function calcularCategoria(edad: number, genero: "M" | "F", movilidadReducida: boolean = false): string {
+  // Overrride supremo: Si tiene movilidad reducida, se ignora edad y género.
+  if (movilidadReducida) {
+    return "Movilidad Reducida Absoluto";
+  }
+
   const g = genero === "M" ? "Masculino" : "Femenino";
   
   if (edad >= 16 && edad <= 19) return `Juvenil ${g}`;
   if (edad >= 20 && edad <= 29) return `Libre ${g}`;
-  if (edad >= 30 && edad <= 34) return `Sub-Master A ${g}`;
-  if (edad >= 35 && edad <= 39) return `Sub-Master B ${g}`;
-  if (edad >= 40 && edad <= 49) return `Master A ${g}`;
-  if (edad >= 50 && edad <= 59) return `Master B ${g}`;
-  if (edad >= 60 && edad <= 64) return `Master C ${g}`;
-  if (edad >= 65) return `Master D ${g}`;
+  if (edad >= 30 && edad <= 39) return `Submaster ${g}`;
+  if (edad >= 40) return `Master ${g}`;
   
-  return `Absoluto ${g}`; // Fallback táctico en caso de anomalía de edad
+  return `Absoluto ${g}`; // Fallback táctico
 }
 
 // ─── SCHEMA DE VALIDACIÓN ZOD ───────────────────────────────────────────────
@@ -65,6 +67,7 @@ export const registrationSchema = z.object({
   }, "Edad permitida: 16+ años"),
   genero: z.enum(["M", "F"]),
   talla: z.enum(["XS", "S", "M", "L", "XL", "XXL"]),
+  movilidadReducida: z.boolean().default(false), // <-- INYECCIÓN TÁCTICA ZOD
   referenciaPago: z.string().min(4, "Referencia bancaria inválida"),
   contactoEmergencia: z.string().min(3),
   telefonoEmergencia: z.string(),
@@ -98,7 +101,8 @@ export interface RunnerResultData {
 export async function registerRunner(formData: RegistrationFormData): Promise<RegistrationResult> {
   const parsed = registrationSchema.parse(formData);
   const edad = calcularEdad(parsed.fechaNacimiento);
-  const categoria = calcularCategoria(edad, parsed.genero);
+  // Se pasa el parámetro de movilidad reducida al motor de categorías
+  const categoria = calcularCategoria(edad, parsed.genero, parsed.movilidadReducida);
 
   const { data, error } = await supabase
     .from("runners")
@@ -112,6 +116,7 @@ export async function registerRunner(formData: RegistrationFormData): Promise<Re
       genero: parsed.genero,
       categoria: categoria,
       talla_camiseta: parsed.talla,
+      "movilidadReducida": parsed.movilidadReducida, // <-- ENVÍO A BD (Forzando nombre exacto de columna)
       referencia_pago: parsed.referenciaPago, 
       contacto_emergencia: parsed.contactoEmergencia,
       telefono_emergencia: parsed.telefonoEmergencia,

@@ -1,10 +1,10 @@
 /**
- * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V17.2 - FULL EMAILJS LIVE INTEGRATION)
+ * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V17.4 - HUD REALTIME SYNC)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Militar / Operativo / Diseñador
  * REGLA DE ORO: Código completo sin omisiones. 
- * FIX: Inyección de credenciales definitivas de EmailJS para despliegue en producción.
+ * FIX: Sincronización en tiempo real del HUD de Categoría con el interruptor de Movilidad Reducida.
  */
 
 import { useState } from "react";
@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   User, Shield, CheckCircle, ArrowRight, ArrowLeft, Zap, Trophy, 
   Mail, CreditCard, Loader2, AlertCircle, Home, Banknote, UploadCloud, 
-  Printer
+  Printer, Accessibility 
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom"; 
@@ -36,6 +36,7 @@ interface FormData {
   fechaNacimiento: string;
   genero: string;
   talla: string;
+  movilidadReducida: boolean; // <-- PARÁMETRO LOGÍSTICO
   referenciaPago: string; 
   contactoEmergencia: string;
   telefonoEmergencia: string;
@@ -52,6 +53,7 @@ const initialForm: FormData = {
   fechaNacimiento: "",
   genero: "",
   talla: "",
+  movilidadReducida: false, 
   referenciaPago: "",
   contactoEmergencia: "",
   telefonoEmergencia: "",
@@ -71,6 +73,11 @@ const RegistrationForm = () => {
   const [isCompressing, setIsCompressing] = useState(false);
 
   const navigate = useNavigate();
+
+  // ─── CÁLCULOS REACTIVOS (HUD EN TIEMPO REAL) ───
+  const age = form.fechaNacimiento ? calcularEdad(form.fechaNacimiento) : null;
+  // FIX: Se inyecta form.movilidadReducida para que la UI reaccione instantáneamente
+  const category = age !== null && form.genero ? calcularCategoria(age, form.genero as "M" | "F", form.movilidadReducida) : null;
 
   // MIA PROTOCOL: Intercepción y compresión de imagen
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -133,7 +140,7 @@ const RegistrationForm = () => {
         to_email: form.email,
         to_name: `${form.nombre} ${form.apellido}`,
         bib_number: formattedBib,
-        categoria: category || "General"
+        categoria: category || "General" // Se usa la variable reactiva global
       };
 
       // Credenciales tácticas inyectadas
@@ -160,9 +167,6 @@ const RegistrationForm = () => {
   const update = (field: keyof FormData, value: string | boolean) =>
     setForm((f) => ({ ...f, [field]: value }));
 
-  const age = form.fechaNacimiento ? calcularEdad(form.fechaNacimiento) : null;
-  const category = age !== null && form.genero ? calcularCategoria(age, form.genero as "M" | "F") : null;
-
   const canNext = () => {
     if (step === 0) return form.nombre && form.apellido && form.cedula && form.email && form.telefono;
     if (step === 1) return form.fechaNacimiento && form.genero && form.talla;
@@ -175,7 +179,7 @@ const RegistrationForm = () => {
     setSubmitError(null);
     const normalizedCedula = form.cedula.replace(/[VEJGvejg.\s-]/g, "");
 
-    const registrationData: RegistrationFormData = {
+    const registrationData: any = {
       nombre: form.nombre.trim(),
       apellido: form.apellido.trim(),
       cedula: normalizedCedula, 
@@ -184,6 +188,7 @@ const RegistrationForm = () => {
       fechaNacimiento: form.fechaNacimiento,
       genero: form.genero as "M" | "F",
       talla: form.talla as "XS" | "S" | "M" | "L" | "XL" | "XXL",
+      movilidadReducida: form.movilidadReducida, // <-- ENVÍO DEL PARÁMETRO
       referenciaPago: form.referenciaPago.trim(), 
       contactoEmergencia: form.contactoEmergencia,
       telefonoEmergencia: form.telefonoEmergencia,
@@ -246,6 +251,27 @@ const RegistrationForm = () => {
                 <option value="XXL" className="bg-[#03070b]">XXL</option>
               </select>
             </div>
+
+            {/* ─── HUD DE MOVILIDAD REDUCIDA ─── */}
+            <div className="sm:col-span-2 mt-2 bg-white/[0.02] border border-white/5 p-5 rounded-2xl flex items-center justify-between group hover:border-cyan-500/30 transition-all backdrop-blur-md">
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 group-hover:bg-cyan-500 group-hover:text-[#03070b] transition-colors">
+                  <Accessibility className="h-5 w-5" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Movilidad Reducida</span>
+                  <span className="text-[8px] text-white/40 uppercase tracking-widest mt-1">Marcar si requiere logística especial en ruta</span>
+                </div>
+              </div>
+              <input
+                type="checkbox"
+                checked={form.movilidadReducida}
+                onChange={(e) => update("movilidadReducida", e.target.checked)}
+                className="h-5 w-5 rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500/50 cursor-pointer transition-all"
+              />
+            </div>
+            {/* ──────────────────────────────── */}
+
           </div>
           {category && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-cyan-500/5 border border-cyan-500/20 p-6 rounded-2xl text-center backdrop-blur-xl">

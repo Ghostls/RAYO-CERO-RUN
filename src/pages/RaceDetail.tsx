@@ -1,14 +1,16 @@
 /**
- * RAYO CERO — RACE OPERATIVE DETAIL (STABLE BUILD V11.1 - AWARDS HUD INTEGRATION)
+ * RAYO CERO — RACE OPERATIVE DETAIL (STABLE BUILD V11.2 - FLYER PRIORITY HUD)
  * Senior Dev: MIA (Valkyron Group)
- * Fix: Arquitectura de Clústeres HUD Unificados. Cero colisiones en macro-zoom.
- * Cumplimiento de Regla de Oro: Evolución sin omisiones. Integración de visual de premios.
+ * CEO: Lualdo Sciscioli
+ * Grado: Militar / Operativo / Diseñador
+ * FIX: Reestructuración de UI. Flyer de premiación movido a prioridad visual [Posición 1].
+ * Cumplimiento de Regla de Oro: Evolución sin omisiones.
  */
 
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useParams, useNavigate } from "react-router-dom";
-import { MapPin, Calendar, Clock, Zap, Users, ShieldCheck, Music, Droplet, Plus, ArrowLeft } from "lucide-react";
+import { MapPin, Calendar, Clock, Zap, Users, ShieldCheck, Music, Droplet, Plus, ArrowLeft, Trophy } from "lucide-react";
 import { MapContainer, TileLayer, Polyline, Marker, useMap, Circle } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -47,9 +49,9 @@ const createCompoundIcon = (waypoint: any) => {
     className: "custom-compound-marker",
     // Contenedor Flex para que los iconos no se aplasten y crezcan a la derecha
     html: `<div style="display: flex; align-items: center; width: max-content; pointer-events: none;">
-             ${mainCircle}
-             ${poiHtml}
-           </div>`,
+              ${mainCircle}
+              ${poiHtml}
+            </div>`,
     iconSize: [0, 0], // Anula restricciones de tamaño base
     iconAnchor: waypoint.isMeta ? [20, 20] : [15, 15], // Ancla EXACTAMENTE el centro del círculo al mapa
   });
@@ -192,7 +194,7 @@ const RaceDetail = () => {
       <aside className="w-full lg:w-[35%] h-[55vh] lg:h-full overflow-y-auto bg-[#03070b] p-8 lg:p-12 custom-scrollbar border-l border-white/5 relative z-10">
         
         {/* HEADER TÁCTICO INTEGRADO */}
-        <div className="flex items-center justify-between mb-10 pb-6 border-b border-white/5">
+        <div className="flex items-center justify-between mb-8 pb-6 border-b border-white/5">
           <button 
             onClick={() => navigate(-1)} 
             className="flex items-center gap-2 group bg-white/[0.03] hover:bg-white/10 py-2 px-4 rounded-full transition-all border border-white/5"
@@ -212,6 +214,22 @@ const RaceDetail = () => {
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-12 pb-10">
           
+          {/* ─── MÓDULO VISUAL: ESTRUCTURA DE PREMIACIÓN (Prioridad Absoluta) ─── */}
+          <div className="flex flex-col items-center w-full">
+             <p className="flex items-center gap-2 text-[9px] font-black tracking-[0.3em] text-cyan-400 uppercase mb-4 w-full text-left">
+                <Trophy className="h-3 w-3" /> Recompensa Estratégica
+             </p>
+             <div className="w-full relative shadow-[0_0_40px_rgba(34,211,238,0.08)] rounded-2xl overflow-hidden border border-white/10 group">
+                <div className="absolute inset-0 bg-gradient-to-t from-[#03070b] via-transparent to-transparent opacity-50 z-10 pointer-events-none" />
+                <img
+                   src={flyerPremios}
+                   alt="Estructura de Premios Night Fest 10K"
+                   className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                />
+             </div>
+          </div>
+          {/* ─────────────────────────────────────────────────────────────────── */}
+
           <header className="space-y-4">
               <h1 className="text-7xl font-black italic uppercase leading-none tracking-tighter">
                  10<span className="text-cyan-400">K</span>
@@ -281,22 +299,6 @@ const RaceDetail = () => {
                   </div>
               </div>
           </div>
-
-          {/* ─── MÓDULO VISUAL: ESTRUCTURA DE PREMIACIÓN (Integración Flyer) ─── */}
-          <div className="mt-8 pt-8 border-t border-white/5 flex flex-col items-center">
-             <p className="text-[9px] font-black tracking-[0.3em] text-cyan-400 uppercase mb-6 w-full text-left">
-                Recompensa Estratégica
-             </p>
-             <div className="w-full relative shadow-[0_0_40px_rgba(34,211,238,0.08)] rounded-2xl overflow-hidden border border-white/10 group">
-                <div className="absolute inset-0 bg-gradient-to-t from-[#03070b] via-transparent to-transparent opacity-50 z-10 pointer-events-none" />
-                <img
-                   src={flyerPremios}
-                   alt="Estructura de Premios Night Fest 10K"
-                   className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-                />
-             </div>
-          </div>
-          {/* ─────────────────────────────────────────────────────────────────── */}
 
         </motion.div>
       </aside>

@@ -1,15 +1,15 @@
 /**
- * RAYO CERO — PREMIUM RUNNER EXPERIENCE (STABLE V6.3 - CENTER LIQUID GLASS CARD)
- * Senior Dev: MIA (Valkyron Group)
+ * RAYO CERO — PREMIUM RUNNER EXPERIENCE (STABLE V6.4 - LIQUID GLASS & DATE HUD)
+ * Senior Dev: MIA / Gemini (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Militar / Operativo / Diseñador
  * REGLA DE ORO: Código completo sin omisiones. Responsive Design estricto.
- * FIX: Eliminación de esferas flotantes. Creación de Tarjeta Liquid Glass central para el logo.
+ * FIX: Inyección de fecha operativa (06.06.26) bajo el logo central con alineación de columna.
  */
 
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Zap, Trophy, ArrowRight } from "lucide-react";
+import { Zap, Trophy, ArrowRight, Calendar } from "lucide-react";
 
 // MIA IMPORT PROTOCOL: Activos gráficos
 import weRunLogo from "../assets/we-run-logo.png"; 
@@ -47,12 +47,13 @@ const HeroSection = () => {
             </span>
           </div>
 
-          {/* ─── MÓDULO VISUAL: TARJETA LIQUID GLASS + LOGO OFICIAL ─── */}
+          {/* ─── MÓDULO VISUAL: TARJETA LIQUID GLASS + LOGO OFICIAL + FECHA ─── */}
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
-            className="w-full max-w-[90%] sm:max-w-[550px] md:max-w-[700px] lg:max-w-[850px] mb-14 md:mb-16 relative flex justify-center p-8 md:p-14 lg:p-16 rounded-[2.5rem] bg-[#03070b]/40 border border-white/10 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.6)] hover:border-cyan-500/30 transition-all duration-500 group"
+            // Modificado a flex-col e items-center para apilar el logo y la fecha
+            className="w-full max-w-[90%] sm:max-w-[550px] md:max-w-[700px] lg:max-w-[850px] mb-14 md:mb-16 relative flex flex-col items-center justify-center p-8 md:p-14 lg:p-16 rounded-[2.5rem] bg-[#03070b]/40 border border-white/10 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.6)] hover:border-cyan-500/30 transition-all duration-500 group"
           >
             {/* Resplandor interno sutil */}
             <div className="absolute inset-0 rounded-[2.5rem] bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
@@ -65,6 +66,13 @@ const HeroSection = () => {
               alt="Rayo Cero - We Run Powerade 10K Night Fest" 
               className="w-full h-auto object-contain relative z-10 drop-shadow-[0_0_20px_rgba(34,211,238,0.1)] group-hover:drop-shadow-[0_0_30px_rgba(34,211,238,0.3)] transition-all duration-500"
             />
+
+            {/* FECHA DE LA CARRERA INYECTADA */}
+            <div className="relative z-10 mt-6 sm:mt-8 flex items-center justify-center">
+              <p className="text-2xl sm:text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-white tracking-[0.4em] drop-shadow-[0_0_15px_rgba(0,242,255,0.4)]">
+                06.06.26
+              </p>
+            </div>
           </motion.div>
           {/* ───────────────────────────────────────────────────────── */}
 
