@@ -1,11 +1,10 @@
 /**
- * RAYO CERO — HOME CORE MODULE (STABLE V7.1 - AURORA KINETIC EDITION + FLYER INTEGRATION)
+ * RAYO CERO — HOME CORE MODULE (STABLE V7.2 - CLEAN HUD EDITION)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Diseñador / Operativo
  * * REGLA DE ORO: Evolución estructural sin omisiones. Integración de logos oficiales.
- * * FIX: Implementación de Aurora Boreal ultra sutil (Framer Motion) en capa base (Z-0).
- * * UPDATE: Integración de Flyer de Inscripciones responsivo.
+ * * FIX: Eliminación táctica del módulo de Branding Inferior por directriz directa.
  */
 
 import { motion } from "framer-motion";
@@ -215,21 +214,6 @@ const Index = () => {
           </Link>
 
         </div>
-
-        {/* Branding Inferior */}
-        <div className="mt-32 flex flex-col items-center gap-6">
-          <div className="h-[1px] w-24 bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
-          <div className="flex flex-col items-center opacity-30 hover:opacity-100 transition-opacity duration-700">
-            <Zap className="h-6 w-6 text-cyan-400 mb-3 animate-pulse fill-current" />
-            <p className="text-[9px] font-black tracking-[0.8em] uppercase text-white text-center">
-              RAYOCERO EVENTOS
-            </p>
-            <p className="text-[7px] font-bold tracking-[0.4em] uppercase text-white/50 mt-2 text-center">
-              INGENIERÍA DE PRECISIÓN PARA ATLETAS DE ALTO RENDIMIENTO
-            </p>
-          </div>
-        </div>
-
       </section>
     </div>
   );
