@@ -1,10 +1,10 @@
 /**
- * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V17.4 - HUD REALTIME SYNC)
+ * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V17.6 - ANTI-COLLISION PRINT CANVAS)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Militar / Operativo / Diseñador
  * REGLA DE ORO: Código completo sin omisiones. 
- * FIX: Sincronización en tiempo real del HUD de Categoría con el interruptor de Movilidad Reducida.
+ * FIX: Reingeniería de Flexbox en Lienzo de Impresión (justify-start + gap rígido) para anular colisión de textos multilínea.
  */
 
 import { useState } from "react";
@@ -16,16 +16,15 @@ import {
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom"; 
-import imageCompression from "browser-image-compression"; // MIA: Compresión táctica
-import emailjs from '@emailjs/browser'; // <-- MIA: Librería para correos tácticos
+import imageCompression from "browser-image-compression"; 
+import emailjs from '@emailjs/browser'; 
 
 import { registerRunner, calcularEdad, calcularCategoria, type RegistrationFormData } from "@/lib/api";
-import { supabase } from "@/lib/supabase"; // MIA: Cliente para Storage
+import { supabase } from "@/lib/supabase"; 
 
-// MIA IMPORT PROTOCOL: Importación de logos y NUEVA PLANTILLA DEL DORSAL
 import logoPrincipal from "../assets/logo.png";
 import logoSecundario from "../assets/logo2.png";
-import dorsalBg from "../assets/dorsal-bg.jpg"; // <-- PLANTILLA OFICIAL
+import dorsalBg from "../assets/dorsal-bg.jpg"; 
 
 interface FormData {
   nombre: string;
@@ -36,7 +35,7 @@ interface FormData {
   fechaNacimiento: string;
   genero: string;
   talla: string;
-  movilidadReducida: boolean; // <-- PARÁMETRO LOGÍSTICO
+  movilidadReducida: boolean; 
   referenciaPago: string; 
   contactoEmergencia: string;
   telefonoEmergencia: string;
@@ -68,18 +67,14 @@ const RegistrationForm = () => {
   const [bibNumber, setBibNumber] = useState<number | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   
-  // MIA STATE: Controladores de archivo y compresión
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
 
   const navigate = useNavigate();
 
-  // ─── CÁLCULOS REACTIVOS (HUD EN TIEMPO REAL) ───
   const age = form.fechaNacimiento ? calcularEdad(form.fechaNacimiento) : null;
-  // FIX: Se inyecta form.movilidadReducida para que la UI reaccione instantáneamente
   const category = age !== null && form.genero ? calcularCategoria(age, form.genero as "M" | "F", form.movilidadReducida) : null;
 
-  // MIA PROTOCOL: Intercepción y compresión de imagen
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -108,7 +103,6 @@ const RegistrationForm = () => {
 
   const { mutate: submitToSupabase, isPending: isSubmitting } = useMutation({
     mutationFn: async (data: RegistrationFormData) => {
-      // 1. FASE DE SUBIDA AL STORAGE (Si existe un archivo cargado)
       if (comprobanteFile) {
         const fileExt = comprobanteFile.name.split('.').pop();
         const fileName = `${data.cedula}_${Date.now()}.${fileExt}`;
@@ -124,8 +118,6 @@ const RegistrationForm = () => {
           console.error("M.I.A Alerta: Falla al subir evidencia visual al Storage.", uploadError);
         }
       }
-
-      // 2. FASE DE INSERCIÓN EN BASE DE DATOS (Texto)
       return registerRunner(data);
     },
     onSuccess: (data) => {
@@ -133,22 +125,20 @@ const RegistrationForm = () => {
       setSubmitted(true);
       setSubmitError(null);
 
-      // ─── MIA PROTOCOL: DISPARO DE CORREO (EMAILJS) ───
       const formattedBib = data.bib_number.toString().padStart(4, '0');
       
       const templateParams = {
         to_email: form.email,
         to_name: `${form.nombre} ${form.apellido}`,
         bib_number: formattedBib,
-        categoria: category || "General" // Se usa la variable reactiva global
+        categoria: category || "General" 
       };
 
-      // Credenciales tácticas inyectadas
       emailjs.send(
-        "service_7knzrtk", // Service ID
-        "template_7x0cg5m", // Template ID
+        "service_7knzrtk", 
+        "template_7x0cg5m", 
         templateParams,
-        "yUhQUXtq2yj-nVnr7" // Public Key
+        "yUhQUXtq2yj-nVnr7" 
       ).then(
         (response) => {
           console.log('MIA: Correo de confirmación desplegado con éxito.', response.status, response.text);
@@ -157,7 +147,6 @@ const RegistrationForm = () => {
           console.error('MIA Alerta: Fallo en el envío de correo.', error);
         }
       );
-      // ──────────────────────────────────────────────────
     },
     onError: (error: Error) => {
       setSubmitError(error.message);
@@ -188,7 +177,7 @@ const RegistrationForm = () => {
       fechaNacimiento: form.fechaNacimiento,
       genero: form.genero as "M" | "F",
       talla: form.talla as "XS" | "S" | "M" | "L" | "XL" | "XXL",
-      movilidadReducida: form.movilidadReducida, // <-- ENVÍO DEL PARÁMETRO
+      movilidadReducida: form.movilidadReducida, 
       referenciaPago: form.referenciaPago.trim(), 
       contactoEmergencia: form.contactoEmergencia,
       telefonoEmergencia: form.telefonoEmergencia,
@@ -252,7 +241,6 @@ const RegistrationForm = () => {
               </select>
             </div>
 
-            {/* ─── HUD DE MOVILIDAD REDUCIDA ─── */}
             <div className="sm:col-span-2 mt-2 bg-white/[0.02] border border-white/5 p-5 rounded-2xl flex items-center justify-between group hover:border-cyan-500/30 transition-all backdrop-blur-md">
               <div className="flex items-center gap-4">
                 <div className="h-10 w-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 group-hover:bg-cyan-500 group-hover:text-[#03070b] transition-colors">
@@ -270,7 +258,6 @@ const RegistrationForm = () => {
                 className="h-5 w-5 rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500/50 cursor-pointer transition-all"
               />
             </div>
-            {/* ──────────────────────────────── */}
 
           </div>
           {category && (
@@ -347,7 +334,7 @@ const RegistrationForm = () => {
                   {isCompressing ? (
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="h-8 w-8 text-cyan-400 animate-spin" />
-                      <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] text-center">Adjuntando<br/>Activada...</span>
+                      <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] text-center">Adjuntando...<br/></span>
                     </div>
                   ) : comprobanteFile ? (
                     <div className="flex flex-col items-center gap-3">
@@ -400,13 +387,12 @@ const RegistrationForm = () => {
     },
   ];
 
-  // ─── PANTALLA DE ÉXITO Y LIENZO FANTASMA DE IMPRESIÓN ───
   if (submitted && bibNumber) {
     const formattedBib = bibNumber.toString().padStart(4, '0');
 
     return (
       <>
-        {/* ─── VISTA WEB (Se oculta mágicamente al imprimir) ─── */}
+        {/* ─── VISTA WEB ─── */}
         <section id="success-bib" className="relative min-h-screen pt-32 pb-24 px-4 sm:px-6 bg-[#03070b] flex items-center justify-center font-sans overflow-hidden print:hidden">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#00f2ff]/10 blur-[120px] rounded-full pointer-events-none z-0" />
           
@@ -416,21 +402,25 @@ const RegistrationForm = () => {
               <div className="relative w-full max-w-[600px] rounded-2xl shadow-[0_40px_80px_-15px_rgba(0,242,255,0.2)] border-4 sm:border-8 border-white/10 overflow-hidden bg-black">
                 <img src={dorsalBg} alt="Plantilla Dorsal Rayocero" className="w-full h-auto object-contain block relative z-0" />
                 <div className="absolute inset-0 z-10 w-full h-full pointer-events-none">
+                  
                   <div className="absolute top-[18%] h-[50%] w-full flex items-center justify-center">
                     <h2 className="text-[5rem] sm:text-[7rem] md:text-[9rem] lg:text-[10rem] font-[900] text-white tracking-tighter italic drop-shadow-[0_8px_15px_rgba(0,0,0,0.4)] leading-none text-center m-0 p-0">
                       {formattedBib}
                     </h2>
                   </div>
-                  <div className="absolute top-[66.5%] h-[15%] w-full flex flex-col items-center justify-center px-4 sm:px-12 gap-0">
-                     <h3 className="text-xl sm:text-2xl md:text-4xl font-black text-[#03070b] uppercase tracking-widest truncate w-full text-center leading-none m-0 p-0 drop-shadow-sm">
+                  
+                  {/* MIA FIX: Coordenadas calibradas para la Vista Web */}
+                  <div className="absolute top-[65%] h-[22%] w-full flex flex-col items-center justify-start pt-2 px-4 sm:px-12 gap-2">
+                     <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-[#03070b] uppercase tracking-widest w-full text-center leading-tight m-0 p-0 drop-shadow-sm">
                         {form.nombre} {form.apellido}
                      </h3>
                      {category && (
-                       <p className="text-[9px] sm:text-[11px] md:text-sm font-bold text-gray-800 uppercase tracking-[0.3em] leading-none m-0 p-0 -mt-1 sm:-mt-1.5">
+                       <p className="text-[9px] sm:text-[11px] md:text-xs font-bold text-gray-800 uppercase tracking-[0.2em] leading-normal m-0 p-0 text-center w-full px-2">
                          CATEGORÍA: {category}
                        </p>
                      )}
                   </div>
+
                 </div>
               </div>
 
@@ -449,26 +439,25 @@ const RegistrationForm = () => {
           </div>
         </section>
 
-        {/* ─── LIENZO FANTASMA (Solo visible por la impresora, evade todo el CSS de la App) ─── */}
+        {/* ─── LIENZO FANTASMA (Solo visible por la impresora) ─── */}
         <div id="print-canvas" className="hidden">
            <div className="relative w-[19cm] mx-auto">
               <img src={dorsalBg} className="w-full h-auto block" alt="Dorsal Impresion" />
               <div className="absolute inset-0 z-10 w-full h-full">
                 
-                {/* ZONA 1 Impresión */}
                 <div className="absolute top-[18%] h-[50%] w-full flex items-center justify-center">
                   <h2 className="text-[10rem] font-[900] text-white tracking-tighter italic leading-none text-center m-0 p-0 drop-shadow-md">
                     {formattedBib}
                   </h2>
                 </div>
 
-                {/* ZONA 2 Impresión */}
-                <div className="absolute top-[66.5%] h-[15%] w-full flex flex-col items-center justify-center px-12 gap-0">
-                   <h3 className="text-4xl font-black text-[#03070b] uppercase tracking-widest truncate w-full text-center leading-none m-0 p-0">
+                {/* MIA FIX: Coordenadas Anti-Colisión (justify-start + gap-2) */}
+                <div className="absolute top-[65%] h-[22%] w-full flex flex-col items-center justify-start pt-2 px-8 gap-2">
+                   <h3 className="text-2xl font-black text-[#03070b] uppercase tracking-widest w-full text-center leading-tight m-0 p-0">
                       {form.nombre} {form.apellido}
                    </h3>
                    {category && (
-                     <p className="text-sm font-bold text-gray-800 uppercase tracking-[0.3em] leading-none m-0 p-0 -mt-1.5">
+                     <p className="text-[11px] font-bold text-gray-800 uppercase tracking-[0.2em] leading-normal m-0 p-0 text-center w-full px-4">
                        CATEGORÍA: {category}
                      </p>
                    )}
@@ -478,7 +467,6 @@ const RegistrationForm = () => {
            </div>
         </div>
 
-        {/* ─── CÓDIGO NUCLEAR DE IMPRESIÓN ─── */}
         <style>{`
           @media print {
             * {
@@ -507,7 +495,6 @@ const RegistrationForm = () => {
     );
   }
 
-  // ─── PANTALLA PRINCIPAL (FORMULARIO DE REGISTRO) ───
   return (
     <section id="register" className="relative min-h-screen pt-32 pb-24 px-6 bg-[#03070b] font-sans overflow-hidden">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-cyan-500/5 blur-[120px] rounded-full pointer-events-none -z-10" />
