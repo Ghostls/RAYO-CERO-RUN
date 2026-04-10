@@ -1,10 +1,10 @@
 /**
- * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V15.5 - DARK PRO + AUTO COMPRESSION)
+ * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V17.2 - FULL EMAILJS LIVE INTEGRATION)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Militar / Operativo / Diseñador
  * REGLA DE ORO: Código completo sin omisiones. 
- * FIX: Integración de compresión de imágenes táctica (browser-image-compression) y subida a Supabase.
+ * FIX: Inyección de credenciales definitivas de EmailJS para despliegue en producción.
  */
 
 import { useState } from "react";
@@ -17,13 +17,15 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom"; 
 import imageCompression from "browser-image-compression"; // MIA: Compresión táctica
+import emailjs from '@emailjs/browser'; // <-- MIA: Librería para correos tácticos
 
 import { registerRunner, calcularEdad, calcularCategoria, type RegistrationFormData } from "@/lib/api";
 import { supabase } from "@/lib/supabase"; // MIA: Cliente para Storage
 
-// MIA IMPORT PROTOCOL: Importación directa para forzar renderizado en Vite
+// MIA IMPORT PROTOCOL: Importación de logos y NUEVA PLANTILLA DEL DORSAL
 import logoPrincipal from "../assets/logo.png";
 import logoSecundario from "../assets/logo2.png";
+import dorsalBg from "../assets/dorsal-bg.jpg"; // <-- PLANTILLA OFICIAL
 
 interface FormData {
   nombre: string;
@@ -75,7 +77,6 @@ const RegistrationForm = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Si es un PDF, no se comprime, pasa directo
     if (file.type === "application/pdf") {
       setComprobanteFile(file);
       return;
@@ -84,7 +85,7 @@ const RegistrationForm = () => {
     setIsCompressing(true);
     try {
       const options = {
-        maxSizeMB: 0.1, // Límite estricto militar: 100 KB
+        maxSizeMB: 0.1, 
         maxWidthOrHeight: 1280,
         useWebWorker: true,
       };
@@ -92,7 +93,7 @@ const RegistrationForm = () => {
       setComprobanteFile(compressedFile);
     } catch (error) {
       console.error("M.I.A Error de compresión:", error);
-      setComprobanteFile(file); // Fallback: Si falla, guarda la original
+      setComprobanteFile(file); 
     } finally {
       setIsCompressing(false);
     }
@@ -114,7 +115,6 @@ const RegistrationForm = () => {
 
         if (uploadError) {
           console.error("M.I.A Alerta: Falla al subir evidencia visual al Storage.", uploadError);
-          // La operación de registro principal continúa aunque la foto falle, para no perder al cliente.
         }
       }
 
@@ -125,6 +125,32 @@ const RegistrationForm = () => {
       setBibNumber(data.bib_number);
       setSubmitted(true);
       setSubmitError(null);
+
+      // ─── MIA PROTOCOL: DISPARO DE CORREO (EMAILJS) ───
+      const formattedBib = data.bib_number.toString().padStart(4, '0');
+      
+      const templateParams = {
+        to_email: form.email,
+        to_name: `${form.nombre} ${form.apellido}`,
+        bib_number: formattedBib,
+        categoria: category || "General"
+      };
+
+      // Credenciales tácticas inyectadas
+      emailjs.send(
+        "service_7knzrtk", // Service ID
+        "template_7x0cg5m", // Template ID
+        templateParams,
+        "yUhQUXtq2yj-nVnr7" // Public Key
+      ).then(
+        (response) => {
+          console.log('MIA: Correo de confirmación desplegado con éxito.', response.status, response.text);
+        },
+        (error) => {
+          console.error('MIA Alerta: Fallo en el envío de correo.', error);
+        }
+      );
+      // ──────────────────────────────────────────────────
     },
     onError: (error: Error) => {
       setSubmitError(error.message);
@@ -281,7 +307,6 @@ const RegistrationForm = () => {
               </p>
             </div>
 
-            {/* MIA: MÓDULO INTELIGENTE DE CARGA Y COMPRESIÓN */}
             <div className="sm:col-span-2 mt-2">
                <label className="text-[9px] font-black uppercase tracking-[0.3em] text-white/50 mb-3 block ml-1">Capture del Pago (Opcional - Auto Comprimido)</label>
                <label className="w-full border-2 border-dashed border-white/10 hover:border-cyan-500/50 bg-white/[0.02] rounded-2xl p-8 flex flex-col items-center justify-center transition-all cursor-pointer group relative overflow-hidden">
@@ -349,97 +374,114 @@ const RegistrationForm = () => {
     },
   ];
 
-  // ─── PANTALLA DE ÉXITO (DORSAL FLAT PRO - COLORES INVERTIDOS) ───
+  // ─── PANTALLA DE ÉXITO Y LIENZO FANTASMA DE IMPRESIÓN ───
   if (submitted && bibNumber) {
     const formattedBib = bibNumber.toString().padStart(4, '0');
 
     return (
-      <section id="success-bib" className="relative min-h-screen pt-32 pb-24 px-6 bg-[#03070b] flex items-center justify-center font-sans overflow-hidden">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#00f2ff]/10 blur-[120px] rounded-full pointer-events-none" />
-
-        <div className="max-w-2xl mx-auto w-full relative z-10 flex flex-col items-center">
-          <motion.div initial={{ scale: 0.95, opacity: 0, y: 30 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="w-full flex flex-col items-center">
-            
-            <div className="relative w-full aspect-[4/3] bg-[#03070b] rounded-[1rem] shadow-[0_40px_80px_-15px_rgba(0,242,255,0.2)] flex flex-col border-[8px] md:border-[12px] border-[#00f2ff] overflow-hidden">
+      <>
+        {/* ─── VISTA WEB (Se oculta mágicamente al imprimir) ─── */}
+        <section id="success-bib" className="relative min-h-screen pt-32 pb-24 px-4 sm:px-6 bg-[#03070b] flex items-center justify-center font-sans overflow-hidden print:hidden">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#00f2ff]/10 blur-[120px] rounded-full pointer-events-none z-0" />
+          
+          <div className="max-w-3xl mx-auto w-full relative z-10 flex flex-col items-center">
+            <motion.div initial={{ scale: 0.95, opacity: 0, y: 30 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="w-full flex flex-col items-center">
               
-              <div className="h-10 md:h-12 border-b-[3px] border-dashed border-white/20 flex items-center justify-between px-8 bg-[#03070b] z-20">
-                <span className="text-[10px] font-black text-white/40 tabular-nums tracking-[0.2em]">{formattedBib}</span>
-                <div className="flex items-center gap-2">
-                  <Zap className="h-3 w-3 text-[#00f2ff] fill-[#00f2ff]" />
-                  <span className="text-[10px] md:text-xs font-black text-white tracking-[0.25em] italic uppercase">Rayo Cero — 2026</span>
+              <div className="relative w-full max-w-[600px] rounded-2xl shadow-[0_40px_80px_-15px_rgba(0,242,255,0.2)] border-4 sm:border-8 border-white/10 overflow-hidden bg-black">
+                <img src={dorsalBg} alt="Plantilla Dorsal Rayocero" className="w-full h-auto object-contain block relative z-0" />
+                <div className="absolute inset-0 z-10 w-full h-full pointer-events-none">
+                  <div className="absolute top-[18%] h-[50%] w-full flex items-center justify-center">
+                    <h2 className="text-[5rem] sm:text-[7rem] md:text-[9rem] lg:text-[10rem] font-[900] text-white tracking-tighter italic drop-shadow-[0_8px_15px_rgba(0,0,0,0.4)] leading-none text-center m-0 p-0">
+                      {formattedBib}
+                    </h2>
+                  </div>
+                  <div className="absolute top-[66.5%] h-[15%] w-full flex flex-col items-center justify-center px-4 sm:px-12 gap-0">
+                     <h3 className="text-xl sm:text-2xl md:text-4xl font-black text-[#03070b] uppercase tracking-widest truncate w-full text-center leading-none m-0 p-0 drop-shadow-sm">
+                        {form.nombre} {form.apellido}
+                     </h3>
+                     {category && (
+                       <p className="text-[9px] sm:text-[11px] md:text-sm font-bold text-gray-800 uppercase tracking-[0.3em] leading-none m-0 p-0 -mt-1 sm:-mt-1.5">
+                         CATEGORÍA: {category}
+                       </p>
+                     )}
+                  </div>
                 </div>
-                <span className="text-[10px] font-black text-white/40 tabular-nums tracking-[0.2em]">{formattedBib}</span>
               </div>
 
-              <div className="flex-1 flex items-center justify-center relative bg-[#00f2ff] py-4 overflow-hidden z-10">
-                <h2 className="text-[7rem] sm:text-[9rem] md:text-[10rem] font-[900] text-[#03070b] leading-none tracking-tighter italic transform -skew-x-6 drop-shadow-sm flex items-center justify-center w-full">
-                  {formattedBib}
-                </h2>
+              <div className="mt-12 w-full grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-[600px]">
+                <button onClick={() => window.print()} className="flex items-center justify-center gap-3 rounded-2xl bg-[#00f2ff] hover:bg-cyan-400 text-[#03070b] px-10 py-6 text-[11px] font-black uppercase tracking-[0.3em] shadow-[0_20px_40px_-10px_rgba(0,242,255,0.4)] transition-all transform hover:-translate-y-1 active:scale-95">
+                  <Printer className="h-5 w-5" /> IMPRIMIR DORSAL
+                </button>
+                <button onClick={() => navigate("/")} className="flex items-center justify-center gap-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] text-white px-10 py-6 text-[11px] font-black uppercase tracking-[0.3em] border border-white/10 transition-all backdrop-blur-md hover:-translate-y-1 active:scale-95">
+                  <Home className="h-5 w-5 text-[#00f2ff]" /> FINALIZAR REGISTRO
+                </button>
+              </div>
+              <p className="mt-10 text-[9px] text-white/20 font-black uppercase tracking-[0.5em] text-center">
+                Acreditación Oficial Generada Correctamente y Enviada por Correo.
+              </p>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* ─── LIENZO FANTASMA (Solo visible por la impresora, evade todo el CSS de la App) ─── */}
+        <div id="print-canvas" className="hidden">
+           <div className="relative w-[19cm] mx-auto">
+              <img src={dorsalBg} className="w-full h-auto block" alt="Dorsal Impresion" />
+              <div className="absolute inset-0 z-10 w-full h-full">
                 
-                <div className="absolute right-4 h-24 w-8 flex items-center justify-center rotate-180 opacity-40 mix-blend-overlay">
-                  <div className="h-full w-full flex gap-[2px]">
-                    {[...Array(12)].map((_, i) => (
-                      <div key={i} className={`bg-[#03070b] w-[2px] ${i % 3 === 0 ? 'h-full' : 'h-3/4'}`} />
-                    ))}
-                  </div>
+                {/* ZONA 1 Impresión */}
+                <div className="absolute top-[18%] h-[50%] w-full flex items-center justify-center">
+                  <h2 className="text-[10rem] font-[900] text-white tracking-tighter italic leading-none text-center m-0 p-0 drop-shadow-md">
+                    {formattedBib}
+                  </h2>
                 </div>
+
+                {/* ZONA 2 Impresión */}
+                <div className="absolute top-[66.5%] h-[15%] w-full flex flex-col items-center justify-center px-12 gap-0">
+                   <h3 className="text-4xl font-black text-[#03070b] uppercase tracking-widest truncate w-full text-center leading-none m-0 p-0">
+                      {form.nombre} {form.apellido}
+                   </h3>
+                   {category && (
+                     <p className="text-sm font-bold text-gray-800 uppercase tracking-[0.3em] leading-none m-0 p-0 -mt-1.5">
+                       CATEGORÍA: {category}
+                     </p>
+                   )}
+                </div>
+
               </div>
-
-              <div className="h-16 md:h-20 bg-white flex flex-col items-center justify-center px-4 z-20">
-                 <span className="text-xl sm:text-2xl md:text-4xl font-black text-[#03070b] uppercase tracking-[0.1em] italic truncate w-full text-center px-2 drop-shadow-sm">
-                    {form.nombre} {form.apellido}
-                 </span>
-                 <span className="text-[8px] md:text-[10px] font-black text-cyan-600 uppercase tracking-[0.4em] mt-0.5 md:mt-1">
-                   CATEGORÍA: {category}
-                 </span>
-              </div>
-
-              <div className="h-16 md:h-20 flex items-center justify-between px-6 bg-[#03070b] border-t border-white/10 z-20">
-                  <div className="flex-1 flex justify-start items-center">
-                     <img 
-                       src={logoPrincipal} 
-                       alt="Sponsor Principal" 
-                       className="max-h-8 md:max-h-12 w-auto object-contain"
-                     />
-                  </div>
-
-                  <div className="flex-none mx-4">
-                    <div className="h-10 w-10 md:h-12 md:w-12 bg-white rounded-full flex items-center justify-center shadow-lg transform -translate-y-2 border-[3px] border-[#00f2ff]">
-                      <Zap className="h-5 w-5 md:h-6 md:w-6 text-[#03070b] fill-[#03070b]" />
-                    </div>
-                  </div>
-
-                  <div className="flex-1 flex justify-end items-center">
-                     <img 
-                       src={logoSecundario} 
-                       alt="Sponsor Secundario" 
-                       className="max-h-8 md:max-h-12 w-auto object-contain"
-                     />
-                  </div>
-              </div>
-
-              <div className="absolute top-4 left-4 w-4 h-4 bg-[#03070b] rounded-full shadow-inner border border-white/10 z-30" />
-              <div className="absolute top-4 right-4 w-4 h-4 bg-[#03070b] rounded-full shadow-inner border border-white/10 z-30" />
-            </div>
-
-            <div className="mt-12 w-full grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <button onClick={() => window.print()} className="flex items-center justify-center gap-3 rounded-2xl bg-[#00f2ff] hover:bg-cyan-400 text-[#03070b] px-10 py-6 text-[11px] font-black uppercase tracking-[0.3em] shadow-[0_20px_40px_-10px_rgba(0,242,255,0.4)] transition-all transform hover:-translate-y-1 active:scale-95">
-                <Printer className="h-5 w-5" /> IMPRIMIR DORSAL
-              </button>
-              <button onClick={() => navigate("/")} className="flex items-center justify-center gap-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] text-white px-10 py-6 text-[11px] font-black uppercase tracking-[0.3em] border border-white/10 transition-all backdrop-blur-md hover:-translate-y-1 active:scale-95">
-                <Home className="h-5 w-5 text-[#00f2ff]" /> FINALIZAR REGISTRO
-              </button>
-            </div>
-            
-            <p className="mt-10 text-[9px] text-white/20 font-black uppercase tracking-[0.5em] text-center">
-              Acreditación Oficial Integrada
-            </p>
-          </motion.div>
+           </div>
         </div>
-      </section>
+
+        {/* ─── CÓDIGO NUCLEAR DE IMPRESIÓN ─── */}
+        <style>{`
+          @media print {
+            * {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            body * { visibility: hidden !important; }
+            #print-canvas, #print-canvas * { visibility: visible !important; }
+            #print-canvas {
+              display: flex !important;
+              position: absolute !important;
+              left: 0 !important;
+              top: 0 !important;
+              width: 100vw !important;
+              height: 100vh !important;
+              background-color: white !important;
+              justify-content: center !important;
+              align-items: center !important;
+              z-index: 999999 !important;
+            }
+            * { transform: none !important; overflow: visible !important; }
+            @page { size: portrait; margin: 0 !important; }
+          }
+        `}</style>
+      </>
     );
   }
 
+  // ─── PANTALLA PRINCIPAL (FORMULARIO DE REGISTRO) ───
   return (
     <section id="register" className="relative min-h-screen pt-32 pb-24 px-6 bg-[#03070b] font-sans overflow-hidden">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-cyan-500/5 blur-[120px] rounded-full pointer-events-none -z-10" />

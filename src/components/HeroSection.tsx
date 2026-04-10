@@ -1,14 +1,19 @@
 /**
- * RAYO CERO — PREMIUM RUNNER EXPERIENCE (STABLE V6 - LIQUID GLASS)
+ * RAYO CERO — PREMIUM RUNNER EXPERIENCE (STABLE V6.3 - CENTER LIQUID GLASS CARD)
  * Senior Dev: MIA (Valkyron Group)
- * Fix: Sincronización estética con el nuevo Index. Paneles de cristal y resplandor táctico.
- * Cumplimiento de Regla de Oro: Evolución sin omisiones.
+ * CEO: Lualdo Sciscioli
+ * Grado: Militar / Operativo / Diseñador
+ * REGLA DE ORO: Código completo sin omisiones. Responsive Design estricto.
+ * FIX: Eliminación de esferas flotantes. Creación de Tarjeta Liquid Glass central para el logo.
  */
 
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Zap, Trophy, ArrowRight } from "lucide-react";
-import GlassSphere from "./GlassSphere";
+
+// MIA IMPORT PROTOCOL: Activos gráficos
+import weRunLogo from "../assets/we-run-logo.png"; 
+import fondoBg from "../assets/fondobg.png"; // <-- FONDO TÁCTICO
 
 const HeroSection = () => {
   return (
@@ -17,12 +22,14 @@ const HeroSection = () => {
       // Se utiliza flex-col y min-h-screen con padding superior (pt-32) para proteger el NavBar
       className="relative w-full min-h-screen flex flex-col overflow-hidden bg-[#03070b] font-sans pt-32 pb-8"
     >
-      {/* Esferas de Cristal Líquido — Paleta Cyan/Naval */}
-      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-        <GlassSphere size={600} color="hsla(195, 100%, 50%, 0.08)" initialX={-15} initialY={5} delay={0} />
-        <GlassSphere size={450} color="hsla(210, 30%, 20%, 0.15)" initialX={75} initialY={20} delay={1} />
-        <GlassSphere size={350} color="hsla(195, 100%, 50%, 0.05)" initialX={40} initialY={65} delay={2} />
-      </div>
+      {/* ─── CAPA 1: IMAGEN DE FONDO RESPONSIVE ─── */}
+      <div 
+        className="absolute inset-0 z-0 w-full h-full bg-cover bg-center bg-no-repeat opacity-50 md:opacity-60"
+        style={{ backgroundImage: `url(${fondoBg})` }}
+      />
+      {/* Velo Táctico (Overlay) para garantizar la legibilidad del HUD y botones */}
+      <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#03070b]/90 via-[#03070b]/40 to-[#03070b] pointer-events-none" />
+      {/* ────────────────────────────────────────── */}
 
       {/* CONTENEDOR PRINCIPAL */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center w-full max-w-5xl mx-auto px-6">
@@ -33,26 +40,36 @@ const HeroSection = () => {
           className="flex flex-col items-center w-full"
         >
           {/* Badge Operativo (Liquid Glass) */}
-          <div className="flex items-center gap-3 mb-8 px-5 py-2 rounded-full bg-white/[0.02] border border-white/10 backdrop-blur-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] hover:border-cyan-500/30 transition-colors cursor-default">
+          <div className="flex items-center gap-3 mb-10 md:mb-12 px-5 py-2 rounded-full bg-white/[0.02] border border-white/10 backdrop-blur-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] hover:border-cyan-500/30 transition-colors cursor-default z-20">
             <Zap className="h-3 w-3 text-cyan-400 animate-pulse" />
             <span className="text-[9px] font-black tracking-[0.4em] text-white/60 uppercase mt-[1px]">
               Temporada 2026 Abierta
             </span>
           </div>
 
-          {/* Headline Aspiracional */}
-          <h1 className="text-6xl md:text-8xl lg:text-[8.5rem] font-black italic tracking-tighter leading-[0.85] mb-8 text-white uppercase drop-shadow-2xl text-center">
-            DOMINA EL <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-white">ASFALTO.</span>
-          </h1>
+          {/* ─── MÓDULO VISUAL: TARJETA LIQUID GLASS + LOGO OFICIAL ─── */}
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
+            className="w-full max-w-[90%] sm:max-w-[550px] md:max-w-[700px] lg:max-w-[850px] mb-14 md:mb-16 relative flex justify-center p-8 md:p-14 lg:p-16 rounded-[2.5rem] bg-[#03070b]/40 border border-white/10 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.6)] hover:border-cyan-500/30 transition-all duration-500 group"
+          >
+            {/* Resplandor interno sutil */}
+            <div className="absolute inset-0 rounded-[2.5rem] bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+            
+            {/* Halo táctico trasero */}
+            <div className="absolute inset-0 rounded-[2.5rem] bg-cyan-500/0 group-hover:bg-cyan-500/5 transition-colors duration-500 pointer-events-none" />
 
-          <p className="text-sm md:text-lg text-white/40 max-w-2xl mx-auto mb-12 font-medium leading-relaxed tracking-wide text-center">
-            Experimenta el cronometraje de precisión y la gestión inteligente 
-            diseñada para el atleta que exige excelencia en cada kilómetro.
-          </p>
+            <img 
+              src={weRunLogo} 
+              alt="Rayo Cero - We Run Powerade 10K Night Fest" 
+              className="w-full h-auto object-contain relative z-10 drop-shadow-[0_0_20px_rgba(34,211,238,0.1)] group-hover:drop-shadow-[0_0_30px_rgba(34,211,238,0.3)] transition-all duration-500"
+            />
+          </motion.div>
+          {/* ───────────────────────────────────────────────────────── */}
 
           {/* Botonera de Alto Rendimiento */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center w-full max-w-xl">
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center w-full max-w-xl z-20">
             {/* Botón Primario: Cyan Táctico */}
             <Link to="/registro" className="w-full sm:w-auto">
               <button className="w-full sm:w-[260px] py-4 md:py-5 rounded-[1.25rem] bg-cyan-500 hover:bg-cyan-400 text-black font-black text-[10px] tracking-[0.2em] uppercase transition-all duration-300 flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(0,242,255,0.2)] hover:shadow-[0_0_30px_rgba(0,242,255,0.4)] hover:-translate-y-1 active:scale-95 group">
@@ -85,7 +102,7 @@ const HeroSection = () => {
 
       {/* Textura Táctica (Ruido SVG Inline) */}
       <div 
-        className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-screen" 
+        className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-screen z-20" 
         style={{ 
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` 
         }} 

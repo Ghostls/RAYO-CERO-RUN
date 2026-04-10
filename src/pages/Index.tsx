@@ -1,10 +1,11 @@
 /**
- * RAYO CERO — HOME CORE MODULE (STABLE V7 - AURORA KINETIC EDITION)
+ * RAYO CERO — HOME CORE MODULE (STABLE V7.1 - AURORA KINETIC EDITION + FLYER INTEGRATION)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Diseñador / Operativo
  * * REGLA DE ORO: Evolución estructural sin omisiones. Integración de logos oficiales.
  * * FIX: Implementación de Aurora Boreal ultra sutil (Framer Motion) en capa base (Z-0).
+ * * UPDATE: Integración de Flyer de Inscripciones responsivo.
  */
 
 import { motion } from "framer-motion";
@@ -15,9 +16,10 @@ import { Zap, ShieldCheck, Trophy, ArrowRight, Activity, Crosshair, Map } from "
 import HeroSection from "@/components/HeroSection";
 import RacesSection from "@/components/RacesSection";
 
-// Importación de activos gráficos (Logos de Patrocinantes)
+// Importación de activos gráficos (Logos de Patrocinantes y Flyers)
 import logoValkyron from "@/assets/logo1.png";
 import logoPowerade from "@/assets/logo2.png";
+import flyerInscripciones from "@/assets/flier_inscripciones_abiertas.png"; 
 
 const Index = () => {
   return (
@@ -59,6 +61,24 @@ const Index = () => {
 
       {/* 1. MÓDULO HERO: Portal de Entrada (Se mantiene intacto) */}
       <HeroSection />
+
+      {/* ─── MÓDULO VISUAL: FLYER DE INSCRIPCIONES (Integración Estructural) ─── */}
+      <section className="relative w-full overflow-hidden flex justify-center items-center py-10 md:py-16 z-10 bg-gradient-to-b from-transparent via-[#050b14] to-transparent">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
+          className="w-full max-w-[600px] aspect-[9/16] relative px-4 sm:px-0"
+        >
+          <img
+            src={flyerInscripciones}
+            alt="Inscripciones Abiertas - Rayocero"
+            className="w-full h-full object-contain drop-shadow-[0_0_25px_rgba(34,211,238,0.15)] rounded-lg"
+          />
+        </motion.div>
+      </section>
+      {/* ─────────────────────────────────────────────────────────────────────── */}
 
       {/* BRANDING / PARTNERS GRID (Da legitimidad corporativa al evento) */}
       <div className="w-full border-y border-white/5 bg-white/[0.01] py-12 relative z-10">

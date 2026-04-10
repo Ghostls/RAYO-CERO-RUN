@@ -1,8 +1,8 @@
 /**
- * RAYO CERO — RACE OPERATIVE DETAIL (STABLE BUILD V11)
+ * RAYO CERO — RACE OPERATIVE DETAIL (STABLE BUILD V11.1 - AWARDS HUD INTEGRATION)
  * Senior Dev: MIA (Valkyron Group)
  * Fix: Arquitectura de Clústeres HUD Unificados. Cero colisiones en macro-zoom.
- * Cumplimiento de Regla de Oro: Evolución sin omisiones.
+ * Cumplimiento de Regla de Oro: Evolución sin omisiones. Integración de visual de premios.
  */
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -15,6 +15,9 @@ import "leaflet/dist/leaflet.css";
 
 // [MIA TACTICAL UPLINK] - Conexión oficial a la base de datos
 import { supabase } from "@/lib/supabase"; 
+
+// IMPORTACIÓN DE ACTIVO GRÁFICO (Flyer de Premios)
+import flyerPremios from "@/assets/flier_premios_info.png";
 
 // --- BYPASS TÁCTICO PARA ERRORES DE TYPESCRIPT ---
 const MapComp = MapContainer as any;
@@ -200,7 +203,7 @@ const RaceDetail = () => {
           
           <div className="flex items-center gap-3">
               <div className="text-right">
-                  <p className="text-[9px] font-black text-cyan-400 tracking-widest leading-none">RAYO CERO</p>
+                  <p className="text-[9px] font-black text-cyan-400 tracking-widest leading-none">RAYOCERO</p>
                   <p className="text-[7px] text-white/30 font-bold uppercase mt-1">NIGHT FEST 10K</p>
               </div>
               <div className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_10px_#00f2ff]" />
@@ -278,6 +281,22 @@ const RaceDetail = () => {
                   </div>
               </div>
           </div>
+
+          {/* ─── MÓDULO VISUAL: ESTRUCTURA DE PREMIACIÓN (Integración Flyer) ─── */}
+          <div className="mt-8 pt-8 border-t border-white/5 flex flex-col items-center">
+             <p className="text-[9px] font-black tracking-[0.3em] text-cyan-400 uppercase mb-6 w-full text-left">
+                Recompensa Estratégica
+             </p>
+             <div className="w-full relative shadow-[0_0_40px_rgba(34,211,238,0.08)] rounded-2xl overflow-hidden border border-white/10 group">
+                <div className="absolute inset-0 bg-gradient-to-t from-[#03070b] via-transparent to-transparent opacity-50 z-10 pointer-events-none" />
+                <img
+                   src={flyerPremios}
+                   alt="Estructura de Premios Night Fest 10K"
+                   className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                />
+             </div>
+          </div>
+          {/* ─────────────────────────────────────────────────────────────────── */}
 
         </motion.div>
       </aside>
