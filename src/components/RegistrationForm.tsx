@@ -240,7 +240,7 @@ const RegistrationForm = () => {
               </select>
             </div>
             <div className="sm:col-span-2">
-              <label className="text-[9px] font-black uppercase tracking-[0.3em] text-cyan-400 mb-3 block ml-1">Talla de Camiseta (Oficial Rayo Cero)</label>
+              <label className="text-[9px] font-black uppercase tracking-[0.3em] text-cyan-400 mb-3 block ml-1">Talla de Camiseta (Oficial Rayocero)</label>
               <select className={inputClass} value={form.talla} onChange={(e) => update("talla", e.target.value)}>
                 <option value="" className="bg-[#03070b]">Seleccionar talla</option>
                 <option value="XS" className="bg-[#03070b]">XS</option>
@@ -347,7 +347,7 @@ const RegistrationForm = () => {
                   {isCompressing ? (
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="h-8 w-8 text-cyan-400 animate-spin" />
-                      <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] text-center">Compresión Táctica<br/>Activada...</span>
+                      <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] text-center">Adjuntando<br/>Activada...</span>
                     </div>
                   ) : comprobanteFile ? (
                     <div className="flex flex-col items-center gap-3">
@@ -392,7 +392,7 @@ const RegistrationForm = () => {
               <button onClick={(e) => { e.preventDefault(); setShowDeslinde(true); }} className="text-cyan-400 font-bold underline decoration-cyan-400/30 hover:decoration-cyan-400 transition-all">
                 Deslinde de Responsabilidad
               </button>{" "}
-              y los términos operativos de Valkyron Group para este evento.
+              y los términos operativos de Rayocero para este evento.
             </p>
           </div>
         </div>
@@ -535,7 +535,7 @@ const RegistrationForm = () => {
               <div className="p-4 bg-white/[0.03] border border-white/10 rounded-2xl shadow-inner">{steps[step].icon}</div>
               <div>
                 <h3 className="text-2xl font-black text-white uppercase tracking-tight italic">{steps[step].title}</h3>
-                <p className="text-[10px] text-white/40 font-bold tracking-widest uppercase mt-1">Ingeniería Valkyron v2.1</p>
+                <p className="text-[10px] text-white/40 font-bold tracking-widest uppercase mt-1">REGISTRO</p>
               </div>
             </div>
 
@@ -579,7 +579,7 @@ const RegistrationForm = () => {
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 mb-6"><Shield className="h-3 w-3 text-red-400" /><span className="text-[8px] font-black uppercase tracking-[0.3em] text-red-400">Documento Oficial</span></div>
               <h3 className="text-3xl font-black text-white mb-8 italic tracking-tighter uppercase">DESLINDE DE RESPONSABILIDAD</h3>
               <div className="text-sm text-white/50 space-y-6 font-medium leading-relaxed">
-                <p>Al procesar esta inscripción en el ecosistema digital de Rayo Cero Running, el atleta declara:</p>
+                <p>Al procesar esta inscripción en el ecosistema digital de Rayocero Running, el atleta declara:</p>
                 <div className="p-5 rounded-2xl bg-white/[0.02] border-l-2 border-cyan-400 italic text-white/80">"Me encuentro en óptimas condiciones físicas y asumo total responsabilidad operativa y médica por mi participación en este evento de alto rendimiento."</div>
                 <ul className="space-y-4">
                   <li className="flex gap-4 items-start"><span className="text-cyan-400 font-black mt-1">01.</span><span>Sometimiento a protocolos de validación de datos por parte de la ingeniería de Valkyron Group.</span></li>
