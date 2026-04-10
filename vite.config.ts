@@ -1,8 +1,9 @@
 /**
- * RAYO CERO — VITE BUILD CONFIGURATION (STABLE V2.2 - EMERGENCY ROLLBACK)
+ * RAYO CERO — VITE BUILD CONFIGURATION (STABLE V2.6 - APPLE GRADE OPTIMIZATION)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
- * FIX: Reversión de fragmentación manual. Retorno a optimización automática segura para evitar colisión de React.
+ * Grado: Militar / Operativo
+ * FIX: Implementación de Code Splitting Quirúrgico. Aislamiento de cargas pesadas sin tocar el núcleo de React.
  */
 
 import { defineConfig } from "vite";
@@ -28,10 +29,28 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  // MIA PROTOCOL: Retorno a optimización base segura
+  // ─── MIA PROTOCOL: MOTOR DE COMPILACIÓN GRADO APPLE ───
   build: {
     target: 'esnext',
+    minify: 'esbuild', // Minificación ultra rápida nativa
     cssCodeSplit: true,
-    chunkSizeWarningLimit: 1500, // Aumentamos el límite para que no lance advertencias
+    chunkSizeWarningLimit: 1500,
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          // Fragmentación Quirúrgica: Separamos solo las librerías pesadas externas.
+          // El núcleo de React queda intacto para evitar colisiones (pantalla negra).
+          if (id.includes('node_modules')) {
+            if (id.includes('framer-motion')) return 'ui-motion';
+            if (id.includes('leaflet') || id.includes('react-leaflet')) return 'map-leaflet';
+            if (id.includes('@supabase')) return 'db-supabase';
+            if (id.includes('@emailjs')) return 'net-email';
+            
+            // Todo el resto de dependencias menores se agrupan en un solo bloque seguro
+            return 'vendor-core';
+          }
+        }
+      }
+    }
   }
 }));
