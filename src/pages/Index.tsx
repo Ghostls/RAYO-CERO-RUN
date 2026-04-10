@@ -222,10 +222,10 @@ const Index = () => {
           <div className="flex flex-col items-center opacity-30 hover:opacity-100 transition-opacity duration-700">
             <Zap className="h-6 w-6 text-cyan-400 mb-3 animate-pulse fill-current" />
             <p className="text-[9px] font-black tracking-[0.8em] uppercase text-white text-center">
-              RAYO CERO DIGITAL ECOSYSTEM
+              RAYOCERO EVENTOS
             </p>
             <p className="text-[7px] font-bold tracking-[0.4em] uppercase text-white/50 mt-2 text-center">
-              High Performance Computing & Precision Timing
+              INGENIERÍA DE PRECISIÓN PARA ATLETAS DE ALTO RENDIMIENTO
             </p>
           </div>
         </div>

@@ -1,3 +1,12 @@
+/**
+ * RAYOCERO — BRAND LOGO COMPONENT (STABLE BUILD V1.1)
+ * Senior Dev: MIA (Valkyron Group)
+ * CEO: Lualdo Sciscioli
+ * Grado: Militar / Operativo
+ * REGLA DE ORO: Código completo sin omisiones.
+ * FIX: Ajuste tipográfico. Eliminación de espacio (RayoCero -> RAYOCERO).
+ */
+
 import { Zap } from "lucide-react";
 
 const Logo = ({ className = "" }: { className?: string }) => (
@@ -10,8 +19,9 @@ const Logo = ({ className = "" }: { className?: string }) => (
       </div>
     </div>
     <div className="flex flex-col">
+      {/* ─── Identidad Visual Ajustada: Sin espacio ─── */}
       <span className="text-2xl font-black italic tracking-tighter leading-none text-white">
-        RAYO <span className="text-cyan-400">CERO</span>
+        RAYO<span className="text-cyan-400">CERO</span>
       </span>
       <span className="text-[8px] font-black tracking-[0.4em] text-white/40 uppercase">
         Valkyron Systems
