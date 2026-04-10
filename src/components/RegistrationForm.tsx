@@ -1,10 +1,10 @@
 /**
- * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V17.6 - ANTI-COLLISION PRINT CANVAS)
+ * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V17.7 - RESPONSIVE ARMOR)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Militar / Operativo / Diseñador
  * REGLA DE ORO: Código completo sin omisiones. 
- * FIX: Reingeniería de Flexbox en Lienzo de Impresión (justify-start + gap rígido) para anular colisión de textos multilínea.
+ * FIX: Reingeniería profunda de Flexbox y CSS Print. Escalado proporcional en móviles y purga de fondo negro en PDF.
  */
 
 import { useState } from "react";
@@ -334,7 +334,7 @@ const RegistrationForm = () => {
                   {isCompressing ? (
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="h-8 w-8 text-cyan-400 animate-spin" />
-                      <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] text-center">Adjuntando...<br/></span>
+                      <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] text-center">Adjuntando<br/>Activada...</span>
                     </div>
                   ) : comprobanteFile ? (
                     <div className="flex flex-col items-center gap-3">
@@ -409,13 +409,13 @@ const RegistrationForm = () => {
                     </h2>
                   </div>
                   
-                  {/* MIA FIX: Coordenadas calibradas para la Vista Web */}
-                  <div className="absolute top-[65%] h-[22%] w-full flex flex-col items-center justify-start pt-2 px-4 sm:px-12 gap-2">
-                     <h3 className="text-xl sm:text-2xl md:text-3xl font-black text-[#03070b] uppercase tracking-widest w-full text-center leading-tight m-0 p-0 drop-shadow-sm">
+                  {/* MIA FIX: Contenedor estricto centrado y truncate para evitar saltos */}
+                  <div className="absolute top-[66.5%] h-[16%] w-full flex flex-col items-center justify-center px-4 sm:px-12">
+                     <h3 className="text-lg sm:text-2xl md:text-3xl font-black text-[#03070b] uppercase tracking-widest w-full text-center leading-none m-0 p-0 drop-shadow-sm truncate">
                         {form.nombre} {form.apellido}
                      </h3>
                      {category && (
-                       <p className="text-[9px] sm:text-[11px] md:text-xs font-bold text-gray-800 uppercase tracking-[0.2em] leading-normal m-0 p-0 text-center w-full px-2">
+                       <p className="text-[8px] sm:text-[10px] md:text-xs font-bold text-gray-800 uppercase tracking-[0.2em] leading-tight m-0 p-0 text-center w-full px-2 mt-1 sm:mt-1.5 line-clamp-2">
                          CATEGORÍA: {category}
                        </p>
                      )}
@@ -439,25 +439,24 @@ const RegistrationForm = () => {
           </div>
         </section>
 
-        {/* ─── LIENZO FANTASMA (Solo visible por la impresora) ─── */}
+        {/* ─── LIENZO FANTASMA (Renderizado absoluto para PDF móvil) ─── */}
         <div id="print-canvas" className="hidden">
-           <div className="relative w-[19cm] mx-auto">
+           <div className="print-container relative mx-auto w-full max-w-[21cm]">
               <img src={dorsalBg} className="w-full h-auto block" alt="Dorsal Impresion" />
               <div className="absolute inset-0 z-10 w-full h-full">
                 
                 <div className="absolute top-[18%] h-[50%] w-full flex items-center justify-center">
-                  <h2 className="text-[10rem] font-[900] text-white tracking-tighter italic leading-none text-center m-0 p-0 drop-shadow-md">
+                  <h2 className="print-bib font-[900] text-white tracking-tighter italic leading-none text-center m-0 p-0 drop-shadow-md">
                     {formattedBib}
                   </h2>
                 </div>
 
-                {/* MIA FIX: Coordenadas Anti-Colisión (justify-start + gap-2) */}
-                <div className="absolute top-[65%] h-[22%] w-full flex flex-col items-center justify-start pt-2 px-8 gap-2">
-                   <h3 className="text-2xl font-black text-[#03070b] uppercase tracking-widest w-full text-center leading-tight m-0 p-0">
+                <div className="absolute top-[66.5%] h-[16%] w-full flex flex-col items-center justify-center px-4 sm:px-8">
+                   <h3 className="print-name font-black text-[#03070b] uppercase tracking-widest w-full text-center leading-none m-0 p-0 truncate">
                       {form.nombre} {form.apellido}
                    </h3>
                    {category && (
-                     <p className="text-[11px] font-bold text-gray-800 uppercase tracking-[0.2em] leading-normal m-0 p-0 text-center w-full px-4">
+                     <p className="print-cat font-bold text-gray-800 uppercase tracking-[0.2em] leading-tight m-0 p-0 text-center w-full px-2 line-clamp-2">
                        CATEGORÍA: {category}
                      </p>
                    )}
@@ -467,28 +466,40 @@ const RegistrationForm = () => {
            </div>
         </div>
 
+        {/* ─── CÓDIGO NUCLEAR DE IMPRESIÓN (BLINDAJE MÓVIL) ─── */}
         <style>{`
           @media print {
             * {
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
             }
+            html, body {
+              background-color: white !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
             body * { visibility: hidden !important; }
             #print-canvas, #print-canvas * { visibility: visible !important; }
             #print-canvas {
-              display: flex !important;
+              display: block !important;
               position: absolute !important;
               left: 0 !important;
               top: 0 !important;
-              width: 100vw !important;
-              height: 100vh !important;
+              width: 100% !important;
               background-color: white !important;
-              justify-content: center !important;
-              align-items: center !important;
               z-index: 999999 !important;
             }
+            .print-container {
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            /* Clases reactivas al ancho del papel (vw) */
+            .print-bib { font-size: 20vw !important; }
+            .print-name { font-size: 5vw !important; }
+            .print-cat { font-size: 2vw !important; margin-top: 1vw !important; }
+            
             * { transform: none !important; overflow: visible !important; }
-            @page { size: portrait; margin: 0 !important; }
+            @page { size: portrait; margin: 0.5cm !important; }
           }
         `}</style>
       </>
