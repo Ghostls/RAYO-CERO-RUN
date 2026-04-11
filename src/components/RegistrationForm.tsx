@@ -1,18 +1,18 @@
 /**
- * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V17.8 - FINANCIAL HUD INJECTION)
+ * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V18.7 - VALKYRON SYNC)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Militar / Operativo / Diseñador
- * REGLA DE ORO: Código completo sin omisiones. 
- * FIX: Inyección de módulo HUD financiero ($40 + Tasa BCV) en la fase de Pago Operativo.
+ * REGLA DE ORO: Código completo sin omisiones. Base mantenida.
+ * EVOLUCIÓN: Conexión directa a Telemetría Financiera Interna (Supabase) y Motor Matemático Exacto.
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   User, Shield, CheckCircle, ArrowRight, ArrowLeft, Zap, Trophy, 
   Mail, CreditCard, Loader2, AlertCircle, Home, Banknote, UploadCloud, 
-  Printer, Accessibility 
+  Printer, Accessibility, RefreshCw, TrendingUp
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom"; 
@@ -70,10 +70,62 @@ const RegistrationForm = () => {
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
 
+  // ─── ESTADOS FINANCIEROS (TELEMETRÍA INTERNA VALKYRON) ───
+  const [exchangeRate, setExchangeRate] = useState<number | null>(null);
+  const [isFetchingRate, setIsFetchingRate] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null);
+  const TARIFA_USD = 40;
+
   const navigate = useNavigate();
 
   const age = form.fechaNacimiento ? calcularEdad(form.fechaNacimiento) : null;
   const category = age !== null && form.genero ? calcularCategoria(age, form.genero as "M" | "F", form.movilidadReducida) : null;
+
+  // ─── RADAR DE DIVISAS (ENLACE DIRECTO SUPABASE VALKYRON) ───
+  useEffect(() => {
+    if (step === 2 && exchangeRate === null) {
+      const fetchInternalRate = async () => {
+        try {
+          setIsFetchingRate(true);
+          
+          // MIA consulta directamente el núcleo de datos de Rayo Cero establecido por el Admin
+          const { data, error } = await supabase
+            .from('system_config')
+            .select('tasa_bcv, ultima_actualizacion')
+            .eq('id', 1)
+            .single();
+
+          if (error) throw error;
+          
+          if (data && data.tasa_bcv) {
+            setExchangeRate(data.tasa_bcv);
+            
+            const fechaSync = new Date(data.ultima_actualizacion);
+            const horaFormateada = fechaSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            setLastUpdate(horaFormateada);
+            
+            console.log(`[MIA TACTICAL] Telemetría Interna Enlazada: ${data.tasa_bcv} VES`);
+          }
+        } catch (err) {
+          console.error("[MIA TACTICAL ALERT] Ruptura de enlace con el núcleo de datos:", err);
+          setExchangeRate(null);
+        } finally {
+          setIsFetchingRate(false);
+        }
+      };
+      fetchInternalRate();
+    }
+  }, [step, exchangeRate]);
+
+  // ─── MOTOR MATEMÁTICO DE PRECISIÓN MILITAR ───
+  const calcularMontoExacto = (tasa: number, usd: number) => {
+    // Factor de 1,000,000 para soportar los 6 decimales oficiales del BCV sin error de coma flotante en JS
+    const factor = 1000000; 
+    const resultado = (Math.round(tasa * factor) * usd) / factor;
+    return resultado;
+  };
+
+  const totalBolivares = exchangeRate ? calcularMontoExacto(exchangeRate, TARIFA_USD) : 0;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -277,25 +329,44 @@ const RegistrationForm = () => {
         <div className="space-y-6">
           <div className="bg-cyan-500/5 border border-cyan-500/20 rounded-2xl p-6 md:p-8 backdrop-blur-md relative overflow-hidden">
             <div className="absolute top-0 right-0 p-6 opacity-5 pointer-events-none">
-                <Banknote className="h-32 w-32 text-cyan-400" />
+                <TrendingUp className="h-32 w-32 text-cyan-400" />
             </div>
             
-            {/* ─── HUD DE INVERSIÓN OPERATIVA (NUEVO) ─── */}
-            <div className="mb-8 p-5 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10 shadow-[0_0_20px_rgba(0,242,255,0.1)]">
+            {/* ─── HUD DE INVERSIÓN OPERATIVA (SINCRONIZACIÓN OFICIAL VALKYRON) ─── */}
+            <div className="mb-8 p-5 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10 shadow-[0_0_20px_rgba(0,0,0,0.2)] hover:border-cyan-500/30 transition-all">
               <div className="flex items-center gap-4 w-full sm:w-auto">
-                <div className="h-12 w-12 rounded-xl bg-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0">
-                  <Banknote className="h-6 w-6" />
+                <div className="h-12 w-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0">
+                  {isFetchingRate ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Shield className="h-5 w-5" />}
                 </div>
                 <div className="flex flex-col text-left">
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-400">Inversión Operativa</span>
-                  <span className="text-[8px] text-white/60 uppercase tracking-widest mt-1 leading-tight">Pagos en Bs a Tasa Oficial del <br className="sm:hidden"/>Banco Central de Venezuela (BCV)</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-400">Tasa Oficial (Rayo Cero)</span>
+                  <span className="text-[8px] text-white/60 uppercase tracking-widest mt-1 leading-tight">
+                    {exchangeRate ? `Última Sync: ${lastUpdate}` : "Conectando al Servidor..."}
+                  </span>
                 </div>
               </div>
-              <div className="text-4xl font-black italic tracking-tighter text-white drop-shadow-[0_0_15px_rgba(0,242,255,0.4)] shrink-0">
-                $40<span className="text-cyan-400 text-xl">.00</span>
+              
+              <div className="flex flex-col items-end shrink-0 w-full sm:w-auto text-center sm:text-right border-t sm:border-t-0 border-white/5 pt-4 sm:pt-0">
+                <div className="text-4xl font-black italic tracking-tighter text-white drop-shadow-[0_0_15px_rgba(0,242,255,0.4)] leading-none">
+                  ${TARIFA_USD}<span className="text-cyan-400 text-xl">.00</span>
+                </div>
+                
+                {isFetchingRate ? (
+                  <div className="flex items-center gap-2 mt-2 text-cyan-500/60 justify-center sm:justify-end">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span className="text-[8px] font-black tracking-widest uppercase">Consultando Mando Central...</span>
+                  </div>
+                ) : exchangeRate ? (
+                  <div className="text-sm font-black tracking-widest text-cyan-400 uppercase mt-2 bg-cyan-500/10 px-3 py-1 rounded-md border border-cyan-500/20">
+                    Total: Bs. {totalBolivares.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
+                ) : (
+                  <div className="text-[8px] font-bold tracking-widest text-red-400 uppercase mt-2">
+                    Sistema en Mantenimiento. Considere Tasa BCV.
+                  </div>
+                )}
               </div>
             </div>
-            {/* ────────────────────────────────────────── */}
 
             <div className="flex items-center gap-3 mb-6 border-b border-cyan-500/20 pb-4 relative z-10">
               <Zap className="h-4 w-4 text-cyan-400" />
@@ -338,7 +409,7 @@ const RegistrationForm = () => {
             </div>
 
             <div className="sm:col-span-2 mt-2">
-               <label className="text-[9px] font-black uppercase tracking-[0.3em] text-white/50 mb-3 block ml-1">Capture del Pago (Opcional - Auto Comprimido)</label>
+               <label className="text-[9px] font-black uppercase tracking-[0.3em] text-white/50 mb-3 block ml-1">Capture del Pago (Opcional)</label>
                <label className="w-full border-2 border-dashed border-white/10 hover:border-cyan-500/50 bg-white/[0.02] rounded-2xl p-8 flex flex-col items-center justify-center transition-all cursor-pointer group relative overflow-hidden">
                   <input 
                     type="file" 
@@ -351,21 +422,21 @@ const RegistrationForm = () => {
                   {isCompressing ? (
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="h-8 w-8 text-cyan-400 animate-spin" />
-                      <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] text-center">Adjuntando<br/>Activada...</span>
+                      <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] text-center">Adjuntando...</span>
                     </div>
                   ) : comprobanteFile ? (
                     <div className="flex flex-col items-center gap-3">
                       <CheckCircle className="h-8 w-8 text-green-400" />
                       <span className="text-[10px] font-black text-green-400 uppercase tracking-[0.2em] text-center">
                         Evidencia Lista <br/> 
-                        <span className="text-[8px] text-white/50 tracking-widest block mt-1">{comprobanteFile.name} ({(comprobanteFile.size / 1024).toFixed(1)} KB)</span>
+                        <span className="text-[8px] text-white/50 tracking-widest block mt-1">{comprobanteFile.name}</span>
                       </span>
                     </div>
                   ) : (
                     <>
                       <UploadCloud className="h-8 w-8 text-white/20 group-hover:text-cyan-400 transition-colors mb-3" />
                       <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] group-hover:text-white transition-colors text-center">
-                        Haz clic para subir comprobante <br/> <span className="text-[8px] font-bold tracking-widest text-cyan-500/80 mt-1 block">JPG, PNG o PDF (MÁX 100KB AUTO)</span>
+                        Haz clic para subir comprobante <br/> <span className="text-[8px] font-bold tracking-widest text-cyan-500/80 mt-1 block">JPG, PNG o PDF</span>
                       </span>
                     </>
                   )}
@@ -409,7 +480,6 @@ const RegistrationForm = () => {
 
     return (
       <>
-        {/* ─── VISTA WEB ─── */}
         <section id="success-bib" className="relative min-h-screen pt-32 pb-24 px-4 sm:px-6 bg-[#03070b] flex items-center justify-center font-sans overflow-hidden print:hidden">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#00f2ff]/10 blur-[120px] rounded-full pointer-events-none z-0" />
           
@@ -426,7 +496,6 @@ const RegistrationForm = () => {
                     </h2>
                   </div>
                   
-                  {/* MIA FIX: Contenedor estricto centrado y truncate para evitar saltos */}
                   <div className="absolute top-[66.5%] h-[16%] w-full flex flex-col items-center justify-center px-4 sm:px-12">
                      <h3 className="text-lg sm:text-2xl md:text-3xl font-black text-[#03070b] uppercase tracking-widest w-full text-center leading-none m-0 p-0 drop-shadow-sm truncate">
                         {form.nombre} {form.apellido}
@@ -456,65 +525,42 @@ const RegistrationForm = () => {
           </div>
         </section>
 
-        {/* ─── LIENZO FANTASMA (Renderizado absoluto para PDF móvil) ─── */}
         <div id="print-canvas" className="hidden">
            <div className="print-container relative mx-auto w-full max-w-[21cm]">
-              <img src={dorsalBg} className="w-full h-auto block" alt="Dorsal Impresion" />
-              <div className="absolute inset-0 z-10 w-full h-full">
-                
-                <div className="absolute top-[18%] h-[50%] w-full flex items-center justify-center">
-                  <h2 className="print-bib font-[900] text-white tracking-tighter italic leading-none text-center m-0 p-0 drop-shadow-md">
-                    {formattedBib}
-                  </h2>
-                </div>
+             <img src={dorsalBg} className="w-full h-auto block" alt="Dorsal Impresion" />
+             <div className="absolute inset-0 z-10 w-full h-full">
+               
+               <div className="absolute top-[18%] h-[50%] w-full flex items-center justify-center">
+                 <h2 className="print-bib font-[900] text-white tracking-tighter italic leading-none text-center m-0 p-0 drop-shadow-md">
+                   {formattedBib}
+                 </h2>
+               </div>
 
-                <div className="absolute top-[66.5%] h-[16%] w-full flex flex-col items-center justify-center px-4 sm:px-8">
-                   <h3 className="print-name font-black text-[#03070b] uppercase tracking-widest w-full text-center leading-none m-0 p-0 truncate">
-                      {form.nombre} {form.apellido}
-                   </h3>
-                   {category && (
-                     <p className="print-cat font-bold text-gray-800 uppercase tracking-[0.2em] leading-tight m-0 p-0 text-center w-full px-2 line-clamp-2">
-                       CATEGORÍA: {category}
-                     </p>
-                   )}
-                </div>
-
-              </div>
+               <div className="absolute top-[66.5%] h-[16%] w-full flex flex-col items-center justify-center px-4 sm:px-8">
+                  <h3 className="print-name font-black text-[#03070b] uppercase tracking-widest w-full text-center leading-none m-0 p-0 truncate">
+                     {form.nombre} {form.apellido}
+                  </h3>
+                  {category && (
+                    <p className="print-cat font-bold text-gray-800 uppercase tracking-[0.2em] leading-tight m-0 p-0 text-center w-full px-2 line-clamp-2">
+                      CATEGORÍA: {category}
+                    </p>
+                  )}
+               </div>
+             </div>
            </div>
         </div>
 
-        {/* ─── CÓDIGO NUCLEAR DE IMPRESIÓN (BLINDAJE MÓVIL) ─── */}
         <style>{`
           @media print {
-            * {
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            html, body {
-              background-color: white !important;
-              margin: 0 !important;
-              padding: 0 !important;
-            }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            html, body { background-color: white !important; margin: 0 !important; padding: 0 !important; }
             body * { visibility: hidden !important; }
             #print-canvas, #print-canvas * { visibility: visible !important; }
-            #print-canvas {
-              display: block !important;
-              position: absolute !important;
-              left: 0 !important;
-              top: 0 !important;
-              width: 100% !important;
-              background-color: white !important;
-              z-index: 999999 !important;
-            }
-            .print-container {
-              width: 100% !important;
-              max-width: 100% !important;
-            }
-            /* Clases reactivas al ancho del papel (vw) */
+            #print-canvas { display: block !important; position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; background-color: white !important; z-index: 999999 !important; }
+            .print-container { width: 100% !important; max-width: 100% !important; }
             .print-bib { font-size: 20vw !important; }
             .print-name { font-size: 5vw !important; }
             .print-cat { font-size: 2vw !important; margin-top: 1vw !important; }
-            
             * { transform: none !important; overflow: visible !important; }
             @page { size: portrait; margin: 0.5cm !important; }
           }

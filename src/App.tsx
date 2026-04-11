@@ -1,9 +1,10 @@
 /**
- * RAYO CERO — CORE ROUTER V7 (STABLE EVOLUTION - EMERGENCY ROLLBACK)
+ * RAYO CERO — CORE ROUTER V7.1 (STABLE EVOLUTION - VALKYRON SHIELD)
  * Senior Dev: MIA / Gemini (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Operativo / Militar
- * FIX: Reversión táctica de Lazy Loading. Retorno a carga sincrónica segura.
+ * REGLA DE ORO: Código completo sin omisiones. 
+ * EVOLUCIÓN: Redirección OPSEC automática para sesiones activas.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -54,8 +55,24 @@ const AppContent = ({ session, loading }: { session: any, loading: boolean }) =>
           <Route path="/registro" element={<RegistrationForm />} />
           <Route path="/resultados" element={<ResultsSection />} />
 
-          {/* ACCESO ADMINISTRATIVO (OCULTO) */}
-          <Route path="/v-access" element={<AdminLogin />} />
+          {/* ACCESO ADMINISTRATIVO (OCULTO & BLINDADO) */}
+          <Route 
+            path="/v-access" 
+            element={
+              loading ? (
+                <div className="h-screen flex items-center justify-center bg-[#03070b]">
+                  <div className="animate-pulse text-cyan-500 font-black tracking-widest text-xs uppercase">
+                    Escaneando_Perímetro...
+                  </div>
+                </div>
+              ) : session ? (
+                // Bypass Operativo: Si ya hay sesión, saltar el login directo al Dashboard
+                <Navigate to="/admin-dashboard" replace />
+              ) : (
+                <AdminLogin />
+              )
+            } 
+          />
           
           {/* PROTECCIÓN DE RUTA: DASHBOARD M.I.A */}
           <Route 
@@ -64,7 +81,7 @@ const AppContent = ({ session, loading }: { session: any, loading: boolean }) =>
               loading ? (
                 <div className="h-screen flex items-center justify-center bg-[#03070b]">
                   <div className="animate-pulse text-cyan-500 font-black tracking-widest text-xs uppercase">
-                    Verificando_Credenciales...
+                    Verificando_Credenciales_Valkyron...
                   </div>
                 </div>
               ) : session ? (
