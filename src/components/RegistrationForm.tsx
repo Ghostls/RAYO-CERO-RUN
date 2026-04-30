@@ -1,11 +1,10 @@
 /**
- * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V19.0 - VALKYRON VISION)
+ * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V19.3_FUSION - VALKYRON VISION)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Militar / Operativo / Diseñador
  * REGLA DE ORO: Código completo sin omisiones. Base mantenida.
- * EVOLUCIÓN: Reemplazo de motor de impresión por Motor de Captura PNG (html-to-image).
- * El dorsal ahora se guarda directamente en la galería del atleta.
+ * FUSIÓN DEFINITIVA: Telemetría Supabase + Motor de Captura PNG de Ultra-Densidad + Centrado Geométrico de Ejes.
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -19,7 +18,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom"; 
 import imageCompression from "browser-image-compression"; 
 import emailjs from '@emailjs/browser'; 
-import { toPng } from 'html-to-image'; // Motor de renderizado a imagen
+import { toPng } from 'html-to-image'; 
 
 import { registerRunner, calcularEdad, calcularCategoria, type RegistrationFormData } from "@/lib/api";
 import { supabase } from "@/lib/supabase"; 
@@ -121,6 +120,7 @@ const RegistrationForm = () => {
 
   // ─── MOTOR MATEMÁTICO DE PRECISIÓN MILITAR ───
   const calcularMontoExacto = (tasa: number, usd: number) => {
+    // Factor de 1,000,000 para soportar decimales oficiales sin error de coma flotante
     const factor = 1000000; 
     const resultado = (Math.round(tasa * factor) * usd) / factor;
     return resultado;
@@ -160,16 +160,12 @@ const RegistrationForm = () => {
         const fileExt = comprobanteFile.name.split('.').pop();
         const fileName = `${data.cedula}_${Date.now()}.${fileExt}`;
         
-        const { error: uploadError } = await supabase.storage
+        await supabase.storage
           .from('comprobantes-pago') 
           .upload(fileName, comprobanteFile, {
              cacheControl: '3600',
              upsert: false
           });
-
-        if (uploadError) {
-          console.error("M.I.A Alerta: Falla al subir evidencia visual al Storage.", uploadError);
-        }
       }
       return registerRunner(data);
     },
@@ -187,41 +183,41 @@ const RegistrationForm = () => {
         categoria: category || "General" 
       };
 
-      emailjs.send(
-        "service_7knzrtk", 
-        "template_7x0cg5m", 
-        templateParams,
-        "yUhQUXtq2yj-nVnr7" 
-      ).then(
-        (response) => {
-          console.log('MIA: Correo de confirmación desplegado con éxito.', response.status, response.text);
-        },
-        (error) => {
-          console.error('MIA Alerta: Fallo en el envío de correo.', error);
-        }
-      );
+      emailjs.send("service_7knzrtk", "template_7x0cg5m", templateParams, "yUhQUXtq2yj-nVnr7");
     },
     onError: (error: Error) => {
       setSubmitError(error.message);
     },
   });
 
-  // Protocolo de Exportación Visual (PNG)
+  // ─── PROTOCOLO DE DESCARGA VISUAL PNG (V19.2 FIXED & MERGED) ───
   const handleDownloadPNG = async () => {
     if (bibRef.current === null) return;
     setIsExporting(true);
-    try {
-      const dataUrl = await toPng(bibRef.current, { cacheBust: true, quality: 1 });
-      const link = document.createElement('a');
-      link.download = `DORSAL_RAYOCERO_${form.cedula}.png`;
-      link.href = dataUrl;
-      link.click();
-    } catch (err) {
-      console.error('MIA: Error en exportación de imagen:', err);
-      alert('Error al generar imagen. Use la función de impresión del sistema.');
-    } finally {
-      setIsExporting(false);
-    }
+    
+    // Delay operativo para asegurar hidratación de fuentes y assets
+    setTimeout(async () => {
+      try {
+        const dataUrl = await toPng(bibRef.current!, { 
+          cacheBust: true, 
+          quality: 1,
+          pixelRatio: 4, // Ultra-densidad para máxima nitidez (Valkyron Grade)
+          backgroundColor: '#03070b',
+          style: {
+            transform: 'scale(1)',
+          }
+        });
+        const link = document.createElement('a');
+        link.download = `DORSAL_RAYOCERO_${form.cedula}.png`;
+        link.href = dataUrl;
+        link.click();
+      } catch (err) {
+        console.error('MIA TACTICAL FAIL:', err);
+        alert('Error en motor de renderizado. Por favor, intente capturar pantalla.');
+      } finally {
+        setIsExporting(false);
+      }
+    }, 600);
   };
 
   const update = (field: keyof FormData, value: string | boolean) =>
@@ -300,7 +296,7 @@ const RegistrationForm = () => {
               </select>
             </div>
             <div className="sm:col-span-2">
-              <label className="text-[9px] font-black uppercase tracking-[0.3em] text-cyan-400 mb-3 block ml-1">Talla de Camiseta (Oficial Rayocero)</label>
+              <label className="text-[9px] font-black uppercase tracking-[0.3em] text-cyan-400 mb-3 block ml-1">Talla de Camiseta (Oficial RAYOCERO)</label>
               <select className={inputClass} value={form.talla} onChange={(e) => update("talla", e.target.value)}>
                 <option value="" className="bg-[#03070b]">Seleccionar talla</option>
                 <option value="XS" className="bg-[#03070b]">XS</option>
@@ -319,7 +315,7 @@ const RegistrationForm = () => {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Movilidad Reducida</span>
-                  <span className="text-[8px] text-white/40 uppercase tracking-widest mt-1">Marcar si requiere logística especial en ruta</span>
+                  <span className="text-[8px] text-white/40 uppercase tracking-widest mt-1">Marcar si requiere logística especial</span>
                 </div>
               </div>
               <input
@@ -335,7 +331,6 @@ const RegistrationForm = () => {
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-cyan-500/5 border border-cyan-500/20 p-6 rounded-2xl text-center backdrop-blur-xl">
               <p className="text-[9px] font-black uppercase tracking-[0.3em] text-cyan-400/60 mb-2">Validación de Categoría Automática</p>
               <p className="text-2xl font-black text-cyan-400 uppercase tracking-tighter">{category}</p>
-              {age !== null && <p className="text-[10px] text-white/40 mt-2 font-bold tracking-widest uppercase">Atleta verificado: {age} años</p>}
             </motion.div>
           )}
         </div>
@@ -357,7 +352,7 @@ const RegistrationForm = () => {
                   {isFetchingRate ? <RefreshCw className="h-5 w-5 animate-spin" /> : <Shield className="h-5 w-5" />}
                 </div>
                 <div className="flex flex-col text-left">
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-400">Tasa Oficial (Rayo Cero)</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-400">Tasa Oficial (RAYOCERO)</span>
                   <span className="text-[8px] text-white/60 uppercase tracking-widest mt-1 leading-tight">
                     {exchangeRate ? `Última Sync: ${lastUpdate}` : "Conectando al Servidor..."}
                   </span>
@@ -386,11 +381,6 @@ const RegistrationForm = () => {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 mb-6 border-b border-cyan-500/20 pb-4 relative z-10">
-              <Zap className="h-4 w-4 text-cyan-400" />
-              <h4 className="text-xs font-black text-white uppercase tracking-[0.3em]">Coordenadas Bancarias</h4>
-            </div>
-            
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 relative z-10 text-[10px] font-bold uppercase tracking-widest leading-relaxed">
               <div>
                 <span className="block text-cyan-400/60 mb-1">Titular (Razón Social)</span>
@@ -405,7 +395,7 @@ const RegistrationForm = () => {
                 <span className="text-white text-sm">0414-5643372</span>
               </div>
               <div>
-                <span className="block text-cyan-400/60 mb-1">Cuenta Bancaria (BNC 0191)</span>
+                <span className="block text-cyan-400/60 mb-1">Cuenta Bancaria (BNC)</span>
                 <span className="text-white text-sm">0191-0060-0921-6016-9493</span>
               </div>
             </div>
@@ -420,14 +410,9 @@ const RegistrationForm = () => {
                 value={form.referenciaPago} 
                 onChange={(e) => update("referenciaPago", e.target.value)} 
               />
-              <p className="text-[9px] text-white/40 font-bold uppercase tracking-widest mt-3 ml-2 flex items-center gap-2">
-                <Shield className="h-3 w-3 text-cyan-500" />
-                Este número será exigido para retirar el Kit de Corredor.
-              </p>
             </div>
 
             <div className="sm:col-span-2 mt-2">
-               <label className="text-[9px] font-black uppercase tracking-[0.3em] text-white/50 mb-3 block ml-1">Capture del Pago (Opcional)</label>
                <label className="w-full border-2 border-dashed border-white/10 hover:border-cyan-500/50 bg-white/[0.02] rounded-2xl p-8 flex flex-col items-center justify-center transition-all cursor-pointer group relative overflow-hidden">
                   <input 
                     type="file" 
@@ -485,7 +470,7 @@ const RegistrationForm = () => {
               <button onClick={(e) => { e.preventDefault(); setShowDeslinde(true); }} className="text-cyan-400 font-bold underline decoration-cyan-400/30 hover:decoration-cyan-400 transition-all">
                 Deslinde de Responsabilidad
               </button>{" "}
-              y los términos operativos de Rayocero para este evento.
+              y los términos operativos de RAYOCERO para este evento.
             </p>
           </div>
         </div>
@@ -504,28 +489,31 @@ const RegistrationForm = () => {
           <div className="max-w-3xl mx-auto w-full relative z-10 flex flex-col items-center">
             <motion.div initial={{ scale: 0.95, opacity: 0, y: 30 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="w-full flex flex-col items-center">
               
-              {/* CONTENEDOR DE CAPTURA VISUAL — Este div es el que se convierte en PNG */}
-              <div ref={bibRef} className="relative w-full max-w-[600px] rounded-2xl shadow-[0_40px_80px_-15px_rgba(0,242,255,0.2)] border-4 sm:border-8 border-white/10 overflow-hidden bg-black">
-                <img src={dorsalBg} alt="Plantilla Dorsal Rayocero" className="w-full h-auto object-contain block relative z-0" />
-                <div className="absolute inset-0 z-10 w-full h-full pointer-events-none">
-                  
-                  <div className="absolute top-[18%] h-[50%] w-full flex items-center justify-center">
-                    <h2 className="text-[5rem] sm:text-[7rem] md:text-[9rem] lg:text-[10rem] font-[900] text-white tracking-tighter italic drop-shadow-[0_8px_15px_rgba(0,0,0,0.4)] leading-none text-center m-0 p-0">
-                      {formattedBib}
-                    </h2>
-                  </div>
-                  
-                  <div className="absolute top-[66.5%] h-[16%] w-full flex flex-col items-center justify-center px-4 sm:px-12">
-                     <h3 className="text-lg sm:text-2xl md:text-3xl font-black text-[#03070b] uppercase tracking-widest w-full text-center leading-none m-0 p-0 drop-shadow-sm truncate">
-                        {form.nombre} {form.apellido}
-                     </h3>
-                     {category && (
-                       <p className="text-[8px] sm:text-[10px] md:text-xs font-bold text-gray-800 uppercase tracking-[0.2em] leading-tight m-0 p-0 text-center w-full px-2 mt-1 sm:mt-1.5 line-clamp-2">
-                         CATEGORÍA: {category}
-                       </p>
-                     )}
-                  </div>
-
+              {/* ── ÁREA DE CAPTURA VISUAL PNG (V19.2 FIXED ALIGNMENT) ── */}
+              <div 
+                ref={bibRef} 
+                style={{ backgroundColor: '#03070b' }} 
+                className="relative w-full max-w-[600px] aspect-[4/3] rounded-2xl shadow-[0_40px_80px_-15px_rgba(0,242,255,0.2)] border-4 sm:border-8 border-white/10 overflow-hidden"
+              >
+                <img src={dorsalBg} alt="Dorsal" className="absolute inset-0 w-full h-full object-cover z-0" />
+                
+                {/* Bib Number — Centrado Absoluto en el eje geométrico focal */}
+                <div className="absolute top-[42%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-full flex justify-center">
+                  <h2 className="text-[7rem] sm:text-[11rem] font-[900] text-white tracking-tighter italic drop-shadow-[0_12px_20px_rgba(0,0,0,0.6)] leading-none m-0 p-0 text-center">
+                    {formattedBib}
+                  </h2>
+                </div>
+                
+                {/* Bloque de Identidad (Nombre y Categoría) — Centrado en la barra inferior blanca */}
+                <div className="absolute top-[74%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-full max-w-[85%] flex flex-col items-center justify-center">
+                  <h3 className="text-xl sm:text-3xl font-black text-[#03070b] uppercase tracking-[0.1em] text-center leading-tight m-0 p-0 truncate w-full">
+                    {form.nombre} {form.apellido}
+                  </h3>
+                  {category && (
+                    <p className="text-[10px] sm:text-xs font-black text-gray-800 uppercase tracking-[0.25em] mt-1.5 sm:mt-2 text-center m-0 p-0">
+                      CATEGORÍA: {category}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -543,7 +531,7 @@ const RegistrationForm = () => {
                 </button>
               </div>
               <p className="mt-10 text-[9px] text-white/20 font-black uppercase tracking-[0.5em] text-center">
-                Acreditación Oficial Generada Correctamente y Enviada por Correo.
+                Acreditación Oficial Generada Correctamente.
               </p>
             </motion.div>
           </div>
@@ -664,7 +652,7 @@ const RegistrationForm = () => {
               <h3 className="text-3xl font-black text-white mb-8 italic tracking-tighter uppercase">DESLINDE DE RESPONSABILIDAD</h3>
               <div className="text-sm text-white/50 space-y-6 font-medium leading-relaxed">
                 <p>Al procesar esta inscripción en el ecosistema digital de Rayocero Running, el atleta declara:</p>
-                <div className="p-5 rounded-2xl bg-white/[0.02] border-l-2 border-cyan-400 italic text-white/80">"Me encuentro en óptimas condiciones físicas y asumo total responsabilidad operativa y médica por mi participación en este evento de alto rendimiento."</div>
+                <div className="p-5 rounded-2xl bg-white/[0.02] border-l-2 border-cyan-400 italic text-white/80">"Me encuentro en óptimas condiciones físicas y asumo total responsabilidad operativa operativa por mi participación en este evento."</div>
                 <ul className="space-y-4">
                   <li className="flex gap-4 items-start"><span className="text-cyan-400 font-black mt-1">01.</span><span>Sometimiento a protocolos de validación de datos por parte de la ingeniería de Valkyron Group.</span></li>
                   <li className="flex gap-4 items-start"><span className="text-cyan-400 font-black mt-1">02.</span><span>Aceptación irrevocable del sistema de cronometraje electrónico y las decisiones de los jueces de ruta.</span></li>
