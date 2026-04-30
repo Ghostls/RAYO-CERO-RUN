@@ -1,23 +1,25 @@
 /**
- * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V18.7 - VALKYRON SYNC)
+ * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V19.0 - VALKYRON VISION)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Militar / Operativo / Diseñador
  * REGLA DE ORO: Código completo sin omisiones. Base mantenida.
- * EVOLUCIÓN: Conexión directa a Telemetría Financiera Interna (Supabase) y Motor Matemático Exacto.
+ * EVOLUCIÓN: Reemplazo de motor de impresión por Motor de Captura PNG (html-to-image).
+ * El dorsal ahora se guarda directamente en la galería del atleta.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   User, Shield, CheckCircle, ArrowRight, ArrowLeft, Zap, Trophy, 
   Mail, CreditCard, Loader2, AlertCircle, Home, Banknote, UploadCloud, 
-  Printer, Accessibility, RefreshCw, TrendingUp
+  Printer, Accessibility, RefreshCw, TrendingUp, Download, Image as ImageIcon
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom"; 
 import imageCompression from "browser-image-compression"; 
 import emailjs from '@emailjs/browser'; 
+import { toPng } from 'html-to-image'; // Motor de renderizado a imagen
 
 import { registerRunner, calcularEdad, calcularCategoria, type RegistrationFormData } from "@/lib/api";
 import { supabase } from "@/lib/supabase"; 
@@ -69,6 +71,10 @@ const RegistrationForm = () => {
   
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Referencia táctica para la captura del dorsal
+  const bibRef = useRef<HTMLDivElement>(null);
 
   // ─── ESTADOS FINANCIEROS (TELEMETRÍA INTERNA VALKYRON) ───
   const [exchangeRate, setExchangeRate] = useState<number | null>(null);
@@ -87,8 +93,6 @@ const RegistrationForm = () => {
       const fetchInternalRate = async () => {
         try {
           setIsFetchingRate(true);
-          
-          // MIA consulta directamente el núcleo de datos de Rayo Cero establecido por el Admin
           const { data, error } = await supabase
             .from('system_config')
             .select('tasa_bcv, ultima_actualizacion')
@@ -99,11 +103,9 @@ const RegistrationForm = () => {
           
           if (data && data.tasa_bcv) {
             setExchangeRate(data.tasa_bcv);
-            
             const fechaSync = new Date(data.ultima_actualizacion);
             const horaFormateada = fechaSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             setLastUpdate(horaFormateada);
-            
             console.log(`[MIA TACTICAL] Telemetría Interna Enlazada: ${data.tasa_bcv} VES`);
           }
         } catch (err) {
@@ -119,7 +121,6 @@ const RegistrationForm = () => {
 
   // ─── MOTOR MATEMÁTICO DE PRECISIÓN MILITAR ───
   const calcularMontoExacto = (tasa: number, usd: number) => {
-    // Factor de 1,000,000 para soportar los 6 decimales oficiales del BCV sin error de coma flotante en JS
     const factor = 1000000; 
     const resultado = (Math.round(tasa * factor) * usd) / factor;
     return resultado;
@@ -204,6 +205,24 @@ const RegistrationForm = () => {
       setSubmitError(error.message);
     },
   });
+
+  // Protocolo de Exportación Visual (PNG)
+  const handleDownloadPNG = async () => {
+    if (bibRef.current === null) return;
+    setIsExporting(true);
+    try {
+      const dataUrl = await toPng(bibRef.current, { cacheBust: true, quality: 1 });
+      const link = document.createElement('a');
+      link.download = `DORSAL_RAYOCERO_${form.cedula}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('MIA: Error en exportación de imagen:', err);
+      alert('Error al generar imagen. Use la función de impresión del sistema.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const update = (field: keyof FormData, value: string | boolean) =>
     setForm((f) => ({ ...f, [field]: value }));
@@ -332,7 +351,6 @@ const RegistrationForm = () => {
                 <TrendingUp className="h-32 w-32 text-cyan-400" />
             </div>
             
-            {/* ─── HUD DE INVERSIÓN OPERATIVA (SINCRONIZACIÓN OFICIAL VALKYRON) ─── */}
             <div className="mb-8 p-5 rounded-2xl bg-white/[0.02] border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10 shadow-[0_0_20px_rgba(0,0,0,0.2)] hover:border-cyan-500/30 transition-all">
               <div className="flex items-center gap-4 w-full sm:w-auto">
                 <div className="h-12 w-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0">
@@ -486,7 +504,8 @@ const RegistrationForm = () => {
           <div className="max-w-3xl mx-auto w-full relative z-10 flex flex-col items-center">
             <motion.div initial={{ scale: 0.95, opacity: 0, y: 30 }} animate={{ scale: 1, opacity: 1, y: 0 }} className="w-full flex flex-col items-center">
               
-              <div className="relative w-full max-w-[600px] rounded-2xl shadow-[0_40px_80px_-15px_rgba(0,242,255,0.2)] border-4 sm:border-8 border-white/10 overflow-hidden bg-black">
+              {/* CONTENEDOR DE CAPTURA VISUAL — Este div es el que se convierte en PNG */}
+              <div ref={bibRef} className="relative w-full max-w-[600px] rounded-2xl shadow-[0_40px_80px_-15px_rgba(0,242,255,0.2)] border-4 sm:border-8 border-white/10 overflow-hidden bg-black">
                 <img src={dorsalBg} alt="Plantilla Dorsal Rayocero" className="w-full h-auto object-contain block relative z-0" />
                 <div className="absolute inset-0 z-10 w-full h-full pointer-events-none">
                   
@@ -511,8 +530,13 @@ const RegistrationForm = () => {
               </div>
 
               <div className="mt-12 w-full grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-[600px]">
-                <button onClick={() => window.print()} className="flex items-center justify-center gap-3 rounded-2xl bg-[#00f2ff] hover:bg-cyan-400 text-[#03070b] px-10 py-6 text-[11px] font-black uppercase tracking-[0.3em] shadow-[0_20px_40px_-10px_rgba(0,242,255,0.4)] transition-all transform hover:-translate-y-1 active:scale-95">
-                  <Printer className="h-5 w-5" /> IMPRIMIR DORSAL
+                <button 
+                  onClick={handleDownloadPNG} 
+                  disabled={isExporting}
+                  className="flex items-center justify-center gap-3 rounded-2xl bg-[#00f2ff] hover:bg-cyan-400 text-[#03070b] px-10 py-6 text-[11px] font-black uppercase tracking-[0.3em] shadow-[0_20px_40px_-10px_rgba(0,242,255,0.4)] transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-50"
+                >
+                  {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Download className="h-5 w-5" />} 
+                  {isExporting ? "GENERANDO..." : "GUARDAR EN GALERÍA"}
                 </button>
                 <button onClick={() => navigate("/")} className="flex items-center justify-center gap-3 rounded-2xl bg-white/[0.03] hover:bg-white/[0.08] text-white px-10 py-6 text-[11px] font-black uppercase tracking-[0.3em] border border-white/10 transition-all backdrop-blur-md hover:-translate-y-1 active:scale-95">
                   <Home className="h-5 w-5 text-[#00f2ff]" /> FINALIZAR REGISTRO
@@ -525,17 +549,16 @@ const RegistrationForm = () => {
           </div>
         </section>
 
+        {/* Mantenemos el canvas oculto solo para propósitos de compatibilidad legacy si fuera necesario */}
         <div id="print-canvas" className="hidden">
            <div className="print-container relative mx-auto w-full max-w-[21cm]">
              <img src={dorsalBg} className="w-full h-auto block" alt="Dorsal Impresion" />
              <div className="absolute inset-0 z-10 w-full h-full">
-               
                <div className="absolute top-[18%] h-[50%] w-full flex items-center justify-center">
                  <h2 className="print-bib font-[900] text-white tracking-tighter italic leading-none text-center m-0 p-0 drop-shadow-md">
                    {formattedBib}
                  </h2>
                </div>
-
                <div className="absolute top-[66.5%] h-[16%] w-full flex flex-col items-center justify-center px-4 sm:px-8">
                   <h3 className="print-name font-black text-[#03070b] uppercase tracking-widest w-full text-center leading-none m-0 p-0 truncate">
                      {form.nombre} {form.apellido}

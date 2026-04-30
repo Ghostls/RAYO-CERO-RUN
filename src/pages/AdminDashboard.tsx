@@ -1,14 +1,15 @@
 /**
- * RAYO CERO — ADMIN HQ DASHBOARD (STABLE BUILD V28.0_INTERCEPTOR)
- * Senior Dev: MIA (Valkyron Group) — Protocolo de Centrado Global Absoluto
+ * RAYO CERO — ADMIN HQ DASHBOARD (STABLE BUILD V28.3_ULTRA_STABLE)
+ * Senior Dev: MIA (Valkyron Group) — Protocolo de Inteligencia y Alcance Global
  * CEO: Lualdo Sciscioli
  * Grado: Militar / Operativo
- * FIX: Intercepción de DOM mediante Portal para bypass de stacking context.
- * La UI ahora ignora los márgenes del sidebar y se ancla al centro geométrico del hardware.
+ * FIX: Unificación de estados y corrección de scope para exportación PDF.
+ * INTEGRACIÓN: Marca RAYOCERO (sin espacios) y Logo en reportes oficiales.
+ * REGLA DE ORO: Código completo sin omisiones.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom'; // Capa de transporte táctico
+import { createPortal } from 'react-dom'; 
 import { supabase } from '../lib/supabase';
 import {
   ShieldCheck,
@@ -37,11 +38,19 @@ import {
   X,
   ExternalLink,
   ShieldAlert,
+  FileText,
 } from 'lucide-react';
+
+// Motores de reporte
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 import { RaceForm } from '../components/admin/RaceForm';
 import { RouteConfig } from '../components/admin/RouteConfig';
 import { ResultsTable } from '../components/admin/ResultsTable';
+
+// Importación de identidad visual
+import logoPrincipal from '../assets/logo.png';
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -352,7 +361,6 @@ const AtletasList = () => {
   const [selectedAtleta, setSelectedAtleta] = useState<Runner | null>(null);
   const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
   const [imgLoading, setImgLoading] = useState(false);
-  const [imgError, setImgError] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string>('');
 
   const fetchAtletas = async () => {
@@ -386,10 +394,56 @@ const AtletasList = () => {
     return () => { document.body.style.overflow = 'unset'; };
   }, [selectedAtleta]);
 
+  // Cálculo de filtrado para uso global en el componente
+  const filteredAtletas = atletas.filter((a) =>
+    `${a.nombre} ${a.apellido} ${a.cedula}`.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // MOTOR DE EXPORTACIÓN PDF CON IDENTIDAD VISUAL
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    const timestamp = new Date().toLocaleString('es-VE');
+
+    // Inyección de Logo
+    const img = new Image();
+    img.src = logoPrincipal;
+    
+    // Dibujar logo (x, y, w, h)
+    doc.addImage(img, 'PNG', 14, 10, 30, 10);
+
+    // Configuración estética del reporte
+    doc.setFontSize(18);
+    doc.setTextColor(6, 182, 212); // Color Cyan RAYOCERO
+    doc.text('RAYOCERO — REPORTE DE INTELIGENCIA ATLETAS', 14, 30);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Grado: Operativo / Generado: ${timestamp}`, 14, 38);
+    doc.text(`Filtro Activo: ${filterStatus.toUpperCase()} | Unidades detectadas: ${filteredAtletas.length}`, 14, 43);
+
+    const tableRows = filteredAtletas.map(atleta => [
+      atleta.nombre + ' ' + atleta.apellido,
+      `V-${atleta.cedula}`,
+      atleta.referencia_pago || 'PENDIENTE',
+      atleta.bib_number ? `#${atleta.bib_number}` : '---',
+      atleta.categoria || 'N/A'
+    ]);
+
+    autoTable(doc, {
+      startY: 50,
+      head: [['Unidad Atleta', 'ID Operativo', 'Ref_Pago', 'Dorsal', 'Categoría']],
+      body: tableRows,
+      headStyles: { fillColor: [6, 182, 212], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      styles: { fontSize: 8, font: 'helvetica' },
+    });
+
+    doc.save(`RAYOCERO_ATLETAS_${filterStatus}_${Date.now()}.pdf`);
+  };
+
   const inspectComprobante = async (atleta: Runner) => {
     setSelectedAtleta(atleta);
     setComprobanteUrl(null);
-    setImgError(false);
     setImgLoading(true);
     setStatusMsg('Escaneando hangar...');
     try {
@@ -412,12 +466,7 @@ const AtletasList = () => {
   const closeModal = () => {
     setSelectedAtleta(null);
     setComprobanteUrl(null);
-    setImgError(false);
   };
-
-  const filteredAtletas = atletas.filter((a) =>
-    `${a.nombre} ${a.apellido} ${a.cedula}`.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   return (
     <div className="relative">
@@ -437,6 +486,13 @@ const AtletasList = () => {
                 {status === 'all' ? 'Todos' : status === 'confirmado' ? 'Confirmados' : 'Pendientes'}
               </button>
             ))}
+            
+            <button 
+              onClick={exportToPDF}
+              className="px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all bg-white/5 text-cyan-400 border border-cyan-400/20 hover:bg-cyan-400 hover:text-black flex items-center gap-2"
+            >
+              <FileText size={14} /> Exportar PDF
+            </button>
           </div>
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
@@ -489,7 +545,6 @@ const AtletasList = () => {
         </div>
       </div>
 
-      {/* ── MODAL V28.0 INTERCEPTOR — Bypass de Stacking Context ── */}
       {selectedAtleta && createPortal(
         <div
           onClick={closeModal}
@@ -497,9 +552,9 @@ const AtletasList = () => {
             position: 'fixed',
             top: 0,
             left: 0,
-            width: '100vw', // Fuerza ancho total de la pantalla
-            height: '100vh', // Fuerza alto total de la pantalla
-            zIndex: 999999, // Supera cualquier contexto previo
+            width: '100vw',
+            height: '100vh',
+            zIndex: 999999,
             background: 'rgba(0,0,0,0.95)',
             display: 'flex',
             alignItems: 'center',
@@ -515,7 +570,7 @@ const AtletasList = () => {
               border: '1px solid rgba(0,229,255,0.25)',
               borderRadius: '24px',
               width: '100%',
-              maxWidth: '1100px', // Mayor amplitud para visualización
+              maxWidth: '1100px',
               height: '85vh',
               display: 'flex',
               flexDirection: 'row',
@@ -523,7 +578,6 @@ const AtletasList = () => {
               boxShadow: '0 0 100px rgba(0,0,0,1), 0 0 40px rgba(0,229,255,0.2)',
             }}
           >
-            {/* Panel imagen — Centrado Absoluto en el contenedor de inspección */}
             <div style={{ flex: 1, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', position: 'relative' }}>
               {imgLoading ? (
                 <div style={{ textAlign: 'center' }}>
@@ -547,7 +601,6 @@ const AtletasList = () => {
               </div>
             </div>
 
-            {/* Panel datos — Optimizado para no empujar la imagen */}
             <div style={{ width: '280px', borderLeft: '1px solid rgba(255,255,255,0.08)', padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', background: '#0d1319' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div>
@@ -587,7 +640,7 @@ const AtletasList = () => {
             </div>
           </div>
         </div>,
-        document.body // ANCLAJE FINAL AL BODY: Ignora por completo el Sidebar y el layout del Dashboard
+        document.body
       )}
     </div>
   );
@@ -617,8 +670,8 @@ const AdminDashboard = () => {
         <div className="flex items-center gap-3 text-left">
           <div className="bg-cyan-500 p-2 rounded-lg shadow-[0_0_15px_rgba(6,182,212,0.5)] rotate-2"><ShieldCheck size={24} className="text-black" /></div>
           <div>
-            <h1 className="text-2xl font-black tracking-tighter uppercase italic bg-gradient-to-r from-white to-gray-500 bg-clip-text text-transparent leading-none">Rayo Cero HQ</h1>
-            <p className="text-[10px] text-cyan-500 tracking-[0.4em] font-bold uppercase mt-1">Terminal_Valkyron_v28.0</p>
+            <h1 className="text-2xl font-black tracking-tighter uppercase italic bg-gradient-to-r from-white to-gray-500 bg-clip-text text-transparent leading-none">RAYOCERO HQ</h1>
+            <p className="text-[10px] text-cyan-500 tracking-[0.4em] font-bold uppercase mt-1">Terminal_Valkyron_v28.3</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
