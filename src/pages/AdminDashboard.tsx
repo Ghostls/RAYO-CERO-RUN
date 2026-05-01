@@ -1,10 +1,10 @@
 /**
- * RAYO CERO — ADMIN HQ DASHBOARD (STABLE BUILD V28.3_ULTRA_STABLE)
+ * RAYO CERO — ADMIN HQ DASHBOARD (STABLE BUILD V28.4_FINANCE_SYNC)
  * Senior Dev: MIA (Valkyron Group) — Protocolo de Inteligencia y Alcance Global
  * CEO: Lualdo Sciscioli
  * Grado: Militar / Operativo
- * FIX: Unificación de estados y corrección de scope para exportación PDF.
- * INTEGRACIÓN: Marca RAYOCERO (sin espacios) y Logo en reportes oficiales.
+ * FIX: Dinamización de Costo de Inscripción USD. Ahora modificable desde DB.
+ * INTEGRACIÓN: RAYOCERO (sin espacios) y Logo en reportes oficiales.
  * REGLA DE ORO: Código completo sin omisiones.
  */
 
@@ -39,6 +39,7 @@ import {
   ExternalLink,
   ShieldAlert,
   FileText,
+  DollarSign, // Icono para el costo USD
 } from 'lucide-react';
 
 // Motores de reporte
@@ -116,26 +117,28 @@ const getComprobantePublicUrl = async (
   return null;
 };
 
-// ─── SUB-COMPONENTE 1: CONTROL DE DIVISA BCV ─────────────────────────────────
+// ─── SUB-COMPONENTE 1: CONTROL DE DIVISA Y TARIFAS ───────────────────────────
 
 const TasaConfig = () => {
   const [tasaActual, setTasaActual] = useState<number | null>(null);
   const [nuevaTasa, setNuevaTasa] = useState<string>('');
+  const [costoUSDActual, setCostoUSDActual] = useState<number | null>(null);
+  const [nuevoCostoUSD, setNuevoCostoUSD] = useState<string>('');
   const [ultimaActualizacion, setUltimaActualizacion] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState(false);
 
   useEffect(() => {
-    fetchTasa();
+    fetchConfig();
   }, []);
 
-  const fetchTasa = async () => {
+  const fetchConfig = async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('system_config')
-        .select('tasa_bcv, ultima_actualizacion')
+        .select('tasa_bcv, costo_usd, ultima_actualizacion')
         .eq('id', 1)
         .single();
 
@@ -143,38 +146,44 @@ const TasaConfig = () => {
       if (data) {
         setTasaActual(data.tasa_bcv);
         setNuevaTasa(data.tasa_bcv.toString());
+        setCostoUSDActual(data.costo_usd || 40); // Fallback a 40 si no existe
+        setNuevoCostoUSD((data.costo_usd || 40).toString());
         setUltimaActualizacion(
           new Date(data.ultima_actualizacion).toLocaleString('es-VE')
         );
       }
     } catch (error) {
-      console.error('Error obteniendo tasa:', error);
+      console.error('Error obteniendo configuración financiera:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleUpdateTasa = async (e: React.FormEvent) => {
+  const handleUpdateProtocol = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     try {
       const parsedTasa = parseFloat(nuevaTasa.replace(',', '.'));
-      if (isNaN(parsedTasa) || parsedTasa <= 0) throw new Error('Valor inválido');
+      const parsedCosto = parseFloat(nuevoCostoUSD.replace(',', '.'));
+      
+      if (isNaN(parsedTasa) || parsedTasa <= 0) throw new Error('Tasa inválida');
+      if (isNaN(parsedCosto) || parsedCosto <= 0) throw new Error('Costo inválido');
 
       const { error } = await supabase
         .from('system_config')
         .update({
           tasa_bcv: parsedTasa,
+          costo_usd: parsedCosto,
           ultima_actualizacion: new Date().toISOString(),
         })
         .eq('id', 1);
 
       if (error) throw error;
-      await fetchTasa();
+      await fetchConfig();
       setSuccessMsg(true);
       setTimeout(() => setSuccessMsg(false), 3000);
-    } catch {
-      alert('Error táctico: Verifique el formato de la tasa');
+    } catch (err: any) {
+      alert(`Error táctico: ${err.message || 'Verifique los valores'}`);
     } finally {
       setIsSaving(false);
     }
@@ -187,19 +196,32 @@ const TasaConfig = () => {
           <Banknote className="h-32 w-32 text-cyan-400" />
         </div>
         <h4 className="text-sm font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
-          <Settings size={18} className="text-cyan-400" /> Ajuste Manual de Divisa
+          <Settings size={18} className="text-cyan-400" /> Parámetros de Inversión
         </h4>
-        <form onSubmit={handleUpdateTasa} className="space-y-6 relative z-10">
-          <div>
-            <label className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-400 mb-2 block">
-              Tasa BCV (Bs por USD)
-            </label>
-            <input
-              type="text"
-              value={nuevaTasa}
-              onChange={(e) => setNuevaTasa(e.target.value)}
-              className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-xl font-bold text-white focus:outline-none focus:border-cyan-400 font-mono"
-            />
+        <form onSubmit={handleUpdateProtocol} className="space-y-6 relative z-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-400 mb-2 block">
+                Tasa BCV (Bs)
+              </label>
+              <input
+                type="text"
+                value={nuevaTasa}
+                onChange={(e) => setNuevaTasa(e.target.value)}
+                className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-xl font-bold text-white focus:outline-none focus:border-cyan-400 font-mono"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-400 mb-2 block">
+                Inscripción ($)
+              </label>
+              <input
+                type="text"
+                value={nuevoCostoUSD}
+                onChange={(e) => setNuevoCostoUSD(e.target.value)}
+                className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-xl font-bold text-white focus:outline-none focus:border-cyan-400 font-mono"
+              />
+            </div>
           </div>
           <button
             type="submit"
@@ -207,7 +229,7 @@ const TasaConfig = () => {
             className="w-full flex items-center justify-center gap-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black px-6 py-4 text-xs font-black uppercase tracking-[0.2em] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSaving ? <RefreshCw className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
-            {isSaving ? 'ACTUALIZANDO PROTOCOLO...' : 'ESTABLECER NUEVA TASA'}
+            {isSaving ? 'ACTUALIZANDO PROTOCOLO...' : 'SINCRONIZAR CONFIGURACIÓN'}
           </button>
           {successMsg && (
             <div className="flex items-center gap-2 text-green-400 justify-center mt-4">
@@ -219,21 +241,29 @@ const TasaConfig = () => {
       </div>
 
       <div className="bg-cyan-500/5 border border-cyan-500/20 rounded-2xl flex flex-col justify-center p-8 text-center backdrop-blur-md">
-        <h4 className="text-[10px] font-black text-cyan-500/60 uppercase tracking-[0.3em] mb-4">Valor Operativo Actual</h4>
+        <h4 className="text-[10px] font-black text-cyan-500/60 uppercase tracking-[0.3em] mb-4">Estado Operativo Actual</h4>
         {isLoading ? (
           <div className="flex justify-center">
             <Activity className="animate-pulse text-cyan-500" size={48} />
           </div>
         ) : (
-          <>
-            <div className="text-6xl font-black italic tracking-tighter text-white drop-shadow-[0_0_15px_rgba(0,242,255,0.4)] font-mono">
-              {tasaActual?.toFixed(2)}
+          <div className="space-y-4">
+            <div className="flex justify-around items-center">
+               <div>
+                  <p className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mb-1">Tasa BCV</p>
+                  <div className="text-4xl font-black italic text-white font-mono">{tasaActual?.toFixed(2)}</div>
+               </div>
+               <div className="h-12 w-[1px] bg-white/10" />
+               <div>
+                  <p className="text-[8px] text-gray-500 font-bold uppercase tracking-widest mb-1">Inscripción</p>
+                  <div className="text-4xl font-black italic text-cyan-400 font-mono">${costoUSDActual}</div>
+               </div>
             </div>
-            <div className="mt-4 inline-flex flex-col items-center gap-1 bg-black/30 px-4 py-2 rounded-lg border border-white/5">
+            <div className="mt-4 inline-flex flex-col items-center gap-1 bg-black/30 px-4 py-2 rounded-lg border border-white/5 w-full">
               <span className="text-[8px] text-gray-500 font-bold uppercase tracking-widest">Última Sincronización</span>
               <span className="text-[10px] text-cyan-400 font-mono">{ultimaActualizacion || 'Desconocida'}</span>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
@@ -671,7 +701,7 @@ const AdminDashboard = () => {
           <div className="bg-cyan-500 p-2 rounded-lg shadow-[0_0_15px_rgba(6,182,212,0.5)] rotate-2"><ShieldCheck size={24} className="text-black" /></div>
           <div>
             <h1 className="text-2xl font-black tracking-tighter uppercase italic bg-gradient-to-r from-white to-gray-500 bg-clip-text text-transparent leading-none">RAYOCERO HQ</h1>
-            <p className="text-[10px] text-cyan-500 tracking-[0.4em] font-bold uppercase mt-1">Terminal_Valkyron_v28.3</p>
+            <p className="text-[10px] text-cyan-500 tracking-[0.4em] font-bold uppercase mt-1">Terminal_Valkyron_v28.4</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
