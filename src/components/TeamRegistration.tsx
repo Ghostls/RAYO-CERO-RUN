@@ -271,7 +271,7 @@ const TeamRegistration = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
                 <div className="bg-white/[0.02] p-4 rounded-xl border border-white/5 flex gap-3 items-start">
                   <Info className="h-4 w-4 text-cyan-400 shrink-0" />
                   <p className="text-[8px] text-white/30 font-medium uppercase leading-relaxed tracking-widest">
-                    REGLA MIA: El tiempo del equipo será la suma de los 4 tiempos individuales. Todos los miembros deben estar confirmados previamente.
+                    El tiempo del equipo será la suma de los 4 tiempos individuales. El equipo con menor tiempo en su sumatoria conseguira la victoria.
                   </p>
                 </div>
               </div>
