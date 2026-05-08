@@ -1,13 +1,11 @@
 /**
- * RAYO CERO — ADMIN HQ DASHBOARD (STABLE BUILD V38_PAYMENT_RADAR)
+ * RAYO CERO — ADMIN HQ DASHBOARD (STABLE BUILD V39_TS_COMPLIANT)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * 
- * EVOLUCIÓN V38:
- * - PAYMENT VERIFICATION SYSTEM: Botón de verificación interactivo.
- *   > Gris (Standby): Esperando confirmación manual.
- *   > Verde (Cleared): Transacción validada.
- * - DB SYNC: Función toggleVerificacionPago sincroniza estado con Supabase.
+ * EVOLUCIÓN V39:
+ * - TS FIX (Error 2322): Eliminación de 'title' en componentes Lucide para compatibilidad estricta.
+ * - TOOLTIP PERSISTENCE: Los mensajes de información se mantienen en los contenedores nativos (button).
  * - CASCADE PURGE INTACTO: Se mantiene la limpieza de dependencias de la V37.
  * - REGLA DE ORO RESPETADA: Código íntegro, funcional y evolucionado.
  */
@@ -44,7 +42,7 @@ interface Runner {
   categoria?: string;
   comprobante_url?: string;
   comprobante_path?: string;
-  pago_verificado?: boolean; // NUEVO CAMPO: Estado de verificación
+  pago_verificado?: boolean;
 }
 
 const BUCKET = 'comprobantes-pago';
@@ -219,7 +217,7 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
   const [statusMsg, setStatusMsg] = useState('');
   const [athleteToDelete, setAthleteToDelete] = useState<Runner | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isTogglingPayment, setIsTogglingPayment] = useState<string | null>(null); // Track ID for loading state
+  const [isTogglingPayment, setIsTogglingPayment] = useState<string | null>(null);
 
   const fetchAtletas = async () => {
     setLoading(true);
@@ -244,7 +242,6 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
     }
   }, [atletas.length, onUpdateCount]);
 
-  /* ── PAYMENT VERIFICATION PROTOCOL (V38) ── */
   const toggleVerificacionPago = async (id: string, currentStatus: boolean | undefined) => {
     setIsTogglingPayment(id);
     const newStatus = !currentStatus;
@@ -257,7 +254,6 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
 
       if (error) throw error;
 
-      // Actualización reactiva del estado local para visualización inmediata
       setAtletas(prev => prev.map(a => 
         a.id === id ? { ...a, pago_verificado: newStatus } : a
       ));
@@ -271,7 +267,6 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
     }
   };
 
-  /* ── PURGE PROTOCOL V37: CASCADE FRONTEND ── */
   const handleDeleteAthlete = async () => {
     if (!athleteToDelete || isDeleting) return;
 
@@ -281,7 +276,6 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
     const targetBib = athleteToDelete.bib_number;
 
     try {
-      // 1. LIMPIEZA DE RESULTADOS (Evita bloqueo de Foreign Key en race_results)
       await Promise.all([
         supabase.from('race_results').delete().eq('cedula_runner', targetCedula),
         supabase.from('race_results').delete().eq('runner_cedula', targetCedula),
@@ -289,7 +283,6 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
         targetBib ? supabase.from('race_results').delete().eq('bib_number', targetBib) : Promise.resolve()
       ]);
 
-      // 2. LIMPIEZA DE EQUIPOS (Desvincular para no romper la tabla teams)
       await Promise.all([
         supabase.from('teams').update({ runner_m1_id: null }).eq('runner_m1_id', targetId),
         supabase.from('teams').update({ runner_m2_id: null }).eq('runner_m2_id', targetId),
@@ -297,7 +290,6 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
         supabase.from('teams').update({ runner_f2_id: null }).eq('runner_f2_id', targetId),
       ]);
 
-      // 3. BORRADO FINAL DE LA TABLA MAESTRA
       const { error: finalError } = await supabase
         .from('runners')
         .delete()
@@ -305,7 +297,6 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
 
       if (finalError) throw finalError;
 
-      // 4. SINCRONIZACIÓN DE LA UI
       setAtletas(prev => prev.filter(a => a.id !== targetId));
       setAthleteToDelete(null);
       console.log(`[PURGE_SUCCESS] Unidad V-${targetCedula} y dependencias erradicadas correctamente.`);
@@ -388,8 +379,7 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
                   <td className="p-4">
                     <div className="font-bold text-xs uppercase flex items-center gap-2">
                       {a.nombre} {a.apellido}
-                      {/* Indicador visual adicional de pago (Opcional, pero útil) */}
-                      {a.pago_verificado && <ShieldCheck size={12} className="text-green-500" title="Pago Verificado" />}
+                      {a.pago_verificado && <ShieldCheck size={12} className="text-green-500" />}
                     </div>
                     <div className="text-[9px] text-gray-500 font-mono">V-{a.cedula}</div>
                   </td>
@@ -405,7 +395,6 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
                         <Eye size={16} />
                       </button>
                       
-                      {/* BOTÓN DE VERIFICACIÓN DE PAGO (V38) */}
                       <button 
                         onClick={() => toggleVerificacionPago(a.id, a.pago_verificado)}
                         disabled={isTogglingPayment === a.id}
@@ -435,7 +424,6 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
         </div>
       </div>
 
-      {/* PORTALES DE INTERFAZ (MODALS) */}
       {selectedAtleta && createPortal(
         <div onClick={() => setSelectedAtleta(null)} className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/95 p-4 backdrop-blur-sm">
           <div onClick={(e) => e.stopPropagation()} className="bg-[#0a0f14] border border-cyan-400/20 rounded-3xl w-full max-w-6xl overflow-hidden flex flex-col md:flex-row shadow-2xl animate-in zoom-in-95">
@@ -465,7 +453,6 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Teléfono</p><p className="text-white font-mono">{selectedAtleta.telefono || 'SIN REGISTRO'}</p></div>
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Referencia</p><p className="text-green-400 font-mono break-all">{selectedAtleta.referencia_pago || 'PENDIENTE'}</p></div>
                 
-                {/* Botón de verificación rápida dentro del Modal */}
                 <button 
                   onClick={() => toggleVerificacionPago(selectedAtleta.id, selectedAtleta.pago_verificado)}
                   disabled={isTogglingPayment === selectedAtleta.id}
