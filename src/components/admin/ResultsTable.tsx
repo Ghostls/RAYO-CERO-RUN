@@ -1,17 +1,20 @@
 /**
- * RAYO CERO — RESULTS TABLE (STABLE BUILD V3.1 - SUPABASE UPLINK)
+ * RAYO CERO — RESULTS TABLE (STABLE BUILD V3.5_STEALTH)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Militar / Operativo 
- * REGLA DE ORO: Código completo sin omisiones.
- * FIX: Eliminación de datos estáticos (Mockup). Conexión en tiempo real con BD Supabase.
+ * 
+ * EVOLUCIÓN V3.5:
+ * - STEALTH OPTIMIZATION: Tras confirmación táctica, el enlace primario 
+ *   ahora es 'bib_number' (Beta Link anterior). Se elimina el warning de consola.
+ * - FALLBACK SILENCIOSO: Redundancia mantenida en background por seguridad.
+ * - REGLA DE ORO RESPETADA: Código completo y optimizado.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Loader2, AlertCircle, Trophy } from 'lucide-react';
-import { supabase } from '@/lib/supabase'; // MIA UPLINK: Conexión a la BD
+import { supabase } from '../../lib/supabase';
 
-// Interfaz estricta para mapear la telemetría de Supabase
 interface RunnerResult {
   bib_number: number;
   nombre: string;
@@ -21,139 +24,146 @@ interface RunnerResult {
 
 export const ResultsTable = () => {
   const [results, setResults] = useState<RunnerResult[]>([]);
-  const [filteredResults, setFilteredResults] = useState<RunnerResult[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // MIA PROTOCOL: Extracción de datos de Supabase al montar el componente
   useEffect(() => {
     const fetchResults = async () => {
       try {
         setIsLoading(true);
-        // Hacemos un JOIN táctico entre runners y race_results (si existe el tiempo)
-        const { data, error: fetchError } = await supabase
+        setError(null);
+
+        /**
+         * MIA STEALTH LINK:
+         * Ruta confirmada y optimizada: bib_number.
+         */
+        const { data: primaryData, error: primaryError } = await supabase
           .from('runners')
           .select(`
             bib_number,
             nombre,
             apellido,
-            race_results (
+            race_results!bib_number (
               tiempo_chip
             )
           `)
           .order('bib_number', { ascending: true });
 
-        if (fetchError) throw fetchError;
+        if (primaryError) {
+          // Fallback silencioso en caso de anomalías futuras
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('runners')
+            .select(`
+              bib_number,
+              nombre,
+              apellido,
+              race_results!cedula_runner (
+                tiempo_chip
+              )
+            `)
+            .order('bib_number', { ascending: true });
 
-        // Formateo de los datos recibidos
-        const formattedData: RunnerResult[] = (data || []).map((runner: any) => ({
-          bib_number: runner.bib_number,
-          nombre: runner.nombre,
-          apellido: runner.apellido,
-          // Si no tiene tiempo registrado aún, indicamos que está en espera
-          tiempo: runner.race_results && runner.race_results.length > 0 
-            ? runner.race_results[0].tiempo_chip 
-            : 'En espera / DNS',
-        }));
+          if (fallbackError) throw fallbackError;
+          processTelemetry(fallbackData);
+        } else {
+          processTelemetry(primaryData);
+        }
 
-        setResults(formattedData);
-        setFilteredResults(formattedData);
       } catch (err: any) {
-        console.error('[MIA CRITICAL] Fallo al obtener telemetría de resultados:', err);
-        setError('Error de conexión con la base de datos de resultados.');
+        console.error('[MIA CRITICAL] Caída de Enlace:', err.message);
+        setError('Error de enlace: Imposible establecer conexión con la tabla de tiempos.');
       } finally {
         setIsLoading(false);
       }
     };
 
+    const processTelemetry = (data: any[]) => {
+      if (!data) return;
+      const formattedData: RunnerResult[] = data.map((runner: any) => ({
+        bib_number: runner.bib_number,
+        nombre: runner.nombre || 'SIN NOMBRE',
+        apellido: runner.apellido || '',
+        tiempo: runner.race_results && runner.race_results.length > 0 
+          ? runner.race_results[0].tiempo_chip 
+          : 'En espera / DNS',
+      }));
+      setResults(formattedData);
+    };
+
     fetchResults();
   }, []);
 
-  // MIA PROTOCOL: Motor de filtrado en tiempo real (Radar)
-  useEffect(() => {
+  const filteredResults = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    if (!query) {
-      setFilteredResults(results);
-      return;
-    }
-
-    const filtered = results.filter(
-      (runner) =>
-        runner.nombre.toLowerCase().includes(query) ||
-        runner.apellido.toLowerCase().includes(query) ||
-        runner.bib_number.toString().includes(query)
+    if (!query) return results;
+    return results.filter(r => 
+      `${r.nombre} ${r.apellido} ${r.bib_number}`.toLowerCase().includes(query)
     );
-    setFilteredResults(filtered);
   }, [searchQuery, results]);
 
   return (
-    <div className="w-full">
-      {/* ─── RADAR DE BÚSQUEDA ─── */}
+    <div className="w-full animate-in fade-in duration-500">
       <div className="flex gap-2 mb-6">
         <div className="relative flex-1 group">
-          <Search className="absolute left-4 top-3 text-cyan-500/50 group-focus-within:text-cyan-400 transition-colors" size={18} />
+          <Search className="absolute left-4 top-3 text-cyan-500/50" size={18} />
           <input 
             type="text" 
-            placeholder="Escanear por Dorsal, Nombre o Apellido..." 
+            placeholder="Radar de búsqueda activa..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#03070b]/50 border border-white/10 focus:border-cyan-500/50 focus:bg-white/[0.02] pl-12 pr-4 py-3 rounded-xl text-sm text-white placeholder:text-white/30 outline-none transition-all shadow-inner backdrop-blur-md" 
+            className="w-full bg-[#03070b]/50 border border-white/10 pl-12 pr-4 py-3 rounded-xl text-sm text-white focus:border-cyan-500/50 outline-none transition-all" 
           />
         </div>
       </div>
 
-      {/* ─── PANTALLAS DE ESTADO TÁCTICO ─── */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-12 bg-white/[0.02] rounded-xl border border-white/5">
-          <Loader2 className="h-8 w-8 text-cyan-400 animate-spin mb-4" />
-          <p className="text-[10px] font-black tracking-[0.3em] text-cyan-400 uppercase">Descargando Telemetría...</p>
+        <div className="py-20 text-center bg-white/[0.02] rounded-2xl border border-white/5">
+          <Loader2 className="h-10 w-10 text-cyan-500 animate-spin mx-auto mb-4" />
+          <p className="text-[10px] font-black tracking-[0.4em] text-cyan-500 uppercase">Sincronizando Uplink Pro...</p>
         </div>
       ) : error ? (
-        <div className="flex flex-col items-center justify-center py-12 bg-red-500/5 border border-red-500/20 rounded-xl">
-          <AlertCircle className="h-8 w-8 text-red-500 mb-4" />
-          <p className="text-xs font-bold tracking-widest text-red-400 uppercase">{error}</p>
+        <div className="p-10 text-center bg-red-500/5 border border-red-500/20 rounded-2xl">
+          <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-4" />
+          <p className="text-sm font-bold text-red-400 uppercase tracking-widest">{error}</p>
+          <p className="text-[10px] text-gray-500 mt-2 font-mono">Consulte al Analista de Inteligencia Militar</p>
         </div>
       ) : (
-        /* ─── TABLA DE RESULTADOS OPERATIVA ─── */
-        <div className="overflow-x-auto rounded-xl border border-white/10 bg-white/[0.02] backdrop-blur-md">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-[#03070b]/80 border-b border-white/10">
+        <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/40 shadow-2xl">
+          <table className="w-full text-left">
+            <thead className="bg-white/5 border-b border-white/10">
               <tr>
-                <th className="p-4 text-[10px] font-black text-white/40 uppercase tracking-[0.3em]">Dorsal</th>
-                <th className="p-4 text-[10px] font-black text-white/40 uppercase tracking-[0.3em]">Atleta</th>
-                <th className="p-4 text-[10px] font-black text-white/40 uppercase tracking-[0.3em] text-right">Tiempo Oficial</th>
+                <th className="p-5 text-[9px] font-black text-gray-500 uppercase tracking-[0.3em]">Unidad (Dorsal)</th>
+                <th className="p-5 text-[9px] font-black text-gray-500 uppercase tracking-[0.3em]">Atleta</th>
+                <th className="p-5 text-[9px] font-black text-gray-500 uppercase tracking-[0.3em] text-right">Telemetría (Tiempo)</th>
               </tr>
             </thead>
-            <tbody className="text-sm">
+            <tbody className="divide-y divide-white/5">
               {filteredResults.length > 0 ? (
-                filteredResults.map((runner, index) => (
-                  <tr 
-                    key={runner.bib_number} 
-                    className={`hover:bg-white/5 transition-colors border-b border-white/5 group ${index % 2 === 0 ? 'bg-transparent' : 'bg-white/[0.01]'}`}
-                  >
-                    <td className="p-4">
-                      <span className="inline-block px-2 py-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-black font-mono text-xs rounded-md shadow-[0_0_10px_rgba(0,242,255,0.1)] group-hover:shadow-[0_0_15px_rgba(0,242,255,0.3)] transition-shadow">
-                        #{runner.bib_number.toString().padStart(4, '0')}
+                filteredResults.map((runner) => (
+                  <tr key={runner.bib_number} className="group hover:bg-cyan-500/[0.03] transition-all">
+                    <td className="p-5">
+                      <span className="font-mono text-cyan-400 font-bold bg-cyan-500/5 border border-cyan-500/10 px-3 py-1 rounded-lg">
+                        #{runner.bib_number?.toString().padStart(4, '0') || '0000'}
                       </span>
                     </td>
-                    <td className="p-4 font-bold text-white uppercase tracking-wider">
+                    <td className="p-5 font-bold text-white uppercase text-xs tracking-tight">
                       {runner.nombre} {runner.apellido}
                     </td>
-                    <td className="p-4 font-mono text-right text-cyan-500">
-                      {runner.tiempo === 'En espera / DNS' ? (
-                        <span className="text-white/30 text-[10px] tracking-widest">{runner.tiempo}</span>
+                    <td className="p-5 text-right">
+                      {runner.tiempo.includes('En espera') ? (
+                        <span className="text-gray-600 text-[10px] font-bold uppercase tracking-widest italic">{runner.tiempo}</span>
                       ) : (
-                        <span className="font-black">{runner.tiempo}</span>
+                        <span className="font-black text-cyan-400 font-mono text-lg">{runner.tiempo}</span>
                       )}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={3} className="p-12 text-center text-white/30">
-                    <Trophy className="h-8 w-8 mx-auto mb-3 opacity-20" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.3em]">No se encontraron registros</span>
+                  <td colSpan={3} className="p-20 text-center opacity-30">
+                    <Trophy className="mx-auto h-12 w-12 mb-4" />
+                    <p className="text-[10px] font-black uppercase tracking-[0.5em]">Radar Limpio - Cero Unidades</p>
                   </td>
                 </tr>
               )}
