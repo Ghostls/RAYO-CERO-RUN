@@ -1,42 +1,135 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* ==========================================================================
+   LIQUID-RACE-FLOW: GOLDEN RATIO ENGINE (POLAR LIGHT SPEC)
+   ========================================================================== */
+
+:root {
+  --max-width: 1280px;
+  --bg-obsidian: #030712;
+  --polar-cyan: #50E8E3;
+  --polar-glow: rgba(80, 232, 227, 0.25);
+  --glass-border: rgba(80, 232, 227, 0.15);
+  --glass-bg: rgba(10, 15, 30, 0.7);
+  --text-muted: #9ca3af;
+
+  /* --- CONSTANTES GEOMÉTRICAS (PHI) --- */
+  --phi: 1.618034;
+  
+  /* Escala de Espaciado Base (Fibonacci/Phi Modulated) */
+  --space-sm: 1rem;
+  --space-md: calc(var(--space-sm) * var(--phi)); /* 1.618rem */
+  --space-lg: calc(var(--space-md) * var(--phi)); /* 2.618rem */
+  --space-xl: calc(var(--space-lg) * var(--phi)); /* 4.236rem */
+
+  /* Cinemática Áurea: Tiempos de absorción de impacto visual (en segundos) */
+  --t-fast: 0.236s;
+  --t-normal: 0.382s;
+  --t-fluid: 0.618s; 
+
+  /* Curva de aceleración inercial basada en dispersión áurea */
+  --bezier-phi: cubic-bezier(0.25, 1, 0.382, 1);
 }
 
+#root {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  /* Aplicación estricta de proporción en padding (Vertical = Horizontal * Phi) */
+  padding: var(--space-lg) var(--space-md);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+/* --- LOGO & BRANDING (FÓRMULA DE DISPERSIÓN HARMONICA) --- */
 .logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
+  /* Escala áurea proporcional para bounding box del asset */
+  height: calc(4rem * var(--phi) * var(--phi)); /* ~10.47rem */
+  padding: var(--space-md);
+  will-change: filter, transform;
+  transition: all var(--t-fluid) var(--bezier-phi);
+  transform: scale(1);
 }
+
 .logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+  /* Escala calibrada con la constante de decaimiento (1 / phi) */
+  transform: scale(1.0618) translateY(-4px);
+  filter: drop-shadow(0 0 var(--space-md) var(--polar-cyan))
+          drop-shadow(0 0 var(--space-xl) rgba(80, 232, 227, 0.382));
 }
 
 @keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+  .logo.spin-active {
+    /* Ciclo armónico macro: 24.27s (frecuencia basada en múltiplos de phi) */
+    animation: logo-spin infinite 24.27s linear;
   }
 }
 
+/* --- CARDS & PANELS (GOLDEN GLASSMORPHISM) --- */
 .card {
-  padding: 2em;
+  /* Radio de curvatura derivado de la geometría del contenedor */
+  border-radius: calc(15px * var(--phi)); /* ~24.27px */
+  padding: var(--space-lg);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: 
+    0 4px 30px rgba(0, 0, 0, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 0.05),
+    inset 0 0 calc(12px * var(--phi)) var(--polar-glow);
+  transition: all var(--t-fluid) var(--bezier-phi);
+  position: relative;
+  overflow: hidden;
 }
 
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(80, 232, 227, 0.1),
+    transparent
+  );
+  /* Sincronización temporal con el barrido del sponsor */
+  transition: transform var(--t-fluid) var(--bezier-phi);
+}
+
+.card:hover::before {
+  transform: translateX(200%);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(80, 232, 227, 0.382);
+  box-shadow: 
+    0 var(--space-md) var(--space-xl) rgba(0, 0, 0, 0.6),
+    inset 0 1px 2px rgba(255, 255, 255, 0.1),
+    0 0 var(--space-lg) rgba(80, 232, 227, 0.236);
+}
+
+/* --- TYPOGRAPHY & DATA STRUCTURE --- */
 .read-the-docs {
-  color: #888;
+  /* Escala tipográfica exacta: 0.618rem * phi = 1rem base */
+  font-size: calc(1.5rem / var(--phi)); /* ~0.927rem */
+  letter-spacing: calc(0.03125rem * var(--phi)); /* ~0.05em */
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: var(--space-lg);
+  transition: all var(--t-normal) var(--bezier-phi);
+}
+
+.read-the-docs:hover {
+  color: var(--polar-cyan);
+  text-shadow: 0 0 calc(6px * var(--phi)) var(--polar-glow);
 }

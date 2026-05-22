@@ -1,14 +1,15 @@
 /**
- * RAYO CERO — ADMIN HQ DASHBOARD (STABLE BUILD V41_SQUAD_SHARP)
+ * RAYO CERO — ADMIN HQ DASHBOARD (STABLE BUILD V44_SQUAD_SHARP)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * 
- * EVOLUCIÓN V41:
- * - AMBIGUITY RESOLUTION: Implementación de alias 'race_results:race_results!...' 
- *   para aniquilar el error PGRST201 en el radar de escuadrones.
- * - SQUAD TELEMETRY: Cálculo matemático de tiempos combinados para equipos de 4.
- * - TS COMPLIANCE: Mantiene la eliminación de 'title' en iconos para evitar error 2322.
- * - REGLA DE ORO RESPETADA: Código íntegro, funcional y evolucionado.
+ * EVOLUCIÓN V44:
+ * - CATEGORY MAPPING: Integración y renderizado dinámico del campo 'categoria' en la tabla de atletas,
+ *   lista de escuadrones, modal de inspección y reportes PDF.
+ * - SHIRT SIZE SYNC: Preserva el uso exacto del campo de base de datos 'talla_camiseta'.
+ * - TELEPHONE & COMMUNICATION: Mantenimiento estricto de las líneas de comunicación y desestructuración.
+ * - AMBIGUITY RESOLUTION: Preservación de alias de relación 'race_results' contra error PGRST201.
+ * - REGLA DE ORO RESPETADA: Código íntegro, funcional y evolucionado sin omitir componentes.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -37,10 +38,11 @@ interface Runner {
   cedula: string;
   email?: string;
   telefono?: string;
+  talla_camiseta?: string;
   referencia_pago?: string;
   created_at: string;
   bib_number?: string | number;
-  categoria?: string;
+  categoria?: string; // Campo completamente integrado en los componentes visuales
   comprobante_url?: string;
   comprobante_path?: string;
   pago_verificado?: boolean;
@@ -306,7 +308,7 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
   };
 
   const filteredAtletas = useMemo(() => {
-    return atletas.filter(a => `${a.nombre} ${a.apellido} ${a.cedula}`.toLowerCase().includes(searchTerm.toLowerCase()));
+    return atletas.filter(a => `${a.nombre} ${a.apellido} ${a.cedula} ${a.categoria || ''}`.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [atletas, searchTerm]);
 
   const exportToPDF = () => {
@@ -316,8 +318,8 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
     doc.addImage(img, 'PNG', 14, 10, 30, 10);
     doc.setFontSize(18);
     doc.text('RAYO CERO — REPORTE', 14, 30);
-    const rows = filteredAtletas.map(a => [`${a.nombre} ${a.apellido}`, `V-${a.cedula}`, a.telefono || 'N/A', a.bib_number ? `#${a.bib_number}` : '---']);
-    autoTable(doc, { startY: 40, head: [['Nombre', 'Cédula', 'Teléfono', 'Dorsal']], body: rows });
+    const rows = filteredAtletas.map(a => [`${a.nombre} ${a.apellido}`, `V-${a.cedula}`, a.telefono || 'N/A', a.categoria || 'N/A', a.talla_camiseta || 'N/A', a.bib_number ? `#${a.bib_number}` : '---']);
+    autoTable(doc, { startY: 40, head: [['Nombre', 'Cédula', 'Teléfono', 'Categoría', 'Talla', 'Dorsal']], body: rows });
     doc.save(`RAYOCERO_${Date.now()}.pdf`);
   };
 
@@ -345,15 +347,16 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
           <table className="w-full">
             <thead>
               <tr className="bg-white/5">
-                <th className="p-4 text-left text-[9px] uppercase text-gray-400">Atleta</th>
+                <th className="p-4 text-left text-[9px] uppercase text-gray-400">Atleta / Categoría</th>
                 <th className="p-4 text-left text-[9px] uppercase text-gray-400">Comunicación</th>
+                <th className="p-4 text-left text-[9px] uppercase text-gray-400">Talla</th>
                 <th className="p-4 text-left text-[9px] uppercase text-gray-400">Dorsal</th>
                 <th className="p-4 text-center text-[9px] uppercase text-gray-400">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
               {loading ? (
-                <tr><td colSpan={4} className="p-20 text-center text-cyan-500 font-black animate-pulse uppercase tracking-widest">Reconstruyendo Hangar...</td></tr>
+                <tr><td colSpan={5} className="p-20 text-center text-cyan-500 font-black animate-pulse uppercase tracking-widest">Reconstruyendo Hangar...</td></tr>
               ) : filteredAtletas.map(a => (
                 <tr key={a.id} className="hover:bg-white/[0.02] transition-colors">
                   <td className="p-4">
@@ -361,12 +364,22 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
                       {a.nombre} {a.apellido}
                       {a.pago_verificado && <ShieldCheck size={12} className="text-green-500" />}
                     </div>
-                    <div className="text-[9px] text-gray-500 font-mono">V-{a.cedula}</div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[9px] text-gray-500 font-mono">V-{a.cedula}</span>
+                      <span className="text-[8px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
+                        {a.categoria || 'SIN CAT'}
+                      </span>
+                    </div>
                   </td>
                   <td className="p-4">
                     <div className="flex items-center gap-2 text-cyan-400 text-[10px] font-mono">
                       <Phone size={12} /> {a.telefono || 'SIN_TLF'}
                     </div>
+                  </td>
+                  <td className="p-4">
+                    <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded border border-white/10 text-white">
+                      {a.talla_camiseta || 'N/A'}
+                    </span>
                   </td>
                   <td className="p-4">{a.bib_number ? `#${a.bib_number}` : <Clock size={14} className="text-yellow-500/50" />}</td>
                   <td className="p-4">
@@ -423,7 +436,9 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
                   </p>
                   <p className="text-cyan-400 font-mono text-xs">V-{selectedAtleta.cedula}</p>
                 </div>
+                <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Categoría Asignada</p><p className="text-cyan-400 font-black uppercase tracking-wider">{selectedAtleta.categoria || 'SIN ASIGNAR'}</p></div>
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Teléfono</p><p className="text-white font-mono">{selectedAtleta.telefono || 'SIN REGISTRO'}</p></div>
+                <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Talla Reservada</p><p className="text-white font-mono uppercase">{selectedAtleta.talla_camiseta || 'NO ESPECIFICADA'}</p></div>
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Referencia</p><p className="text-green-400 font-mono break-all">{selectedAtleta.referencia_pago || 'PENDIENTE'}</p></div>
                 <button 
                   onClick={() => toggleVerificacionPago(selectedAtleta.id, selectedAtleta.pago_verificado)}
@@ -480,11 +495,10 @@ const EscuadronesList = () => {
 
         const runnerIds = [...new Set(teamsData.flatMap(t => [t.runner_m1_id, t.runner_m2_id, t.runner_f1_id, t.runner_f2_id]).filter(Boolean))];
 
-        // MIA TACTICAL FIX: Usamos el alias explícito de relación sugerido por el error PGRST201
         const { data: runnersData, error: runnersError } = await supabase
           .from('runners')
           .select(`
-            id, nombre, apellido, bib_number, 
+            id, nombre, apellido, bib_number, telefono, talla_camiseta, categoria, 
             race_results:race_results!race_results_bib_number_fkey ( tiempo_chip )
           `)
           .in('id', runnerIds);
@@ -500,13 +514,15 @@ const EscuadronesList = () => {
             const memberData = runnersMap.get(id);
             if (!memberData) return null;
             
-            // Accedemos a través del alias 'race_results' que definimos en el select
             const timeRaw = (memberData as any).race_results?.[0]?.tiempo_chip;
             const secs = parseTimeToSeconds(timeRaw);
             if (secs > 0) totalSeconds += secs; else allFinished = false;
             return {
               nombre: `${memberData.nombre} ${memberData.apellido}`,
               bib: memberData.bib_number,
+              telefono: memberData.telefono,
+              talla_camiseta: memberData.talla_camiseta,
+              categoria: memberData.categoria,
               tiempoStr: secs > 0 ? formatSeconds(secs) : 'EN PISTA',
               secs
             };
@@ -557,7 +573,10 @@ const EscuadronesList = () => {
           <div className="space-y-3 mb-6">
             {equipo.members.map((m: any, i: number) => (
               <div key={i} className="flex justify-between items-center bg-white/[0.03] p-3 rounded-xl border border-white/5">
-                <div className="flex flex-col"><span className="text-xs font-bold text-white uppercase">{m.nombre}</span><span className="text-[9px] text-gray-500 font-mono">DORSAL #{m.bib || '---'}</span></div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-white uppercase">{m.nombre}</span>
+                  <span className="text-[9px] text-gray-500 font-mono">DORSAL #{m.bib || '---'} — {m.categoria || 'SIN CAT'} — TALLA: {m.talla_camiseta || 'N/A'}</span>
+                </div>
                 <span className={`text-xs font-mono font-bold px-3 py-1 rounded-lg ${m.secs > 0 ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' : 'bg-white/5 text-gray-400'}`}>{m.tiempoStr}</span>
               </div>
             ))}
@@ -600,7 +619,24 @@ export default function AdminDashboard() {
           <button onClick={() => setActiveTab('race_config')} className={`px-8 py-5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'race_config' ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' : 'bg-white/5 hover:bg-white/10 text-gray-400'}`}>Carrera</button>
           <button onClick={() => setActiveTab('results')} className={`px-8 py-5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'results' ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' : 'bg-white/5 hover:bg-white/10 text-gray-400'}`}>Resultados</button>
         </div>
-        {activeTab === 'overview' && (<><TasaConfig /><div className="grid grid-cols-1 lg:grid-cols-3 gap-8"><div className="lg:col-span-2"><AtletasList onUpdateCount={setTotalAtletas} /></div><div><div className="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-3xl p-8 text-black shadow-2xl relative overflow-hidden group"><div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><Activity size={80} /></div><h4 className="text-xs font-black uppercase relative z-10">Participación Total</h4><p className="text-7xl font-black italic relative z-10">{totalAtletas.toString().padStart(3, '0')}</p><p className="text-[10px] font-bold uppercase mt-4 opacity-70">Unidades en Base</p></div></div></div></>)}
+        {activeTab === 'overview' && (
+          <>
+            <TasaConfig />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2">
+                <AtletasList onUpdateCount={setTotalAtletas} />
+              </div>
+              <div>
+                <div className="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-3xl p-8 text-black shadow-2xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><Activity size={80} /></div>
+                  <h4 className="text-xs font-black uppercase relative z-10">Participación Total</h4>
+                  <p className="text-7xl font-black italic relative z-10">{totalAtletas.toString().padStart(3, '0')}</p>
+                  <p className="text-[10px] font-bold uppercase mt-4 opacity-70">Unidades en Base</p>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
         {activeTab === 'teams' && (<EscuadronesList />)}
         {activeTab === 'race_config' && (<div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in slide-in-from-bottom-4"><RaceForm /><RouteConfig /></div>)}
         {activeTab === 'results' && (<div className="animate-in fade-in"><ResultsTable /></div>)}

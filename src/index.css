@@ -6,43 +6,48 @@
 
 @layer base {
   :root {
+    /* --- CONSTANTES GEOMÉTRICAS (PHI) --- */
+    --phi: 1.618034;
+
     /* [RAYO CERO CORE] - Obsidian Naval Base */
-    --background: 210 30% 3%;     /* #02060a */
+    --background: 220 40% 2%;     /* #020408 - Fondo ultra oscuro balanceado */
     --foreground: 210 10% 98%;    /* White/98 */
 
-    /* [RAYO CERO ACCENT] - Electric Cyan */
-    --primary: 195 100% 50%;      /* #00bfff - Cyan Principal */
-    --primary-foreground: 210 30% 3%;
+    /* [SPONSOR ACCENT] - Polar Light Cyan (#50E8E3) */
+    --primary: 176 77% 61%;       /* #50E8E3 - Cyan Eléctrico de Alta Visibilidad */
+    --primary-foreground: 220 40% 2%;
 
-    --card: 210 30% 6%;           /* Un tono arriba del fondo */
+    --card: 220 40% 4%;           /* Un paso arriba en la escala de profundidad */
     --card-foreground: 0 0% 98%;
 
-    --popover: 210 30% 5%;
+    --popover: 220 40% 3%;
     --popover-foreground: 0 0% 98%;
 
-    --secondary: 210 20% 12%;
+    --secondary: 220 25% 10%;
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 20% 12%;
-    --muted-foreground: 210 10% 60%;
+    --muted: 220 25% 10%;
+    --muted-foreground: 220 10% 60%;
 
-    --accent: 195 100% 40%;
+    /* Acento de dispersión lumínica en saturación media */
+    --accent: 176 77% 45%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 350 85% 55%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 210 20% 14%;
-    --input: 210 20% 14%;
-    --ring: 195 100% 50%;
+    --border: 220 25% 12%;
+    --input: 220 25% 12%;
+    --ring: 176 77% 61%;
 
-    --radius: 1.25rem; /* Bordes más suaves, estilo App Apple */
+    /* --- RADIOS SINTONIZADOS CON PHI --- */
+    --radius: 1.236rem;           /* Calibración: 1rem * (phi - 0.382) */
 
-    /* Tokens de Diseño Premium */
-    --glass-bg: 210 30% 8%;
-    --glass-border: 210 20% 25%;
-    --glow-cyan: 195 100% 50%;
-    --success: 150 80% 50%;
+    /* Tokens de Diseño Premium (Liquid Physics) */
+    --glass-bg: 220 40% 5%;
+    --glass-border: 176 77% 20%;  /* Bordes de cristal polarizado reactivo */
+    --glow-cyan: 176 77% 61%;
+    --success: 145 80% 50%;
   }
 }
 
@@ -53,72 +58,88 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    /* [MIA TYPOGRAPHY] - Inter Variable con ajustes de espaciado de diseñador */
     font-family: 'Inter', -apple-system, sans-serif;
     letter-spacing: -0.015em;
     font-feature-settings: "ss01", "ss03", "cv08", "tnum"; 
   }
 
-  /* Títulos de Alto Rendimiento */
+  /* Títulos de Alto Rendimiento (Estilo Tipográfico de la Carrera) */
   h1, h2, h3, h4 {
     @apply font-black italic tracking-tighter uppercase;
-    line-height: 0.9;
+    line-height: 0.85; /* Ajustado para la tipografía compacta "WE RUN" */
   }
 }
 
 @layer components {
-  /* [MIA UI] - Botón con Simetría Perfecta y Glow sutil */
+  /* [MIA UI] - Botón con Proporciones Áureas y Glow Polar */
   .btn-primary {
-    @apply relative flex items-center justify-center gap-3 px-8 py-4 
-           rounded-2xl font-black text-sm uppercase tracking-widest
-           bg-primary text-primary-foreground transition-all duration-300
-           hover:scale-[1.02] active:scale-[0.98]
-           shadow-[0_0_20px_rgba(0,191,255,0.25)];
+    @apply relative flex items-center justify-center gap-3 rounded-2xl font-black text-sm uppercase tracking-widest
+           bg-primary text-primary-foreground transition-all duration-500
+           hover:scale-[1.0382] active:scale-[0.9618];
+    /* Padding calibrado: Vertical (1rem) / Horizontal (1.618rem * 1.618rem = 2.618rem) */
+    padding: 1rem 2.618rem;
+    box-shadow: 0 0 calc(12px * var(--phi)) hsla(var(--glow-cyan), 0.3);
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  .btn-primary:hover {
+    box-shadow: 0 0 calc(24px * var(--phi)) hsla(var(--glow-cyan), 0.5);
   }
 
   .btn-secondary {
-    @apply flex items-center justify-center gap-3 px-8 py-4 
-           rounded-2xl font-black text-sm uppercase tracking-widest
+    @apply flex items-center justify-center gap-3 rounded-2xl font-black text-sm uppercase tracking-widest
            bg-white/5 border border-white/10 text-white backdrop-blur-xl
-           transition-all duration-300 hover:bg-white/10 active:scale-[0.98];
+           transition-all duration-500 active:scale-[0.9618];
+    padding: 1rem 2.618rem;
+    transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  .btn-secondary:hover {
+    @apply bg-white/10 border-primary/30 text-primary;
   }
 
-  /* [MIA UI] - Liquid Glass (Perfeccionado) */
+  /* [MIA UI] - Liquid Glass Perfeccionado para la Noche */
   .glass-card {
-    @apply relative rounded-[2.5rem] border border-white/10 overflow-hidden;
+    @apply relative overflow-hidden;
+    /* Radio de esquina mapeado a escala Fibonacci */
+    border-radius: calc(16px * var(--phi)); 
+    border: 1px solid hsla(var(--glass-border), 0.25);
     background: radial-gradient(
       circle at top left,
-      hsla(var(--glass-bg), 0.7),
-      hsla(var(--glass-bg), 0.3)
+      hsla(var(--glass-bg), 0.75),
+      hsla(var(--glass-bg), 0.4)
     );
-    backdrop-filter: blur(30px) saturate(1.8);
+    backdrop-filter: blur(24px) saturate(1.8);
     box-shadow: 
-      0 20px 50px rgba(0,0,0,0.4),
-      inset 0 1px 1px rgba(255,255,255,0.05);
+      0 calc(10px * var(--phi)) calc(30px * var(--phi)) rgba(0,0,0,0.6),
+      inset 0 1px 1px rgba(255,255,255,0.08),
+      inset 0 0 20px hsla(var(--glow-cyan), 0.05);
   }
 
-  /* Mesh Gradient: Ahora con la paleta Cyan/Naval */
+  /* Mesh Gradient Atmosférico: Simulación de Iluminación de Carrera Nocturna */
   .mesh-gradient {
     background: 
-      radial-gradient(circle at 10% 10%, hsla(195, 100%, 50%, 0.12) 0%, transparent 40%),
-      radial-gradient(circle at 90% 90%, hsla(195, 100%, 50%, 0.08) 0%, transparent 40%),
-      radial-gradient(circle at 50% 50%, hsla(210, 30%, 5%, 1) 0%, transparent 100%),
+      radial-gradient(circle at 5% 10%, hsla(176, 77%, 61%, 0.15) 0%, transparent 45%),
+      radial-gradient(circle at 95% 85%, hsla(176, 77%, 45%, 0.1) 0%, transparent 40%),
+      radial-gradient(circle at 50% 50%, hsla(220, 40%, 3%, 1) 0%, transparent 100%),
       hsl(var(--background));
   }
 
-  /* Gradiente de Texto Rayo Cero */
+  /* Gradiente de Texto de Alto Contraste */
   .text-rayo-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-b from-white to-white/40;
+    @apply bg-clip-text text-transparent bg-gradient-to-b from-white via-white to-white/50;
   }
 }
 
 @layer utilities {
+  /* Dispersión de Fósforo Orgánico */
   .text-glow-cyan {
-    text-shadow: 0 0 15px hsla(var(--glow-cyan), 0.4);
+    text-shadow: 0 0 calc(8px * var(--phi)) hsla(var(--glow-cyan), 0.5);
   }
   
-  /* Simetría de Contenedor */
+  /* Simetría del Contenedor Basada en Bloques Áureos */
   .container-tight {
-    @apply max-w-6xl mx-auto px-6;
+    @apply mx-auto px-6;
+    max-width: calc(45rem * var(--phi)); /* ~72.8rem / 1165px para un enfoque compacto de alta lectura */
   }
 }

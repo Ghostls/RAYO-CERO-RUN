@@ -62,7 +62,7 @@ const Navbar = () => {
               {!logoError ? (
                 <img 
                   src={logoPng} 
-                  alt="Rayo Cero" 
+                  alt="Rayocero" 
                   className="h-10 w-auto object-contain"
                   onError={() => setLogoError(true)} 
                 />
