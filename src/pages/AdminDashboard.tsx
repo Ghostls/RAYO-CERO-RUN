@@ -1,24 +1,21 @@
 /**
- * RAYO CERO — ADMIN HQ DASHBOARD (STABLE BUILD V44_SQUAD_SHARP)
+ * RAYO CERO — ADMIN HQ DASHBOARD (STABLE BUILD V46_TELEMETRY_DEPLOY)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
- * 
- * EVOLUCIÓN V44:
- * - CATEGORY MAPPING: Integración y renderizado dinámico del campo 'categoria' en la tabla de atletas,
- *   lista de escuadrones, modal de inspección y reportes PDF.
- * - SHIRT SIZE SYNC: Preserva el uso exacto del campo de base de datos 'talla_camiseta'.
- * - TELEPHONE & COMMUNICATION: Mantenimiento estricto de las líneas de comunicación y desestructuración.
- * - AMBIGUITY RESOLUTION: Preservación de alias de relación 'race_results' contra error PGRST201.
+ * EVOLUCIÓN V46:
+ * - TELEMETRY MODULE: Integración del panel de telemetría RFID en tiempo real.
+ *   SSE stream desde backend Python (FX9600 + sllurp). Pistola de salida,
+ *   detección de cruces, tabla de resultados live.
  * - REGLA DE ORO RESPETADA: Código íntegro, funcional y evolucionado sin omitir componentes.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import {
   ShieldCheck, Settings, LogOut, Activity, RefreshCw, Save, CheckCircle,
   Search, CheckSquare, Eye, X, ShieldAlert, FileText, Trash2, Phone,
-  Clock, AlertTriangle, Users 
+  Clock, AlertTriangle, Users, Package, Scan, Radio, Zap
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -42,13 +39,18 @@ interface Runner {
   referencia_pago?: string;
   created_at: string;
   bib_number?: string | number;
-  categoria?: string; // Campo completamente integrado en los componentes visuales
+  categoria?: string;
   comprobante_url?: string;
   comprobante_path?: string;
   pago_verificado?: boolean;
+  rfid_epc?: string | null;
 }
 
 const BUCKET = 'comprobantes-pago';
+
+// ── CAMBIAR ESTA IP AL IP DE LA PC WINDOWS EN EL EVENTO ──────────
+// Ejecutar ipconfig en CMD y copiar la IPv4 de la red local
+const TELEMETRY_API = 'http://localhost:8090';
 
 /* ────────────────────────────────────────────────────────────── */
 /* HELPERS FÍSICO-MATEMÁTICOS PARA TELEMETRÍA DE EQUIPOS         */
@@ -70,7 +72,7 @@ const parseTimeToSeconds = (timeVal: any): number => {
 };
 
 const formatSeconds = (totalSeconds: number): string => {
-  if (totalSeconds <= 0) return "--:--:--";
+  if (totalSeconds <= 0) return '--:--:--';
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = Math.floor(totalSeconds % 60);
@@ -105,6 +107,160 @@ const getComprobantePublicUrl = async (
     offset += PAGE_SIZE;
   }
   return null;
+};
+
+/* ────────────────────────────────────────────────────────────── */
+/* MÓDULO TÁCTICO: ENTREGA DE KITS Y APROVISIONAMIENTO RFID       */
+/* ────────────────────────────────────────────────────────────── */
+
+const ModuloEntregaKits = () => {
+  const [bibInput, setBibInput] = useState<string>('');
+  const [epcInput, setEpcInput] = useState<string>('');
+  const [activeRunner, setActiveRunner] = useState<Runner | null>(null);
+  const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  const epcInputRef = useRef<HTMLInputElement>(null);
+
+  const searchRunner = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!bibInput) return;
+    setIsLoading(true);
+    setStatusMsg(null);
+    setActiveRunner(null);
+    const { data, error } = await supabase
+      .from('runners')
+      .select('id, bib_number, nombre, apellido, cedula, categoria, rfid_epc, talla_camiseta')
+      .eq('bib_number', parseInt(bibInput, 10))
+      .single();
+    setIsLoading(false);
+    if (error || !data) {
+      setStatusMsg({ text: `Objetivo DORSAL #${bibInput} no localizado en la base.`, type: 'error' });
+      return;
+    }
+    if (data.rfid_epc) {
+      setStatusMsg({ text: `ALERTA: El dorsal ${data.bib_number} ya posee el chip enlazado (${data.rfid_epc}).`, type: 'error' });
+      return;
+    }
+    setActiveRunner(data as Runner);
+    setStatusMsg({ text: 'Identidad confirmada. Proceda a escanear el chip RFID sobre el sensor HID.', type: 'info' });
+    setTimeout(() => epcInputRef.current?.focus(), 100);
+  };
+
+  const handleEpcScan = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!activeRunner || !epcInput) return;
+      setIsLoading(true);
+      const { error } = await supabase
+        .from('runners')
+        .update({ rfid_epc: epcInput })
+        .eq('id', activeRunner.id);
+      setIsLoading(false);
+      if (error) {
+        setStatusMsg({ text: `Falla de enlace: ${error.message}`, type: 'error' });
+        setEpcInput('');
+      } else {
+        setStatusMsg({ text: `APROVISIONAMIENTO EXITOSO: Chip asignado al Dorsal #${activeRunner.bib_number}`, type: 'success' });
+        setBibInput('');
+        setEpcInput('');
+        setActiveRunner(null);
+      }
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto bg-black/40 border border-cyan-500/20 rounded-2xl p-8 shadow-2xl relative overflow-hidden animate-in fade-in">
+      <div className="absolute top-0 right-0 bg-cyan-500/10 text-cyan-400 font-black text-xs px-4 py-2 rounded-bl-2xl border-b border-l border-cyan-500/20">
+        ENLACE RFID ACTIVO
+      </div>
+      <h3 className="text-xl font-black text-white uppercase italic tracking-widest flex items-center gap-3 mb-8">
+        <Package className="text-cyan-400" /> Centro de Aprovisionamiento
+      </h3>
+      {statusMsg && (
+        <div className={`p-4 mb-8 rounded-xl border backdrop-blur-md font-mono text-xs uppercase font-bold tracking-wider ${
+          statusMsg.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+          statusMsg.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
+          'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
+        }`}>
+          {statusMsg.type === 'success' && <CheckCircle size={16} className="inline mr-2 mb-1" />}
+          {statusMsg.type === 'error' && <AlertTriangle size={16} className="inline mr-2 mb-1" />}
+          {statusMsg.text}
+        </div>
+      )}
+      <form onSubmit={searchRunner} className="flex gap-4 mb-8">
+        <div className="flex-1">
+          <label className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-2 block">
+            Número de Dorsal Físico
+          </label>
+          <input
+            type="number"
+            value={bibInput}
+            onChange={(e) => setBibInput(e.target.value)}
+            disabled={activeRunner !== null}
+            className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-2xl font-black text-white outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50"
+            placeholder="Ej: 0001"
+            autoFocus
+          />
+        </div>
+        <div className="flex items-end">
+          <button
+            type="submit"
+            disabled={!bibInput || isLoading || activeRunner !== null}
+            className="h-[64px] px-8 flex items-center justify-center gap-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-[0.2em] transition-all disabled:opacity-50"
+          >
+            {isLoading && !activeRunner ? <RefreshCw className="animate-spin" size={18} /> : <Search size={18} />}
+            Localizar
+          </button>
+        </div>
+      </form>
+      {activeRunner && (
+        <div className="space-y-6 border-t border-white/10 pt-8 animate-in slide-in-from-bottom-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-white/[0.02] border border-white/5 p-5 rounded-xl">
+              <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-1">Objetivo Identificado</p>
+              <p className="text-lg font-black text-white uppercase">{activeRunner.nombre} {activeRunner.apellido}</p>
+              <p className="text-xs text-cyan-400 font-mono mt-1">CI: V-{activeRunner.cedula}</p>
+            </div>
+            <div className="bg-white/[0.02] border border-white/5 p-5 rounded-xl flex flex-col justify-center">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[9px] text-gray-500 uppercase font-black tracking-widest">Categoría:</span>
+                <span className="text-xs text-white font-bold">{activeRunner.categoria || 'N/A'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[9px] text-gray-500 uppercase font-black tracking-widest">Talla Asignada:</span>
+                <span className="text-xs bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded font-black">{activeRunner.talla_camiseta || 'N/A'}</span>
+              </div>
+            </div>
+          </div>
+          <div className="bg-cyan-900/10 border-2 border-dashed border-cyan-500/30 rounded-xl p-6 relative">
+            <label className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Scan size={14} /> Interceptación de Código EPC
+            </label>
+            <input
+              ref={epcInputRef}
+              type="text"
+              value={epcInput}
+              onChange={(e) => setEpcInput(e.target.value)}
+              onKeyDown={handleEpcScan}
+              disabled={isLoading}
+              className="w-full bg-transparent border-b-2 border-cyan-500/50 pb-2 text-center text-xl font-mono text-white outline-none focus:border-cyan-400 transition-colors placeholder-cyan-500/20"
+              placeholder="[ APROXIME EL CHIP AL LECTOR USB ]"
+            />
+            <p className="text-center text-[9px] text-gray-500 uppercase mt-4 tracking-widest">El sensor ejecutará el enlace automáticamente al leer el tag.</p>
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={() => { setActiveRunner(null); setBibInput(''); }}
+              className="text-[10px] uppercase font-black tracking-widest text-red-500 hover:text-red-400 transition-colors"
+            >
+              [ Abortar Secuencia ]
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 /* ────────────────────────────────────────────────────────────── */
@@ -163,37 +319,18 @@ const TasaConfig = () => {
         <form onSubmit={handleUpdateProtocol} className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="tasa_bcv_input" className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-2 block">
-                Tasa BCV
-              </label>
-              <input
-                id="tasa_bcv_input"
-                name="tasa_bcv"
-                type="text"
-                value={nuevaTasa}
-                onChange={(e) => setNuevaTasa(e.target.value)}
-                className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-cyan-500/50 transition-colors"
-              />
+              <label htmlFor="tasa_bcv_input" className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-2 block">Tasa BCV</label>
+              <input id="tasa_bcv_input" name="tasa_bcv" type="text" value={nuevaTasa} onChange={(e) => setNuevaTasa(e.target.value)}
+                className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-cyan-500/50 transition-colors" />
             </div>
             <div>
-              <label htmlFor="costo_usd_input" className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-2 block">
-                Inscripción USD
-              </label>
-              <input
-                id="costo_usd_input"
-                name="costo_usd"
-                type="text"
-                value={nuevoCostoUSD}
-                onChange={(e) => setNuevoCostoUSD(e.target.value)}
-                className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-cyan-500/50 transition-colors"
-              />
+              <label htmlFor="costo_usd_input" className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-2 block">Inscripción USD</label>
+              <input id="costo_usd_input" name="costo_usd" type="text" value={nuevoCostoUSD} onChange={(e) => setNuevoCostoUSD(e.target.value)}
+                className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-cyan-500/50 transition-colors" />
             </div>
           </div>
-          <button
-            type="submit"
-            disabled={isSaving || isLoading}
-            className="w-full flex items-center justify-center gap-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black px-6 py-4 text-xs font-black uppercase tracking-[0.2em] transition-all"
-          >
+          <button type="submit" disabled={isSaving || isLoading}
+            className="w-full flex items-center justify-center gap-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black px-6 py-4 text-xs font-black uppercase tracking-[0.2em] transition-all">
             {isSaving ? <RefreshCw className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
             {isSaving ? 'ACTUALIZANDO...' : 'SINCRONIZAR'}
           </button>
@@ -254,10 +391,7 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
   };
 
   useEffect(() => { fetchAtletas(); }, []);
-
-  useEffect(() => {
-    if (onUpdateCount) onUpdateCount(atletas.length);
-  }, [atletas.length, onUpdateCount]);
+  useEffect(() => { if (onUpdateCount) onUpdateCount(atletas.length); }, [atletas.length, onUpdateCount]);
 
   const toggleVerificacionPago = async (id: string, currentStatus: boolean | undefined) => {
     setIsTogglingPayment(id);
@@ -332,15 +466,9 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
           </button>
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-            <input
-              id="filter_atletas"
-              name="filter_atletas"
-              type="text"
-              placeholder="Filtrar base..."
-              value={searchTerm}
+            <input id="filter_atletas" name="filter_atletas" type="text" placeholder="Filtrar base..." value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-10 pr-4 text-[10px] uppercase font-bold outline-none focus:border-cyan-500/30 transition-all"
-            />
+              className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-10 pr-4 text-[10px] uppercase font-bold outline-none focus:border-cyan-500/30 transition-all" />
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -350,7 +478,7 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
                 <th className="p-4 text-left text-[9px] uppercase text-gray-400">Atleta / Categoría</th>
                 <th className="p-4 text-left text-[9px] uppercase text-gray-400">Comunicación</th>
                 <th className="p-4 text-left text-[9px] uppercase text-gray-400">Talla</th>
-                <th className="p-4 text-left text-[9px] uppercase text-gray-400">Dorsal</th>
+                <th className="p-4 text-left text-[9px] uppercase text-gray-400">Dorsal & RFID</th>
                 <th className="p-4 text-center text-[9px] uppercase text-gray-400">Acciones</th>
               </tr>
             </thead>
@@ -381,21 +509,19 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
                       {a.talla_camiseta || 'N/A'}
                     </span>
                   </td>
-                  <td className="p-4">{a.bib_number ? `#${a.bib_number}` : <Clock size={14} className="text-yellow-500/50" />}</td>
+                  <td className="p-4">
+                    <div className="flex flex-col">
+                      <span className="font-bold text-white">{a.bib_number ? `#${a.bib_number}` : <Clock size={14} className="text-yellow-500/50" />}</span>
+                      {a.rfid_epc && <span className="text-[8px] text-cyan-400 font-mono tracking-widest mt-1">RFID CONFIRMADO</span>}
+                    </div>
+                  </td>
                   <td className="p-4">
                     <div className="flex items-center justify-center gap-2">
                       <button onClick={() => inspectComprobante(a)} className="p-2 rounded-lg bg-white/5 hover:bg-cyan-500 hover:text-black transition-all">
                         <Eye size={16} />
                       </button>
-                      <button 
-                        onClick={() => toggleVerificacionPago(a.id, a.pago_verificado)}
-                        disabled={isTogglingPayment === a.id}
-                        className={`p-2 rounded-lg transition-all border ${
-                          a.pago_verificado 
-                            ? 'bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500 hover:text-black' 
-                            : 'bg-white/5 text-gray-500 border-transparent hover:bg-white/10 hover:text-white'
-                        }`}
-                      >
+                      <button onClick={() => toggleVerificacionPago(a.id, a.pago_verificado)} disabled={isTogglingPayment === a.id}
+                        className={`p-2 rounded-lg transition-all border ${a.pago_verificado ? 'bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500 hover:text-black' : 'bg-white/5 text-gray-500 border-transparent hover:bg-white/10 hover:text-white'}`}>
                         {isTogglingPayment === a.id ? <RefreshCw size={16} className="animate-spin" /> : <CheckSquare size={16} />}
                       </button>
                       <button onClick={() => setAthleteToDelete(a)} className="p-2 rounded-lg bg-white/5 hover:bg-red-500 hover:text-black text-red-500 transition-all">
@@ -440,13 +566,8 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Teléfono</p><p className="text-white font-mono">{selectedAtleta.telefono || 'SIN REGISTRO'}</p></div>
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Talla Reservada</p><p className="text-white font-mono uppercase">{selectedAtleta.talla_camiseta || 'NO ESPECIFICADA'}</p></div>
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Referencia</p><p className="text-green-400 font-mono break-all">{selectedAtleta.referencia_pago || 'PENDIENTE'}</p></div>
-                <button 
-                  onClick={() => toggleVerificacionPago(selectedAtleta.id, selectedAtleta.pago_verificado)}
-                  disabled={isTogglingPayment === selectedAtleta.id}
-                  className={`w-full py-3 rounded-xl flex items-center justify-center gap-2 text-xs font-black uppercase transition-all ${
-                    selectedAtleta.pago_verificado ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-cyan-500 hover:bg-cyan-400 text-black'
-                  }`}
-                >
+                <button onClick={() => toggleVerificacionPago(selectedAtleta.id, selectedAtleta.pago_verificado)} disabled={isTogglingPayment === selectedAtleta.id}
+                  className={`w-full py-3 rounded-xl flex items-center justify-center gap-2 text-xs font-black uppercase transition-all ${selectedAtleta.pago_verificado ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-cyan-500 hover:bg-cyan-400 text-black'}`}>
                   {isTogglingPayment === selectedAtleta.id ? <RefreshCw size={14} className="animate-spin" /> : selectedAtleta.pago_verificado ? <><CheckCircle size={14} /> PAGO VALIDADO</> : <><ShieldCheck size={14} /> APROBAR PAGO</>}
                 </button>
               </div>
@@ -492,19 +613,12 @@ const EscuadronesList = () => {
         const { data: teamsData, error: teamsError } = await supabase.from('teams').select('*');
         if (teamsError) throw teamsError;
         if (!teamsData || teamsData.length === 0) { setEquipos([]); return; }
-
         const runnerIds = [...new Set(teamsData.flatMap(t => [t.runner_m1_id, t.runner_m2_id, t.runner_f1_id, t.runner_f2_id]).filter(Boolean))];
-
         const { data: runnersData, error: runnersError } = await supabase
           .from('runners')
-          .select(`
-            id, nombre, apellido, bib_number, telefono, talla_camiseta, categoria, 
-            race_results:race_results!race_results_bib_number_fkey ( tiempo_chip )
-          `)
+          .select(`id, nombre, apellido, bib_number, telefono, talla_camiseta, categoria, race_results:race_results!race_results_bib_number_fkey ( tiempo_chip )`)
           .in('id', runnerIds);
-
         if (runnersError) throw runnersError;
-
         const runnersMap = new Map(runnersData?.map(r => [r.id, r]));
         const processedTeams = teamsData.map(team => {
           const membersIds = [team.runner_m1_id, team.runner_m2_id, team.runner_f1_id, team.runner_f2_id];
@@ -513,34 +627,14 @@ const EscuadronesList = () => {
           const detailedMembers = membersIds.map(id => {
             const memberData = runnersMap.get(id);
             if (!memberData) return null;
-            
             const timeRaw = (memberData as any).race_results?.[0]?.tiempo_chip;
             const secs = parseTimeToSeconds(timeRaw);
             if (secs > 0) totalSeconds += secs; else allFinished = false;
-            return {
-              nombre: `${memberData.nombre} ${memberData.apellido}`,
-              bib: memberData.bib_number,
-              telefono: memberData.telefono,
-              talla_camiseta: memberData.talla_camiseta,
-              categoria: memberData.categoria,
-              tiempoStr: secs > 0 ? formatSeconds(secs) : 'EN PISTA',
-              secs
-            };
+            return { nombre: `${memberData.nombre} ${memberData.apellido}`, bib: memberData.bib_number, telefono: memberData.telefono, talla_camiseta: memberData.talla_camiseta, categoria: memberData.categoria, tiempoStr: secs > 0 ? formatSeconds(secs) : 'EN PISTA', secs };
           }).filter(Boolean);
-
-          return { 
-            ...team, 
-            members: detailedMembers, 
-            totalTimeStr: allFinished && totalSeconds > 0 ? formatSeconds(totalSeconds) : 'OPERATIVO', 
-            totalSeconds: allFinished ? totalSeconds : 0 
-          };
+          return { ...team, members: detailedMembers, totalTimeStr: allFinished && totalSeconds > 0 ? formatSeconds(totalSeconds) : 'OPERATIVO', totalSeconds: allFinished ? totalSeconds : 0 };
         });
-
-        processedTeams.sort((a, b) => {
-          if (a.totalSeconds === 0) return 1;
-          if (b.totalSeconds === 0) return -1;
-          return a.totalSeconds - b.totalSeconds;
-        });
+        processedTeams.sort((a, b) => { if (a.totalSeconds === 0) return 1; if (b.totalSeconds === 0) return -1; return a.totalSeconds - b.totalSeconds; });
         setEquipos(processedTeams);
       } catch (err) { console.error('[MIA_SQUAD_ERROR]', err); } finally { setLoading(false); }
     };
@@ -592,33 +686,374 @@ const EscuadronesList = () => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* MAIN DASHBOARD HQ */
+/* TELEMETRÍA RFID — MÓDULO V46                                  */
+/* ────────────────────────────────────────────────────────────── */
+
+interface SystemStatus {
+  llrp_connected: boolean;
+  reader_host: string;
+  antennas: number[];
+  runners_with_chip: number;
+  race_started: boolean;
+  race_start_time: string | null;
+  demo_mode: boolean;
+}
+
+interface CrossingEvent {
+  type: 'start' | 'finish' | 'race_start' | 'connected';
+  bib?: number;
+  nombre?: string;
+  categoria?: string;
+  time?: string;
+  elapsed_seconds?: number;
+  elapsed_str?: string;
+  epc?: string;
+}
+
+interface RaceResult {
+  position: number;
+  bib_number: number;
+  nombre: string;
+  apellido: string;
+  categoria: string;
+  genero: string;
+  finish_time_seconds: number;
+  finish_time_str: string;
+}
+
+const TelemetryModule = () => {
+  const [status, setStatus] = useState<SystemStatus | null>(null);
+  const [apiOnline, setApiOnline] = useState(false);
+  const [sseConnected, setSseConnected] = useState(false);
+  const [events, setEvents] = useState<CrossingEvent[]>([]);
+  const [results, setResults] = useState<RaceResult[]>([]);
+  const [activeSubTab, setActiveSubTab] = useState<'live' | 'results'>('live');
+  const [raceStarting, setRaceStarting] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const eventsEndRef = useRef<HTMLDivElement>(null);
+
+  // ── Polling status ──────────────────────────────────────────
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch(`${TELEMETRY_API}/status`, { signal: AbortSignal.timeout(3000) });
+        if (res.ok) {
+          setStatus(await res.json());
+          setApiOnline(true);
+        } else {
+          setApiOnline(false);
+        }
+      } catch {
+        setApiOnline(false);
+        setStatus(null);
+      }
+    };
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ── SSE en tiempo real ──────────────────────────────────────
+  useEffect(() => {
+    if (!apiOnline) return;
+    const es = new EventSource(`${TELEMETRY_API}/live`);
+    es.onopen = () => setSseConnected(true);
+    es.onerror = () => setSseConnected(false);
+    es.onmessage = (e) => {
+      try {
+        const event: CrossingEvent = JSON.parse(e.data);
+        if (event.type === 'connected') return;
+        setEvents(prev => [event, ...prev].slice(0, 100));
+        if (event.type === 'finish') fetchResults();
+      } catch {}
+    };
+    return () => { es.close(); setSseConnected(false); };
+  }, [apiOnline]);
+
+  // ── Resultados ──────────────────────────────────────────────
+  const fetchResults = async () => {
+    try {
+      const res = await fetch(`${TELEMETRY_API}/results`);
+      if (res.ok) setResults(await res.json());
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (apiOnline) {
+      fetchResults();
+      const interval = setInterval(fetchResults, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [apiOnline]);
+
+  // ── Acciones ────────────────────────────────────────────────
+  const handleRaceStart = async () => {
+    if (!confirm('¿Disparar pistola de salida? Se registrará start_time para todos los corredores.')) return;
+    setRaceStarting(true);
+    try {
+      const res = await fetch(`${TELEMETRY_API}/race/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+      const data = await res.json();
+      if (res.ok) alert(`✅ Carrera iniciada: ${data.start_time}`);
+      else alert(`❌ Error: ${data.detail}`);
+    } catch { alert('❌ No se pudo conectar con el servidor de telemetría'); }
+    finally { setRaceStarting(false); }
+  };
+
+  const handleReset = async () => {
+    if (!confirm('¿BORRAR TODOS LOS TIEMPOS? Esta acción no se puede deshacer.')) return;
+    setResetting(true);
+    try {
+      await fetch(`${TELEMETRY_API}/race/reset`, { method: 'POST' });
+      setResults([]);
+      setEvents([]);
+    } catch { alert('❌ Error en reset'); }
+    finally { setResetting(false); }
+  };
+
+  // ── Pantalla offline ────────────────────────────────────────
+  if (!apiOnline) {
+    return (
+      <div className="max-w-2xl mx-auto mt-12">
+        <div className="bg-black/40 border border-yellow-500/20 rounded-2xl p-12 text-center">
+          <Radio size={48} className="text-yellow-500/50 mx-auto mb-4" />
+          <h3 className="text-xl font-black text-white uppercase italic tracking-widest mb-2">Servidor Offline</h3>
+          <p className="text-gray-400 text-sm mb-6">El backend de telemetría no está accesible.</p>
+          <div className="bg-white/[0.03] border border-white/5 rounded-xl p-6 text-left space-y-2 mb-6">
+            <p className="text-[10px] text-yellow-400 font-black uppercase tracking-widest mb-3">Checklist de arranque:</p>
+            <p className="text-xs text-gray-300 font-mono">1. Ejecutar <span className="text-cyan-400">start_telemetry.bat</span> en la PC Windows</p>
+            <p className="text-xs text-gray-300 font-mono">2. Zebra IoT UI → Connection → <span className="text-cyan-400">Disconnect</span></p>
+            <p className="text-xs text-gray-300 font-mono">3. Confirmar en consola: <span className="text-green-400">✅ LLRP conectado</span></p>
+            <p className="text-xs text-gray-300 font-mono">4. URL actual: <span className="text-yellow-400">{TELEMETRY_API}</span></p>
+          </div>
+          <p className="text-[9px] text-gray-600 uppercase tracking-widest">
+            Si la IP cambió, editar la constante TELEMETRY_API en AdminDashboard.tsx
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 animate-in fade-in">
+
+      {/* Status Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          {
+            label: 'Lector RFID',
+            value: status?.llrp_connected ? 'CONECTADO' : status?.demo_mode ? 'DEMO' : 'OFFLINE',
+            color: status?.llrp_connected ? 'green' : status?.demo_mode ? 'yellow' : 'red',
+          },
+          { label: 'Corredores con chip', value: String(status?.runners_with_chip ?? 0), color: 'cyan' },
+          {
+            label: 'Carrera',
+            value: status?.race_started ? 'EN CURSO' : 'EN ESPERA',
+            color: status?.race_started ? 'green' : 'gray',
+          },
+          { label: 'Antenas activas', value: status?.antennas?.join(', ') ?? '—', color: 'cyan' },
+        ].map((card) => (
+          <div key={card.label} className={`bg-black/40 border rounded-2xl p-4 ${
+            card.color === 'green' ? 'border-green-500/20' :
+            card.color === 'yellow' ? 'border-yellow-500/20' :
+            card.color === 'red' ? 'border-red-500/20' :
+            card.color === 'cyan' ? 'border-cyan-500/20' :
+            'border-white/10'
+          }`}>
+            <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-1">{card.label}</p>
+            <p className={`font-black text-lg ${
+              card.color === 'green' ? 'text-green-400' :
+              card.color === 'yellow' ? 'text-yellow-400' :
+              card.color === 'red' ? 'text-red-400' :
+              card.color === 'cyan' ? 'text-cyan-400' :
+              'text-gray-400'
+            }`}>{card.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* SSE indicator */}
+      <div className="flex items-center gap-2">
+        <span className={`w-2 h-2 rounded-full ${sseConnected ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
+        <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">
+          {sseConnected ? 'Stream en vivo activo' : 'Stream desconectado'}
+        </span>
+      </div>
+
+      {/* Botones de control */}
+      <div className="flex flex-wrap gap-3">
+        <button
+          onClick={handleRaceStart}
+          disabled={raceStarting}
+          className="flex items-center gap-2 px-6 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-50"
+        >
+          {raceStarting ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
+          Disparar Pistola
+        </button>
+        <button
+          onClick={fetchResults}
+          className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-400 font-black uppercase text-xs tracking-widest transition-all border border-cyan-500/20"
+        >
+          <RefreshCw size={14} /> Actualizar
+        </button>
+        <button
+          onClick={handleReset}
+          disabled={resetting}
+          className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-900/30 hover:bg-red-900/50 text-red-400 font-black uppercase text-xs tracking-widest transition-all border border-red-500/20 ml-auto disabled:opacity-50"
+        >
+          {resetting ? <RefreshCw size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
+          Reset Tiempos
+        </button>
+      </div>
+
+      {/* Sub-tabs */}
+      <div className="flex gap-1 border-b border-white/5">
+        {(['live', 'results'] as const).map(tab => (
+          <button key={tab} onClick={() => setActiveSubTab(tab)}
+            className={`px-6 py-3 text-xs font-black uppercase tracking-widest transition-all rounded-t-xl ${
+              activeSubTab === tab
+                ? 'bg-white/5 text-yellow-400 border-b-2 border-yellow-400'
+                : 'text-gray-500 hover:text-white'
+            }`}>
+            {tab === 'live' ? '📡 Live' : '🏁 Resultados'}
+          </button>
+        ))}
+      </div>
+
+      {/* Live Events */}
+      {activeSubTab === 'live' && (
+        <div className="bg-black/40 border border-white/5 rounded-2xl p-4 max-h-[500px] overflow-y-auto">
+          {events.length === 0 ? (
+            <div className="py-16 text-center">
+              <Radio size={32} className="text-gray-700 mx-auto mb-3" />
+              <p className="text-gray-600 text-xs uppercase font-black tracking-widest">Esperando cruces de chips...</p>
+              <p className="text-gray-700 text-[9px] mt-1">El primer tag aparecerá aquí en tiempo real</p>
+            </div>
+          ) : (
+            events.map((ev, i) => {
+              if (ev.type === 'race_start') return (
+                <div key={i} className="flex items-center gap-3 py-3 border-b border-white/5 text-green-400">
+                  <Zap size={18} />
+                  <div>
+                    <span className="font-black text-xs uppercase">Pistola Disparada</span>
+                    <span className="text-gray-600 text-[9px] ml-2 font-mono">{ev.time}</span>
+                  </div>
+                </div>
+              );
+              const isFinish = ev.type === 'finish';
+              return (
+                <div key={i} className={`flex items-center gap-3 py-3 border-b border-white/5 ${isFinish ? 'text-yellow-400' : 'text-cyan-400'}`}>
+                  <span className="text-lg">{isFinish ? '🏁' : '🚀'}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className="font-black text-xs">BIB #{ev.bib}</span>
+                    <span className="text-white text-xs ml-2">{ev.nombre}</span>
+                    <span className="text-gray-500 text-[9px] ml-2 uppercase">{ev.categoria}</span>
+                  </div>
+                  {isFinish && ev.elapsed_str && (
+                    <span className="text-yellow-400 font-black text-sm font-mono flex-shrink-0">{ev.elapsed_str}</span>
+                  )}
+                  {!isFinish && <span className="text-cyan-400 text-[9px] font-black uppercase flex-shrink-0">Salida</span>}
+                </div>
+              );
+            })
+          )}
+          <div ref={eventsEndRef} />
+        </div>
+      )}
+
+      {/* Results Table */}
+      {activeSubTab === 'results' && (
+        <div className="bg-black/40 border border-white/5 rounded-2xl overflow-hidden">
+          {results.length === 0 ? (
+            <div className="py-16 text-center">
+              <p className="text-gray-600 text-xs uppercase font-black tracking-widest">Sin resultados aún</p>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="bg-white/5">
+                  <th className="p-4 text-left text-[9px] uppercase text-gray-400">#</th>
+                  <th className="p-4 text-left text-[9px] uppercase text-gray-400">Dorsal</th>
+                  <th className="p-4 text-left text-[9px] uppercase text-gray-400">Atleta</th>
+                  <th className="p-4 text-left text-[9px] uppercase text-gray-400">Categoría</th>
+                  <th className="p-4 text-right text-[9px] uppercase text-yellow-400">Tiempo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {results.map((r) => (
+                  <tr key={r.bib_number} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="p-4 text-gray-500 font-black text-sm">{r.position}</td>
+                    <td className="p-4 text-cyan-400 font-black text-sm">#{r.bib_number}</td>
+                    <td className="p-4 text-white text-xs font-bold uppercase">{r.nombre} {r.apellido}</td>
+                    <td className="p-4 text-gray-500 text-[9px] uppercase">{r.categoria}</td>
+                    <td className="p-4 text-right text-yellow-400 font-black font-mono">{r.finish_time_str}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ────────────────────────────────────────────────────────────── */
+/* MAIN DASHBOARD HQ — V46                                       */
 /* ────────────────────────────────────────────────────────────── */
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'race_config' | 'results' | 'teams'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'race_config' | 'results' | 'teams' | 'kit_delivery' | 'telemetry'>('overview');
   const [totalAtletas, setTotalAtletas] = useState(0);
+
   return (
     <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-cyan-500/30">
       <nav className="border-b border-white/5 bg-black/50 backdrop-blur-xl sticky top-0 z-[100]">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="h-10 w-10 bg-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20"><ShieldCheck className="text-black" size={24} /></div>
+            <div className="h-10 w-10 bg-cyan-500 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
+              <ShieldCheck className="text-black" size={24} />
+            </div>
             <div>
               <h1 className="text-lg font-black italic uppercase leading-none">Rayo Cero HQ</h1>
               <p className="text-[8px] text-gray-500 uppercase tracking-widest mt-1">Valkyron Group</p>
             </div>
           </div>
-          <button className="flex items-center gap-2 text-[10px] uppercase text-gray-400 hover:text-white transition-colors"><LogOut size={16} /> Salir</button>
+          <button className="flex items-center gap-2 text-[10px] uppercase text-gray-400 hover:text-white transition-colors">
+            <LogOut size={16} /> Salir
+          </button>
         </div>
       </nav>
+
       <main className="max-w-7xl mx-auto px-6 py-12">
-        <div className="flex flex-wrap gap-4 mb-12">
-          <button onClick={() => setActiveTab('overview')} className={`px-8 py-5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'overview' ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' : 'bg-white/5 hover:bg-white/10 text-gray-400'}`}>Dashboard</button>
-          <button onClick={() => setActiveTab('teams')} className={`px-8 py-5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'teams' ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' : 'bg-white/5 hover:bg-white/10 text-gray-400'}`}>Escuadrones</button>
-          <button onClick={() => setActiveTab('race_config')} className={`px-8 py-5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'race_config' ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' : 'bg-white/5 hover:bg-white/10 text-gray-400'}`}>Carrera</button>
-          <button onClick={() => setActiveTab('results')} className={`px-8 py-5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'results' ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' : 'bg-white/5 hover:bg-white/10 text-gray-400'}`}>Resultados</button>
+        {/* ── Tab Bar ── */}
+        <div className="flex flex-wrap gap-4 mb-12 border-b border-white/5 pb-6">
+          <button onClick={() => setActiveTab('overview')}
+            className={`px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'overview' ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' : 'bg-white/5 hover:bg-white/10 text-gray-400'}`}>
+            Dashboard
+          </button>
+          <button onClick={() => setActiveTab('kit_delivery')}
+            className={`px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all flex items-center gap-2 ${activeTab === 'kit_delivery' ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' : 'bg-white/5 hover:bg-white/10 text-gray-400'}`}>
+            <Package size={14} /> Entrega de Kits
+          </button>
+          <button onClick={() => setActiveTab('telemetry')}
+            className={`px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all flex items-center gap-2 ${activeTab === 'telemetry' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20' : 'bg-white/5 hover:bg-white/10 text-gray-400'}`}>
+            <Radio size={14} /> Telemetría
+          </button>
+          <button onClick={() => setActiveTab('teams')}
+            className={`px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'teams' ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' : 'bg-white/5 hover:bg-white/10 text-gray-400'}`}>
+            Escuadrones
+          </button>
+          <button onClick={() => setActiveTab('race_config')}
+            className={`px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'race_config' ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' : 'bg-white/5 hover:bg-white/10 text-gray-400'}`}>
+            Carrera
+          </button>
+          <button onClick={() => setActiveTab('results')}
+            className={`px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'results' ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20' : 'bg-white/5 hover:bg-white/10 text-gray-400'}`}>
+            Resultados
+          </button>
         </div>
+
+        {/* ── Tab Content ── */}
         {activeTab === 'overview' && (
           <>
             <TasaConfig />
@@ -637,9 +1072,22 @@ export default function AdminDashboard() {
             </div>
           </>
         )}
-        {activeTab === 'teams' && (<EscuadronesList />)}
-        {activeTab === 'race_config' && (<div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in slide-in-from-bottom-4"><RaceForm /><RouteConfig /></div>)}
-        {activeTab === 'results' && (<div className="animate-in fade-in"><ResultsTable /></div>)}
+
+        {activeTab === 'kit_delivery' && <ModuloEntregaKits />}
+
+        {activeTab === 'telemetry' && <TelemetryModule />}
+
+        {activeTab === 'teams' && <EscuadronesList />}
+
+        {activeTab === 'race_config' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in slide-in-from-bottom-4">
+            <RaceForm /><RouteConfig />
+          </div>
+        )}
+
+        {activeTab === 'results' && (
+          <div className="animate-in fade-in"><ResultsTable /></div>
+        )}
       </main>
     </div>
   );
