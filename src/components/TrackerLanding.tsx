@@ -1,22 +1,14 @@
 /**
- * RAYO CERO — TRACKER LANDING V1
+ * RAYO CERO — TRACKER LANDING V2
  * Mini PWA para corredores: BIB → GPS → Timer en vivo → Mapa resultado
+ * Diseño: Liquid Glass Morph + RouteMapStrava integrado
  * Valkyron Group — 2026
- *
- * FLUJO:
- * 1. Corredor abre rayocero-run.vercel.app/tracker
- * 2. Ingresa su BIB number
- * 3. App pide permiso GPS inmediatamente
- * 4. Pantalla de espera hasta que el chip cruce la salida
- * 5. Timer arranca en vivo via Supabase Realtime
- * 6. Al cruzar la meta: tiempo oficial + mapa de ruta
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { GeoKalmanFilter, GeoPoint } from './KalmanFilter';
 
-/* ─── Types ──────────────────────────────────────────────────── */
 type RaceStatus = 'waiting' | 'in_progress' | 'completed';
 type AppStep = 'bib_input' | 'gps_request' | 'waiting' | 'running' | 'finished';
 
@@ -32,7 +24,6 @@ interface Runner {
   gps_track?: GeoPoint[] | null;
 }
 
-/* ─── Helpers ────────────────────────────────────────────────── */
 const formatElapsed = (startIso: string): string => {
   const s = (Date.now() - new Date(startIso).getTime()) / 1000;
   const h = Math.floor(s / 3600);
@@ -52,59 +43,196 @@ const formatFinal = (seconds: number): string => {
 
 const calcDist = (pts: GeoPoint[]): number => pts.reduce((acc, p, i) => {
   if (i === 0) return 0;
-  const prev = pts[i-1];
+  const prev = pts[i - 1];
   const R = 6371;
   const dLat = ((p.lat - prev.lat) * Math.PI) / 180;
   const dLng = ((p.lng - prev.lng) * Math.PI) / 180;
-  const a = Math.sin(dLat/2)**2 + Math.cos((prev.lat*Math.PI)/180)*Math.cos((p.lat*Math.PI)/180)*Math.sin(dLng/2)**2;
-  return acc + R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((prev.lat * Math.PI) / 180) * Math.cos((p.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return acc + R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }, 0);
 
-/* ─── Route Map ──────────────────────────────────────────────── */
-const RouteMap = ({ points }: { points: GeoPoint[] }) => {
+const calcPace = (distKm: number, pts: GeoPoint[]): string => {
+  if (distKm < 0.01 || pts.length < 2) return '--:--';
+  const totalSec = (pts[pts.length - 1].timestamp - pts[0].timestamp) / 1000;
+  const paceSecPerKm = totalSec / distKm;
+  const m = Math.floor(paceSecPerKm / 60);
+  const s = Math.floor(paceSecPerKm % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+};
+
+/* ─── Strava Route Map ───────────────────────────────────────── */
+const StravaMap = ({ points }: { points: GeoPoint[] }) => {
   if (points.length < 2) return null;
-  const PAD = 32, W = 600, H = 260;
-  const lats = points.map(p => p.lat);
-  const lngs = points.map(p => p.lng);
-  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-  const rLat = maxLat - minLat || 0.001;
-  const rLng = maxLng - minLng || 0.001;
-  const xy = (lat: number, lng: number) => ({
-    x: PAD + ((lng - minLng) / rLng) * (W - PAD * 2),
-    y: H - PAD - ((lat - minLat) / rLat) * (H - PAD * 2),
-  });
-  const path = points.map((p, i) => { const {x,y} = xy(p.lat,p.lng); return `${i===0?'M':'L'}${x.toFixed(1)},${y.toFixed(1)}`; }).join(' ');
-  const s = xy(points[0].lat, points[0].lng);
-  const e = xy(points[points.length-1].lat, points[points.length-1].lng);
-  const dist = calcDist(points);
+
+  const W = 800, H = 340, PAD = 44;
+
+  const { path, segments, startPt, endPt, dist, pace, hasSpeed, durationStr } = useMemo(() => {
+    const lats = points.map(p => p.lat);
+    const lngs = points.map(p => p.lng);
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+    const rLat = maxLat - minLat || 0.0001;
+    const rLng = maxLng - minLng || 0.0001;
+    const mapW = W - PAD * 2;
+    const mapH = H - PAD * 2;
+    const scaleX = mapW / rLng;
+    const scaleY = mapH / rLat;
+    const scale = Math.min(scaleX, scaleY);
+    const offX = (mapW - rLng * scale) / 2;
+    const offY = (mapH - rLat * scale) / 2;
+
+    const toXY = (lat: number, lng: number) => ({
+      x: PAD + offX + (lng - minLng) * scale,
+      y: PAD + offY + mapH - (lat - minLat) * scale,
+    });
+
+    const speeds = points.map(p => (p.speed ?? 0) * 3.6);
+    const maxSpd = Math.max(...speeds, 1);
+    const hs = speeds.some(s => s > 0.1);
+
+    const pathStr = points.map((p, i) => {
+      const { x, y } = toXY(p.lat, p.lng);
+      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
+
+    const segs = points.slice(1).map((p, i) => {
+      const prev = points[i];
+      const p1 = toXY(prev.lat, prev.lng);
+      const p2 = toXY(p.lat, p.lng);
+      const spd = hs ? (p.speed ?? 0) * 3.6 : 0;
+      const ratio = Math.min(spd / maxSpd, 1);
+      let color = '#00f2ff';
+      if (hs) {
+        if (ratio < 0.33) color = `hsl(${200 + ratio * 180},80%,60%)`;
+        else if (ratio < 0.66) color = `hsl(${60 - (ratio - 0.33) * 90},90%,55%)`;
+        else color = `hsl(${10},85%,55%)`;
+      }
+      return { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, color };
+    });
+
+    const s = toXY(points[0].lat, points[0].lng);
+    const e = toXY(points[points.length - 1].lat, points[points.length - 1].lng);
+    const d = calcDist(points);
+    const pc = calcPace(d, points);
+    const durSec = (points[points.length - 1].timestamp - points[0].timestamp) / 1000;
+    const durStr = durSec > 3600
+      ? `${Math.floor(durSec / 3600)}h ${Math.floor((durSec % 3600) / 60)}m`
+      : `${Math.floor(durSec / 60)}m ${Math.floor(durSec % 60)}s`;
+
+    return { path: pathStr, segments: segs, startPt: s, endPt: e, dist: d, pace: pc, hasSpeed: hs, durationStr: durStr };
+  }, [points]);
 
   return (
-    <div style={{ borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(0,242,255,0.15)', background: '#000', marginTop: 20 }}>
-      <div style={{ padding: '10px 16px', display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(0,242,255,0.08)' }}>
-        <span style={{ fontSize: 9, letterSpacing: '0.3em', color: 'rgba(0,242,255,0.6)', fontWeight: 900, textTransform: 'uppercase' }}>📍 Tu ruta GPS</span>
-        <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.1em' }}>{dist.toFixed(2)} km · {points.length} pts</span>
+    <div style={{
+      borderRadius: 20,
+      overflow: 'hidden',
+      background: 'rgba(0,5,10,0.8)',
+      border: '1px solid rgba(0,242,255,0.15)',
+      backdropFilter: 'blur(20px)',
+      marginTop: 20,
+    }}>
+      {/* Map header */}
+      <div style={{
+        padding: '10px 16px',
+        borderBottom: '1px solid rgba(0,242,255,0.08)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        background: 'rgba(0,242,255,0.03)',
+      }}>
+        <span style={{ fontSize: 9, color: 'rgba(0,242,255,0.7)', fontWeight: 900, letterSpacing: '0.3em', textTransform: 'uppercase' }}>
+          📍 Tu Ruta GPS
+        </span>
+        {hasSpeed && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.15em' }}>LENTO</span>
+            <div style={{ width: 36, height: 3, borderRadius: 2, background: 'linear-gradient(90deg, #4a9eff, #ffdd44, #ff5544)' }} />
+            <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.15em' }}>RÁPIDO</span>
+          </div>
+        )}
+        <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.1em' }}>{points.length} pts</span>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}>
+
+      {/* SVG Map */}
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block', background: 'radial-gradient(ellipse at center, rgba(0,20,40,0.8) 0%, rgba(0,5,10,1) 100%)' }}>
         <defs>
-          <linearGradient id="tl-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#00f2ff" stopOpacity="0.4" />
-            <stop offset="100%" stopColor="#00f2ff" stopOpacity="1" />
-          </linearGradient>
-          <filter id="tl-glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-          <filter id="tl-glow2"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <filter id="sm-glow">
+            <feGaussianBlur stdDeviation="2.5" result="b" />
+            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+          <filter id="lg-glow">
+            <feGaussianBlur stdDeviation="6" result="b" />
+            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+          <filter id="halo">
+            <feGaussianBlur stdDeviation="12" result="b" />
+            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
         </defs>
-        <path d={path} fill="none" stroke="rgba(0,242,255,0.08)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round"/>
-        <path d={path} fill="none" stroke="url(#tl-grad)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" filter="url(#tl-glow)"/>
-        <circle cx={s.x} cy={s.y} r={7} fill="rgba(34,197,94,0.2)" filter="url(#tl-glow2)"/>
-        <circle cx={s.x} cy={s.y} r={4} fill="#22c55e"/>
-        <circle cx={s.x} cy={s.y} r={2} fill="white"/>
-        <text x={s.x+10} y={s.y+4} fill="#22c55e" fontSize="9" fontFamily="monospace" fontWeight="bold">SALIDA</text>
-        <circle cx={e.x} cy={e.y} r={7} fill="rgba(0,242,255,0.2)" filter="url(#tl-glow2)"/>
-        <circle cx={e.x} cy={e.y} r={4} fill="#00f2ff"/>
-        <circle cx={e.x} cy={e.y} r={2} fill="white"/>
-        <text x={e.x+10} y={e.y+4} fill="#00f2ff" fontSize="9" fontFamily="monospace" fontWeight="bold">META</text>
+
+        {/* Grid */}
+        {[0.25, 0.5, 0.75].map(t => (
+          <g key={t}>
+            <line x1={PAD} y1={PAD + t * (H - PAD * 2)} x2={W - PAD} y2={PAD + t * (H - PAD * 2)}
+              stroke="rgba(0,242,255,0.04)" strokeWidth="1" strokeDasharray="6,12" />
+            <line x1={PAD + t * (W - PAD * 2)} y1={PAD} x2={PAD + t * (W - PAD * 2)} y2={H - PAD}
+              stroke="rgba(0,242,255,0.04)" strokeWidth="1" strokeDasharray="6,12" />
+          </g>
+        ))}
+
+        {/* Outer halo */}
+        <path d={path} fill="none" stroke="rgba(0,242,255,0.04)" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Inner glow */}
+        <path d={path} fill="none" stroke="rgba(0,242,255,0.08)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
+
+        {/* Route — color by speed or uniform */}
+        {hasSpeed ? (
+          segments.map((seg, i) => (
+            <line key={i} x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2}
+              stroke={seg.color} strokeWidth="3" strokeLinecap="round" filter="url(#sm-glow)" />
+          ))
+        ) : (
+          <path d={path} fill="none" stroke="#00f2ff" strokeWidth="3"
+            strokeLinecap="round" strokeLinejoin="round" filter="url(#sm-glow)" />
+        )}
+
+        {/* Start */}
+        <circle cx={startPt.x} cy={startPt.y} r={12} fill="rgba(34,197,94,0.12)" filter="url(#halo)" />
+        <circle cx={startPt.x} cy={startPt.y} r={7} fill="#22c55e" filter="url(#sm-glow)" />
+        <circle cx={startPt.x} cy={startPt.y} r={3} fill="white" />
+        <rect x={startPt.x + 11} y={startPt.y - 10} width={50} height={18} rx={5} fill="rgba(34,197,94,0.9)" />
+        <text x={startPt.x + 36} y={startPt.y + 3} fill="white" fontSize="9" fontFamily="monospace" fontWeight="bold" textAnchor="middle">SALIDA</text>
+
+        {/* Finish */}
+        <circle cx={endPt.x} cy={endPt.y} r={12} fill="rgba(0,242,255,0.12)" filter="url(#halo)" />
+        <circle cx={endPt.x} cy={endPt.y} r={7} fill="#00f2ff" filter="url(#sm-glow)" />
+        <circle cx={endPt.x} cy={endPt.y} r={3} fill="#03070b" />
+        <rect x={endPt.x + 11} y={endPt.y - 10} width={42} height={18} rx={5} fill="rgba(0,200,220,0.9)" />
+        <text x={endPt.x + 32} y={endPt.y + 3} fill="#03070b" fontSize="9" fontFamily="monospace" fontWeight="bold" textAnchor="middle">META</text>
       </svg>
+
+      {/* Stats bar */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderTop: '1px solid rgba(0,242,255,0.08)' }}>
+        {[
+          { label: 'Distancia', value: `${dist.toFixed(2)} km` },
+          { label: 'Ritmo', value: `${pace} /km` },
+          { label: 'Duración', value: durationStr },
+        ].map((stat, i) => (
+          <div key={i} style={{
+            padding: '12px 8px',
+            textAlign: 'center',
+            borderRight: i < 2 ? '1px solid rgba(0,242,255,0.08)' : 'none',
+            background: i === 1 ? 'rgba(0,242,255,0.02)' : 'transparent',
+          }}>
+            <div style={{ fontSize: 7, letterSpacing: '0.25em', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', marginBottom: 3 }}>
+              {stat.label}
+            </div>
+            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 17, fontWeight: 900, fontStyle: 'italic', color: '#00f2ff' }}>
+              {stat.value}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -126,9 +254,8 @@ export default function TrackerLanding() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<any>(null);
 
-  /* ── GPS ─────────────────────────────────────────────────── */
   const startGPS = useCallback(() => {
-    if (!navigator.geolocation) { setGpsStatus('error'); setGpsError('GPS no disponible en este dispositivo'); return; }
+    if (!navigator.geolocation) { setGpsStatus('error'); setGpsError('GPS no disponible'); return; }
     kalmanRef.current.reset();
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
@@ -149,7 +276,6 @@ export default function TrackerLanding() {
     }
   }, []);
 
-  /* ── Buscar corredor ────────────────────────────────────── */
   const handleBibSubmit = async () => {
     const bib = parseInt(bibInput.trim());
     if (!bib || isNaN(bib)) { setError('Ingresa un número de dorsal válido'); return; }
@@ -158,48 +284,37 @@ export default function TrackerLanding() {
       .select('bib_number,nombre,apellido,categoria,race_status,start_time,finish_time,finish_time_seconds,gps_track')
       .eq('bib_number', bib).single();
     setLoading(false);
-    if (err || !data) { setError(`Dorsal #${bib} no encontrado. Verifica tu número.`); return; }
+    if (err || !data) { setError(`Dorsal #${bib} no encontrado`); return; }
     const r = { ...data, race_status: data.race_status ?? 'waiting' } as Runner;
     setRunner(r);
-
     if (r.race_status === 'completed') {
       if (r.gps_track && r.gps_track.length > 0) setGpsPoints(r.gps_track);
-      setStep('finished');
-      return;
+      setStep('finished'); return;
     }
-
     if (r.race_status === 'in_progress' && r.start_time) {
-      setStep('running');
-      startGPS();
+      setStep('running'); startGPS();
       timerRef.current = setInterval(() => setElapsed(formatElapsed(r.start_time!)), 1000);
-      subscribeToRunner(bib, r);
-      return;
+      subscribeToRunner(bib, r); return;
     }
-
     setStep('gps_request');
   };
 
-  /* ── Activar GPS ────────────────────────────────────────── */
   const handleActivateGPS = () => {
-    startGPS();
-    setStep('waiting');
+    startGPS(); setStep('waiting');
     if (runner) subscribeToRunner(runner.bib_number, runner);
   };
 
-  /* ── Realtime ───────────────────────────────────────────── */
-  const subscribeToRunner = useCallback((bib: number, currentRunner: Runner) => {
+  const subscribeToRunner = useCallback((bib: number, _currentRunner: Runner) => {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
     channelRef.current = supabase.channel(`tracker-${bib}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'runners', filter: `bib_number=eq.${bib}` }, async (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'runners', filter: `bib_number=eq.${bib}` }, (payload) => {
         const updated = payload.new as Runner;
         setRunner(updated);
-
         if (updated.race_status === 'in_progress' && updated.start_time) {
           setStep('running');
           if (timerRef.current) clearInterval(timerRef.current);
           timerRef.current = setInterval(() => setElapsed(formatElapsed(updated.start_time!)), 1000);
         }
-
         if (updated.race_status === 'completed') {
           if (timerRef.current) clearInterval(timerRef.current);
           setGpsPoints(prev => { stopGPS(prev, bib); return prev; });
@@ -214,560 +329,442 @@ export default function TrackerLanding() {
     if (timerRef.current) clearInterval(timerRef.current);
   }, []);
 
-  /* ─── Render ─────────────────────────────────────────────── */
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&family=JetBrains+Mono:wght@400;700&display=swap');
 
-        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
         .tl-root {
-          min-height: 100vh;
-          min-height: 100dvh;
+          min-height: 100vh; min-height: 100dvh;
           background: #03070b;
+          background-image:
+            radial-gradient(ellipse at 20% 10%, rgba(0,242,255,0.06) 0%, transparent 40%),
+            radial-gradient(ellipse at 80% 90%, rgba(0,100,180,0.04) 0%, transparent 40%);
           font-family: 'JetBrains Mono', monospace;
           color: white;
-          display: flex;
-          flex-direction: column;
+          display: flex; flex-direction: column;
           overflow-x: hidden;
         }
 
-        .tl-header {
-          background: rgba(0,0,0,0.8);
-          border-bottom: 1px solid rgba(0,242,255,0.1);
-          backdrop-filter: blur(20px);
-          padding: 16px 20px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          flex-shrink: 0;
-        }
-
-        .tl-brand {
-          font-family: 'Barlow Condensed', sans-serif;
-          font-size: 20px;
-          font-weight: 900;
-          font-style: italic;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-
-        .tl-brand span { color: #00f2ff; }
-
-        .tl-step-indicator {
-          font-size: 8px;
-          letter-spacing: 0.3em;
-          color: rgba(0,242,255,0.4);
-          text-transform: uppercase;
-          font-weight: 700;
-        }
-
-        .tl-body {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          padding: 24px 20px;
-          max-width: 440px;
-          margin: 0 auto;
-          width: 100%;
-        }
-
-        /* ── BIB INPUT ── */
-        .tl-bib-section {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          gap: 32px;
-        }
-
-        .tl-bib-title {
-          font-family: 'Barlow Condensed', sans-serif;
-          font-size: clamp(32px, 10vw, 48px);
-          font-weight: 900;
-          font-style: italic;
-          text-transform: uppercase;
-          line-height: 1;
-          color: white;
-        }
-
-        .tl-bib-title span { color: #00f2ff; }
-
-        .tl-bib-sub {
-          font-size: 10px;
-          letter-spacing: 0.2em;
-          color: rgba(255,255,255,0.3);
-          text-transform: uppercase;
-          margin-top: 8px;
-        }
-
-        .tl-input-wrap { position: relative; }
-
-        .tl-input {
-          width: 100%;
+        /* ── GLASS MIXIN ── */
+        .glass {
           background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(0,242,255,0.2);
-          border-radius: 16px;
-          padding: 20px 24px;
-          color: white;
-          font-family: 'Barlow Condensed', sans-serif;
-          font-size: 48px;
-          font-weight: 900;
-          font-style: italic;
-          text-align: center;
-          letter-spacing: 0.05em;
-          outline: none;
-          transition: all 0.2s;
-          -webkit-appearance: none;
+          backdrop-filter: blur(24px) saturate(180%);
+          -webkit-backdrop-filter: blur(24px) saturate(180%);
+          border: 1px solid rgba(255,255,255,0.07);
+          box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 8px 32px rgba(0,0,0,0.3);
         }
 
-        .tl-input:focus {
-          border-color: rgba(0,242,255,0.5);
-          background: rgba(0,242,255,0.03);
-          box-shadow: 0 0 0 3px rgba(0,242,255,0.08);
-        }
-
-        .tl-input::placeholder { color: rgba(255,255,255,0.1); }
-
-        .tl-btn-main {
-          width: 100%;
-          padding: 20px;
-          background: #00f2ff;
-          border: none;
-          border-radius: 16px;
-          color: black;
-          font-family: 'Barlow Condensed', sans-serif;
-          font-size: 18px;
-          font-weight: 900;
-          font-style: italic;
-          letter-spacing: 0.15em;
-          text-transform: uppercase;
-          cursor: pointer;
-          transition: all 0.15s;
-          -webkit-appearance: none;
-        }
-
-        .tl-btn-main:active { transform: scale(0.98); }
-        .tl-btn-main:disabled { opacity: 0.3; cursor: not-allowed; }
-
-        .tl-btn-main.green {
-          background: #22c55e;
-        }
-
-        .tl-error {
-          background: rgba(239,68,68,0.08);
-          border: 1px solid rgba(239,68,68,0.2);
-          border-radius: 12px;
-          padding: 12px 16px;
-          color: #f87171;
-          font-size: 10px;
-          letter-spacing: 0.1em;
-          text-align: center;
-        }
-
-        /* ── GPS REQUEST ── */
-        .tl-gps-section {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          gap: 24px;
-        }
-
-        .tl-runner-card {
-          background: rgba(255,255,255,0.02);
-          border: 1px solid rgba(0,242,255,0.1);
-          border-radius: 20px;
-          padding: 24px;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .tl-runner-card::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 0; right: 0;
-          height: 1px;
-          background: linear-gradient(90deg, transparent, rgba(0,242,255,0.3), transparent);
-        }
-
-        .tl-runner-hello {
-          font-size: 10px;
-          letter-spacing: 0.3em;
-          color: rgba(0,242,255,0.5);
-          text-transform: uppercase;
-          font-weight: 700;
-          margin-bottom: 8px;
-        }
-
-        .tl-runner-name {
-          font-family: 'Barlow Condensed', sans-serif;
-          font-size: clamp(28px, 8vw, 40px);
-          font-weight: 900;
-          font-style: italic;
-          text-transform: uppercase;
-          color: white;
-          line-height: 1;
-          margin-bottom: 12px;
-        }
-
-        .tl-runner-tags {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-        }
-
-        .tl-tag {
-          font-size: 8px;
-          font-weight: 900;
-          letter-spacing: 0.2em;
-          text-transform: uppercase;
-          padding: 3px 10px;
-          border-radius: 20px;
-          background: rgba(0,242,255,0.08);
-          border: 1px solid rgba(0,242,255,0.2);
-          color: rgba(0,242,255,0.8);
-        }
-
-        .tl-gps-info {
+        .glass-cyan {
           background: rgba(0,242,255,0.04);
-          border: 1px solid rgba(0,242,255,0.1);
-          border-radius: 16px;
-          padding: 20px;
-          text-align: center;
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border: 1px solid rgba(0,242,255,0.15);
+          box-shadow: inset 0 1px 0 rgba(0,242,255,0.08), 0 0 30px rgba(0,242,255,0.05);
         }
 
-        .tl-gps-icon { font-size: 32px; margin-bottom: 12px; }
-
-        .tl-gps-title {
-          font-family: 'Barlow Condensed', sans-serif;
-          font-size: 20px;
-          font-weight: 900;
-          font-style: italic;
-          text-transform: uppercase;
-          color: white;
-          margin-bottom: 8px;
-        }
-
-        .tl-gps-desc {
-          font-size: 10px;
-          letter-spacing: 0.1em;
-          color: rgba(255,255,255,0.4);
-          line-height: 1.6;
-        }
-
-        /* ── WAITING ── */
-        .tl-waiting-section {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 32px;
-          text-align: center;
-        }
-
-        .tl-pulse-ring {
-          width: 120px;
-          height: 120px;
-          border-radius: 50%;
-          border: 2px solid rgba(0,242,255,0.3);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          position: relative;
-          animation: tl-ring-pulse 2s infinite;
-        }
-
-        .tl-pulse-ring::before {
+        .glass-top-line::before {
           content: '';
           position: absolute;
-          width: 140px; height: 140px;
-          border-radius: 50%;
-          border: 1px solid rgba(0,242,255,0.1);
-          animation: tl-ring-pulse 2s infinite 0.3s;
-        }
-
-        .tl-pulse-ring::after {
-          content: '';
-          position: absolute;
-          width: 160px; height: 160px;
-          border-radius: 50%;
-          border: 1px solid rgba(0,242,255,0.05);
-          animation: tl-ring-pulse 2s infinite 0.6s;
-        }
-
-        @keyframes tl-ring-pulse {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.05); opacity: 0.7; }
-        }
-
-        .tl-pulse-icon { font-size: 40px; }
-
-        .tl-waiting-title {
-          font-family: 'Barlow Condensed', sans-serif;
-          font-size: 28px;
-          font-weight: 900;
-          font-style: italic;
-          text-transform: uppercase;
-          color: white;
-        }
-
-        .tl-waiting-sub {
-          font-size: 9px;
-          letter-spacing: 0.3em;
-          color: rgba(255,255,255,0.3);
-          text-transform: uppercase;
-        }
-
-        .tl-gps-indicator {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding: 8px 16px;
-          border-radius: 20px;
-          background: rgba(34,197,94,0.08);
-          border: 1px solid rgba(34,197,94,0.2);
-        }
-
-        .tl-gps-dot {
-          width: 6px; height: 6px;
-          border-radius: 50%;
-          background: #22c55e;
-          box-shadow: 0 0 6px #22c55e;
-          animation: tl-gps-blink 1s infinite;
-        }
-
-        @keyframes tl-gps-blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
-
-        .tl-gps-indicator-text {
-          font-size: 9px;
-          letter-spacing: 0.2em;
-          color: #22c55e;
-          font-weight: 700;
-          text-transform: uppercase;
-        }
-
-        /* ── RUNNING ── */
-        .tl-running-section {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 16px;
-          text-align: center;
-        }
-
-        .tl-runner-mini {
-          font-size: 10px;
-          letter-spacing: 0.2em;
-          color: rgba(255,255,255,0.3);
-          text-transform: uppercase;
-          font-weight: 700;
-        }
-
-        .tl-live-badge {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 14px;
-          background: rgba(239,68,68,0.1);
-          border: 1px solid rgba(239,68,68,0.3);
-          border-radius: 20px;
-          margin-bottom: 8px;
-        }
-
-        .tl-live-dot {
-          width: 6px; height: 6px;
-          border-radius: 50%;
-          background: #ef4444;
-          box-shadow: 0 0 6px #ef4444;
-          animation: tl-gps-blink 0.8s infinite;
-        }
-
-        .tl-live-text {
-          font-size: 9px;
-          letter-spacing: 0.3em;
-          color: #ef4444;
-          font-weight: 900;
-          text-transform: uppercase;
-        }
-
-        .tl-big-timer {
-          font-family: 'Barlow Condensed', sans-serif;
-          font-size: clamp(64px, 22vw, 96px);
-          font-weight: 900;
-          font-style: italic;
-          letter-spacing: -0.02em;
-          color: #22c55e;
-          text-shadow: 0 0 40px rgba(34,197,94,0.3);
-          line-height: 1;
-        }
-
-        .tl-gps-pts {
-          font-size: 9px;
-          letter-spacing: 0.2em;
-          color: rgba(34,197,94,0.4);
-          text-transform: uppercase;
-        }
-
-        /* ── FINISHED ── */
-        .tl-finished-section {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-          padding-bottom: 24px;
-        }
-
-        .tl-finish-header {
-          text-align: center;
-          padding: 24px 0 16px;
-        }
-
-        .tl-finish-medal { font-size: 48px; margin-bottom: 8px; }
-
-        .tl-finish-title {
-          font-family: 'Barlow Condensed', sans-serif;
-          font-size: 28px;
-          font-weight: 900;
-          font-style: italic;
-          text-transform: uppercase;
-          color: #00f2ff;
-          text-shadow: 0 0 20px rgba(0,242,255,0.3);
-        }
-
-        .tl-result-card {
-          background: rgba(255,255,255,0.02);
-          border: 1px solid rgba(0,242,255,0.12);
-          border-radius: 20px;
-          padding: 28px 24px;
-          text-align: center;
-          position: relative;
-          overflow: hidden;
-        }
-
-        .tl-result-card::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 0; right: 0;
+          top: 0; left: 10%; right: 10%;
           height: 1px;
           background: linear-gradient(90deg, transparent, rgba(0,242,255,0.4), transparent);
         }
 
-        .tl-result-name {
+        /* ── HEADER ── */
+        .tl-header {
+          background: rgba(0,0,0,0.5);
+          backdrop-filter: blur(30px);
+          -webkit-backdrop-filter: blur(30px);
+          border-bottom: 1px solid rgba(0,242,255,0.08);
+          padding: 16px 20px;
+          display: flex; align-items: center; justify-content: space-between;
+          flex-shrink: 0;
+          position: sticky; top: 0; z-index: 10;
+        }
+
+        .tl-brand {
           font-family: 'Barlow Condensed', sans-serif;
-          font-size: clamp(20px, 6vw, 28px);
-          font-weight: 900;
-          font-style: italic;
-          text-transform: uppercase;
+          font-size: 22px; font-weight: 900; font-style: italic;
+          text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .tl-brand span { color: #00f2ff; }
+
+        .tl-step-pill {
+          font-size: 8px; font-weight: 700;
+          letter-spacing: 0.25em; text-transform: uppercase;
+          padding: 5px 12px; border-radius: 20px;
+          background: rgba(0,242,255,0.06);
+          border: 1px solid rgba(0,242,255,0.15);
+          color: rgba(0,242,255,0.6);
+        }
+
+        /* ── BODY ── */
+        .tl-body {
+          flex: 1; display: flex; flex-direction: column;
+          padding: 28px 20px; max-width: 460px; margin: 0 auto; width: 100%;
+        }
+
+        /* ── BIB INPUT ── */
+        .tl-bib-section {
+          flex: 1; display: flex; flex-direction: column;
+          justify-content: center; gap: 28px;
+        }
+
+        .tl-hero-title {
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: clamp(40px, 12vw, 64px);
+          font-weight: 900; font-style: italic;
+          text-transform: uppercase; line-height: 0.9;
+          letter-spacing: -0.01em;
+        }
+        .tl-hero-title .cyan { color: #00f2ff; }
+
+        .tl-hero-sub {
+          font-size: 9px; letter-spacing: 0.3em;
+          color: rgba(255,255,255,0.2); text-transform: uppercase;
+          margin-top: 10px;
+        }
+
+        .tl-input-group { display: flex; flex-direction: column; gap: 12px; }
+
+        .tl-bib-input {
+          width: 100%;
+          background: rgba(0,242,255,0.03);
+          border: 1px solid rgba(0,242,255,0.2);
+          border-radius: 18px;
+          padding: 22px 24px;
           color: white;
-          margin-bottom: 4px;
-        }
-
-        .tl-result-cat {
-          font-size: 9px;
-          letter-spacing: 0.25em;
-          color: rgba(0,242,255,0.5);
-          text-transform: uppercase;
-          margin-bottom: 24px;
-        }
-
-        .tl-result-time-label {
-          font-size: 8px;
-          letter-spacing: 0.4em;
-          color: rgba(255,255,255,0.2);
-          text-transform: uppercase;
-          margin-bottom: 8px;
-        }
-
-        .tl-result-time {
           font-family: 'Barlow Condensed', sans-serif;
-          font-size: clamp(56px, 18vw, 80px);
-          font-weight: 900;
-          font-style: italic;
-          color: #00f2ff;
-          text-shadow: 0 0 30px rgba(0,242,255,0.4);
-          letter-spacing: -0.02em;
+          font-size: 56px; font-weight: 900; font-style: italic;
+          text-align: center; letter-spacing: 0.03em;
+          outline: none;
+          transition: all 0.2s;
+          -webkit-appearance: none;
+          backdrop-filter: blur(10px);
+        }
+        .tl-bib-input:focus {
+          border-color: rgba(0,242,255,0.5);
+          background: rgba(0,242,255,0.05);
+          box-shadow: 0 0 0 4px rgba(0,242,255,0.06), inset 0 0 20px rgba(0,242,255,0.03);
+        }
+        .tl-bib-input::placeholder { color: rgba(255,255,255,0.07); }
+
+        /* ── BUTTONS ── */
+        .tl-btn-cyan {
+          width: 100%; padding: 20px;
+          background: #00f2ff; border: none; border-radius: 16px;
+          color: #03070b;
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: 18px; font-weight: 900; font-style: italic;
+          letter-spacing: 0.2em; text-transform: uppercase;
+          cursor: pointer; transition: all 0.15s;
+          -webkit-appearance: none;
+          box-shadow: 0 0 20px rgba(0,242,255,0.2);
+        }
+        .tl-btn-cyan:active { transform: scale(0.98); box-shadow: 0 0 10px rgba(0,242,255,0.1); }
+        .tl-btn-cyan:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .tl-btn-green {
+          width: 100%; padding: 20px;
+          background: #22c55e; border: none; border-radius: 16px;
+          color: white;
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: 18px; font-weight: 900; font-style: italic;
+          letter-spacing: 0.15em; text-transform: uppercase;
+          cursor: pointer; transition: all 0.15s;
+          box-shadow: 0 0 20px rgba(34,197,94,0.2);
+        }
+        .tl-btn-green:active { transform: scale(0.98); }
+
+        .tl-btn-ghost {
+          width: 100%; padding: 15px;
+          background: rgba(255,255,255,0.02);
+          border: 1px solid rgba(255,255,255,0.08);
+          border-radius: 14px;
+          color: rgba(255,255,255,0.3);
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: 13px; font-weight: 700;
+          letter-spacing: 0.1em; text-transform: uppercase;
+          cursor: pointer;
+        }
+
+        .tl-error {
+          background: rgba(239,68,68,0.07);
+          border: 1px solid rgba(239,68,68,0.2);
+          border-radius: 12px; padding: 12px 16px;
+          color: #f87171; font-size: 10px;
+          letter-spacing: 0.1em; text-align: center;
+        }
+
+        /* ── GPS REQUEST ── */
+        .tl-gps-section {
+          flex: 1; display: flex; flex-direction: column;
+          justify-content: center; gap: 20px;
+        }
+
+        .tl-runner-card {
+          border-radius: 22px; padding: 24px;
+          position: relative; overflow: hidden;
+        }
+
+        .tl-runner-hello {
+          font-size: 9px; letter-spacing: 0.35em;
+          color: rgba(0,242,255,0.5); text-transform: uppercase;
+          font-weight: 700; margin-bottom: 6px;
+        }
+
+        .tl-runner-name {
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: clamp(26px, 8vw, 38px);
+          font-weight: 900; font-style: italic;
+          text-transform: uppercase; color: white;
+          line-height: 1; margin-bottom: 12px;
+        }
+
+        .tl-tags { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        .tl-tag {
+          font-size: 8px; font-weight: 900;
+          letter-spacing: 0.2em; text-transform: uppercase;
+          padding: 4px 11px; border-radius: 20px;
+          background: rgba(0,242,255,0.06);
+          border: 1px solid rgba(0,242,255,0.18);
+          color: rgba(0,242,255,0.8);
+        }
+
+        .tl-gps-card {
+          border-radius: 18px; padding: 20px; text-align: center;
+        }
+
+        .tl-gps-icon { font-size: 28px; margin-bottom: 10px; }
+
+        .tl-gps-card-title {
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: 18px; font-weight: 900; font-style: italic;
+          text-transform: uppercase; color: white; margin-bottom: 8px;
+        }
+
+        .tl-gps-card-desc {
+          font-size: 10px; letter-spacing: 0.08em;
+          color: rgba(255,255,255,0.35); line-height: 1.7;
+        }
+
+        /* ── WAITING ── */
+        .tl-waiting-section {
+          flex: 1; display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          gap: 28px; text-align: center;
+        }
+
+        .tl-radar {
+          width: 130px; height: 130px;
+          border-radius: 50%;
+          border: 1.5px solid rgba(0,242,255,0.25);
+          display: flex; align-items: center; justify-content: center;
+          position: relative;
+        }
+
+        .tl-radar::before {
+          content: '';
+          position: absolute;
+          width: 156px; height: 156px; border-radius: 50%;
+          border: 1px solid rgba(0,242,255,0.1);
+          animation: tl-radar-expand 2.5s infinite;
+        }
+
+        .tl-radar::after {
+          content: '';
+          position: absolute;
+          width: 182px; height: 182px; border-radius: 50%;
+          border: 1px solid rgba(0,242,255,0.05);
+          animation: tl-radar-expand 2.5s infinite 0.5s;
+        }
+
+        @keyframes tl-radar-expand {
+          0% { transform: scale(0.9); opacity: 0.8; }
+          100% { transform: scale(1.1); opacity: 0; }
+        }
+
+        .tl-radar-icon { font-size: 44px; }
+
+        .tl-waiting-label {
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: 30px; font-weight: 900; font-style: italic;
+          text-transform: uppercase; line-height: 1;
+        }
+        .tl-waiting-label .cyan { color: #00f2ff; }
+
+        .tl-waiting-sub {
+          font-size: 8px; letter-spacing: 0.3em;
+          color: rgba(255,255,255,0.2); text-transform: uppercase;
+          margin-top: 4px;
+        }
+
+        .tl-gps-pill {
+          display: flex; align-items: center; gap: 8px;
+          padding: 8px 16px; border-radius: 20px;
+          background: rgba(34,197,94,0.07);
+          border: 1px solid rgba(34,197,94,0.2);
+        }
+
+        .tl-gps-dot {
+          width: 6px; height: 6px; border-radius: 50%;
+          background: #22c55e;
+          box-shadow: 0 0 6px #22c55e;
+          animation: tl-blink 1s infinite;
+        }
+
+        @keyframes tl-blink {
+          0%, 100% { opacity: 1; } 50% { opacity: 0.25; }
+        }
+
+        .tl-gps-pill-text {
+          font-size: 9px; letter-spacing: 0.2em;
+          color: #22c55e; font-weight: 700; text-transform: uppercase;
+        }
+
+        /* ── RUNNING ── */
+        .tl-running-section {
+          flex: 1; display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          gap: 16px; text-align: center;
+        }
+
+        .tl-live-pill {
+          display: flex; align-items: center; gap: 6px;
+          padding: 6px 14px; border-radius: 20px;
+          background: rgba(239,68,68,0.08);
+          border: 1px solid rgba(239,68,68,0.25);
+        }
+
+        .tl-live-dot {
+          width: 6px; height: 6px; border-radius: 50%;
+          background: #ef4444; box-shadow: 0 0 5px #ef4444;
+          animation: tl-blink 0.8s infinite;
+        }
+
+        .tl-live-text {
+          font-size: 9px; letter-spacing: 0.3em;
+          color: #ef4444; font-weight: 900; text-transform: uppercase;
+        }
+
+        .tl-runner-mini {
+          font-size: 10px; letter-spacing: 0.2em;
+          color: rgba(255,255,255,0.25); text-transform: uppercase;
+        }
+
+        .tl-big-timer {
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: clamp(72px, 24vw, 104px);
+          font-weight: 900; font-style: italic;
+          letter-spacing: -0.02em; color: #22c55e;
+          text-shadow: 0 0 50px rgba(34,197,94,0.25);
           line-height: 1;
         }
 
-        .tl-stats-row {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-          margin-top: 20px;
+        .tl-screen-on {
+          font-size: 8px; letter-spacing: 0.25em;
+          color: rgba(255,255,255,0.08); text-transform: uppercase;
+        }
+
+        /* ── FINISHED ── */
+        .tl-finished-section {
+          flex: 1; display: flex; flex-direction: column;
+          gap: 14px; padding-bottom: 24px;
+        }
+
+        .tl-finish-hero {
+          text-align: center; padding: 20px 0 8px;
+        }
+
+        .tl-finish-medal { font-size: 52px; margin-bottom: 6px; }
+
+        .tl-finish-title {
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: 30px; font-weight: 900; font-style: italic;
+          text-transform: uppercase; color: #00f2ff;
+          text-shadow: 0 0 25px rgba(0,242,255,0.25);
+        }
+
+        .tl-result-glass {
+          border-radius: 22px; padding: 28px 22px;
+          text-align: center; position: relative; overflow: hidden;
+        }
+
+        .tl-res-name {
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: clamp(22px, 6vw, 30px);
+          font-weight: 900; font-style: italic;
+          text-transform: uppercase; color: white;
+          line-height: 1; margin-bottom: 4px;
+        }
+
+        .tl-res-meta {
+          font-size: 9px; letter-spacing: 0.25em;
+          color: rgba(0,242,255,0.4); text-transform: uppercase;
+          margin-bottom: 22px;
+        }
+
+        .tl-res-time-label {
+          font-size: 8px; letter-spacing: 0.45em;
+          color: rgba(255,255,255,0.18); text-transform: uppercase;
+          margin-bottom: 6px;
+        }
+
+        .tl-res-time {
+          font-family: 'Barlow Condensed', sans-serif;
+          font-size: clamp(60px, 20vw, 84px);
+          font-weight: 900; font-style: italic;
+          color: #00f2ff;
+          text-shadow: 0 0 35px rgba(0,242,255,0.35);
+          letter-spacing: -0.02em; line-height: 1;
+        }
+
+        .tl-stats-grid {
+          display: grid; grid-template-columns: 1fr 1fr;
+          gap: 10px; margin-top: 18px;
         }
 
         .tl-stat-box {
           background: rgba(255,255,255,0.02);
-          border: 1px solid rgba(255,255,255,0.05);
-          border-radius: 12px;
-          padding: 12px;
+          border: 1px solid rgba(255,255,255,0.06);
+          border-radius: 14px; padding: 12px;
           text-align: center;
         }
 
         .tl-stat-label {
-          font-size: 7px;
-          letter-spacing: 0.25em;
-          color: rgba(255,255,255,0.2);
-          text-transform: uppercase;
+          font-size: 7px; letter-spacing: 0.25em;
+          color: rgba(255,255,255,0.18); text-transform: uppercase;
           margin-bottom: 4px;
         }
 
         .tl-stat-value {
           font-family: 'Barlow Condensed', sans-serif;
-          font-size: 20px;
-          font-weight: 900;
-          font-style: italic;
-          color: white;
+          font-size: 22px; font-weight: 900; font-style: italic; color: white;
         }
 
-        .tl-share-btn {
-          width: 100%;
-          padding: 16px;
-          background: rgba(0,242,255,0.08);
+        .tl-btn-share {
+          width: 100%; padding: 17px;
+          background: rgba(0,242,255,0.07);
           border: 1px solid rgba(0,242,255,0.2);
-          border-radius: 14px;
-          color: #00f2ff;
+          border-radius: 15px; color: #00f2ff;
           font-family: 'Barlow Condensed', sans-serif;
-          font-size: 15px;
-          font-weight: 900;
-          font-style: italic;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          cursor: pointer;
-          transition: all 0.2s;
+          font-size: 15px; font-weight: 900; font-style: italic;
+          letter-spacing: 0.12em; text-transform: uppercase;
+          cursor: pointer; transition: all 0.2s;
+          backdrop-filter: blur(10px);
         }
-
-        .tl-share-btn:active { background: rgba(0,242,255,0.15); }
-
-        .tl-back-btn {
-          width: 100%;
-          padding: 14px;
-          background: transparent;
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 14px;
-          color: rgba(255,255,255,0.3);
-          font-family: 'Barlow Condensed', sans-serif;
-          font-size: 13px;
-          font-weight: 700;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          cursor: pointer;
-        }
+        .tl-btn-share:active { background: rgba(0,242,255,0.12); }
       `}</style>
 
       <div className="tl-root">
         {/* Header */}
         <div className="tl-header">
           <div className="tl-brand">RAYO<span>CERO</span></div>
-          <div className="tl-step-indicator">
+          <div className="tl-step-pill">
             {step === 'bib_input' && 'Identificación'}
             {step === 'gps_request' && 'Activar GPS'}
             {step === 'waiting' && 'En espera'}
@@ -778,22 +775,19 @@ export default function TrackerLanding() {
 
         <div className="tl-body">
 
-          {/* ── PASO 1: BIB INPUT ── */}
+          {/* PASO 1: BIB */}
           {step === 'bib_input' && (
             <div className="tl-bib-section">
               <div>
-                <div className="tl-bib-title">
-                  Ingresa tu<br /><span>Dorsal</span>
+                <div className="tl-hero-title">
+                  Ingresa tu<br /><span className="cyan">Dorsal</span>
                 </div>
-                <div className="tl-bib-sub">RayoCero We Run · Telemetría GPS</div>
+                <div className="tl-hero-sub">RayoCero We Run · Telemetría GPS</div>
               </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div className="tl-input-group">
                 <input
-                  className="tl-input"
-                  type="number"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
+                  className="tl-bib-input"
+                  type="number" inputMode="numeric" pattern="[0-9]*"
                   placeholder="000"
                   value={bibInput}
                   onChange={e => { setBibInput(e.target.value); setError(''); }}
@@ -801,132 +795,112 @@ export default function TrackerLanding() {
                   autoFocus
                 />
                 {error && <div className="tl-error">{error}</div>}
-                <button className="tl-btn-main" onClick={handleBibSubmit} disabled={loading || !bibInput}>
+                <button className="tl-btn-cyan" onClick={handleBibSubmit} disabled={loading || !bibInput}>
                   {loading ? 'Buscando...' : 'Entrar →'}
                 </button>
               </div>
-
-              <div style={{ textAlign: 'center', fontSize: 9, letterSpacing: '0.2em', color: 'rgba(255,255,255,0.1)', textTransform: 'uppercase' }}>
+              <div style={{ textAlign: 'center', fontSize: 8, letterSpacing: '0.2em', color: 'rgba(255,255,255,0.08)', textTransform: 'uppercase' }}>
                 El número está impreso en tu dorsal
               </div>
             </div>
           )}
 
-          {/* ── PASO 2: GPS REQUEST ── */}
+          {/* PASO 2: GPS REQUEST */}
           {step === 'gps_request' && runner && (
             <div className="tl-gps-section">
-              <div className="tl-runner-card">
+              <div className="tl-runner-card glass glass-top-line">
                 <div className="tl-runner-hello">Hola,</div>
                 <div className="tl-runner-name">{runner.nombre} {runner.apellido}</div>
-                <div className="tl-runner-tags">
+                <div className="tl-tags">
                   <span className="tl-tag">BIB #{runner.bib_number}</span>
                   <span className="tl-tag">{runner.categoria}</span>
                 </div>
               </div>
-
-              <div className="tl-gps-info">
+              <div className="tl-gps-card glass-cyan" style={{ borderRadius: 18 }}>
                 <div className="tl-gps-icon">📍</div>
-                <div className="tl-gps-title">Activar seguimiento GPS</div>
-                <div className="tl-gps-desc">
+                <div className="tl-gps-card-title">Activar Seguimiento GPS</div>
+                <div className="tl-gps-card-desc">
                   Tu teléfono registrará tu ruta durante la carrera.<br />
                   Al terminar verás tu recorrido completo estilo Strava.<br /><br />
-                  <strong style={{ color: 'rgba(0,242,255,0.6)' }}>Acepta el permiso de ubicación cuando aparezca.</strong>
+                  <span style={{ color: 'rgba(0,242,255,0.6)', fontWeight: 700 }}>Acepta el permiso de ubicación cuando aparezca.</span>
                 </div>
               </div>
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <button className="tl-btn-main green" onClick={handleActivateGPS}>
+                <button className="tl-btn-green" onClick={handleActivateGPS}>
                   ✓ Activar GPS y esperar salida
                 </button>
-                <button className="tl-back-btn" onClick={() => setStep('bib_input')}>
+                <button className="tl-btn-ghost" onClick={() => setStep('bib_input')}>
                   ← Cambiar dorsal
                 </button>
               </div>
             </div>
           )}
 
-          {/* ── PASO 3: ESPERANDO SALIDA ── */}
+          {/* PASO 3: WAITING */}
           {step === 'waiting' && runner && (
             <div className="tl-waiting-section">
-              <div className="tl-pulse-ring">
-                <div className="tl-pulse-icon">⚡</div>
+              <div className="tl-radar">
+                <div className="tl-radar-icon">⚡</div>
               </div>
-
               <div>
-                <div style={{ fontSize: 9, letterSpacing: '0.3em', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', marginBottom: 8, textAlign: 'center' }}>
+                <div style={{ fontSize: 9, letterSpacing: '0.3em', color: 'rgba(255,255,255,0.15)', textTransform: 'uppercase', marginBottom: 10, textAlign: 'center' }}>
                   {runner.nombre} · BIB #{runner.bib_number}
                 </div>
-                <div className="tl-waiting-title">Esperando</div>
-                <div className="tl-waiting-title" style={{ color: '#00f2ff' }}>Pistola de salida</div>
-                <div className="tl-waiting-sub" style={{ marginTop: 12 }}>
-                  El timer arrancará automáticamente
-                </div>
+                <div className="tl-waiting-label">Esperando</div>
+                <div className="tl-waiting-label"><span className="cyan">pistola de salida</span></div>
+                <div className="tl-waiting-sub" style={{ marginTop: 10 }}>El timer arrancará automáticamente</div>
               </div>
-
               {gpsStatus === 'active' && (
-                <div className="tl-gps-indicator">
+                <div className="tl-gps-pill">
                   <div className="tl-gps-dot" />
-                  <span className="tl-gps-indicator-text">GPS activo · {gpsPoints.length} pts</span>
+                  <span className="tl-gps-pill-text">GPS activo · {gpsPoints.length} pts</span>
                 </div>
               )}
-
               {gpsStatus === 'error' && (
-                <div className="tl-error" style={{ fontSize: 9 }}>
-                  GPS: {gpsError}. El tiempo se registrará igual.
-                </div>
+                <div className="tl-error" style={{ fontSize: 9 }}>GPS: {gpsError}. El tiempo se registrará igual.</div>
               )}
-
-              <div style={{ fontSize: 8, letterSpacing: '0.2em', color: 'rgba(255,255,255,0.1)', textTransform: 'uppercase', textAlign: 'center' }}>
+              <div style={{ fontSize: 8, letterSpacing: '0.2em', color: 'rgba(255,255,255,0.07)', textTransform: 'uppercase' }}>
                 Mantén esta pantalla abierta
               </div>
             </div>
           )}
 
-          {/* ── PASO 4: EN CARRERA ── */}
+          {/* PASO 4: RUNNING */}
           {step === 'running' && runner && (
             <div className="tl-running-section">
-              <div className="tl-live-badge">
+              <div className="tl-live-pill">
                 <div className="tl-live-dot" />
                 <span className="tl-live-text">En vivo</span>
               </div>
-
-              <div className="tl-runner-mini">
-                {runner.nombre} {runner.apellido} · BIB #{runner.bib_number}
-              </div>
-
+              <div className="tl-runner-mini">{runner.nombre} {runner.apellido} · BIB #{runner.bib_number}</div>
               <div className="tl-big-timer">{elapsed}</div>
-
               {gpsStatus === 'active' && (
-                <div className="tl-gps-indicator">
+                <div className="tl-gps-pill">
                   <div className="tl-gps-dot" />
-                  <span className="tl-gps-indicator-text">GPS · {gpsPoints.length} pts</span>
+                  <span className="tl-gps-pill-text">GPS · {gpsPoints.length} pts</span>
                 </div>
               )}
-
-              <div style={{ fontSize: 8, letterSpacing: '0.2em', color: 'rgba(255,255,255,0.1)', textTransform: 'uppercase' }}>
-                No cierres esta pantalla
-              </div>
+              <div className="tl-screen-on">No cierres esta pantalla</div>
             </div>
           )}
 
-          {/* ── PASO 5: FINALIZADO ── */}
+          {/* PASO 5: FINISHED */}
           {step === 'finished' && runner && (
             <div className="tl-finished-section">
-              <div className="tl-finish-header">
+              <div className="tl-finish-hero">
                 <div className="tl-finish-medal">🏅</div>
                 <div className="tl-finish-title">¡Carrera completada!</div>
               </div>
 
-              <div className="tl-result-card">
-                <div className="tl-result-name">{runner.nombre} {runner.apellido}</div>
-                <div className="tl-result-cat">BIB #{runner.bib_number} · {runner.categoria}</div>
-                <div className="tl-result-time-label">Tiempo oficial</div>
-                <div className="tl-result-time">
+              <div className="tl-result-glass glass glass-top-line">
+                <div className="tl-res-name">{runner.nombre} {runner.apellido}</div>
+                <div className="tl-res-meta">BIB #{runner.bib_number} · {runner.categoria}</div>
+                <div className="tl-res-time-label">Tiempo oficial</div>
+                <div className="tl-res-time">
                   {runner.finish_time_seconds ? formatFinal(runner.finish_time_seconds) : '--:--'}
                 </div>
-
                 {gpsPoints.length > 0 && (
-                  <div className="tl-stats-row">
+                  <div className="tl-stats-grid">
                     <div className="tl-stat-box">
                       <div className="tl-stat-label">Distancia GPS</div>
                       <div className="tl-stat-value">{calcDist(gpsPoints).toFixed(2)} km</div>
@@ -939,17 +913,17 @@ export default function TrackerLanding() {
                 )}
               </div>
 
-              {gpsPoints.length >= 2 && <RouteMap points={gpsPoints} />}
+              {gpsPoints.length >= 2 && <StravaMap points={gpsPoints} />}
 
-              <button className="tl-share-btn" onClick={async () => {
-                const text = `⚡ RayoCero We Run\n🏃 ${runner.nombre} ${runner.apellido} — BIB #${runner.bib_number}\n⏱️ ${runner.finish_time_seconds ? formatFinal(runner.finish_time_seconds) : '--'}\n📍 ${calcDist(gpsPoints).toFixed(2)} km\n\nrayocero-run.vercel.app`;
-                if (navigator.share) { await navigator.share({ title: 'Mi resultado RayoCero', text }); }
+              <button className="tl-btn-share" onClick={async () => {
+                const text = `⚡ RayoCero We Run\n🏃 ${runner.nombre} ${runner.apellido} — BIB #${runner.bib_number}\n⏱️ ${runner.finish_time_seconds ? formatFinal(runner.finish_time_seconds) : '--'}\n📍 ${calcDist(gpsPoints).toFixed(2)} km\n\nrayocero-run.vercel.app/tracker`;
+                if (navigator.share) await navigator.share({ title: 'Mi resultado RayoCero', text });
                 else { await navigator.clipboard.writeText(text); alert('Resultado copiado'); }
               }}>
                 🔗 Compartir mi resultado
               </button>
 
-              <button className="tl-back-btn" onClick={() => {
+              <button className="tl-btn-ghost" onClick={() => {
                 setStep('bib_input'); setRunner(null); setBibInput(''); setGpsPoints([]);
               }}>
                 Ver otro corredor
