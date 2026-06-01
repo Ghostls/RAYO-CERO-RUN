@@ -56,7 +56,7 @@ const INSCRIPCIONES_ABIERTAS = false;
 const EVENTO = {
   nombre:     "RAYOCERO 10K · NIGHT FEST",
   fecha:      "06 JUN 2026",
-  hora:       "06:00 PM",
+  hora:       "06:00 AM",
   distancia:  "10K",
   atletas:    "+1.000",
   desnivel:   "+180M",
@@ -205,8 +205,8 @@ const RealRouteMap = () => {
 
         {/* Tile layer Stadia Alidade Smooth Dark — máximo detalle urbano */}
         <TileComp
-          url="https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://carto.com/">CARTO</a>'
         />
 
         {/* Pulso radar en salida/meta */}
