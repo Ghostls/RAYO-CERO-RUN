@@ -56,7 +56,7 @@ const INSCRIPCIONES_ABIERTAS = false;
 const EVENTO = {
   nombre:     "RAYOCERO 10K · NIGHT FEST",
   fecha:      "06 JUN 2026",
-  hora:       "06:00 AM",
+  hora:       "06:00 PM",
   distancia:  "10K",
   atletas:    "+1.000",
   desnivel:   "+180M",
