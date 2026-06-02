@@ -3,7 +3,7 @@
     /* Configuración Estructural (Requerido para Referencias de Proyecto) */
     "composite": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
-    "noEmit": false,
+    "noEmit": true,
 
     /* Configuración de Entorno */
     "target": "ES2022",

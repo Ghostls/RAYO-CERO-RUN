@@ -12,6 +12,14 @@
  * [V25-4] GLOW PATH: Polyline con drop-shadow cyan idéntico al RaceDetail.
  * [V25-5] PANEL: Mapa flotante con overlay de título y badge de ruta oficial.
  * [V25-6] Todo el formulario original intacto debajo del early return.
+ *
+ * CHANGELOG V25.1 — CATEGORÍAS COMPLETAS:
+ * [V25.1-1] calcularCategoria: segmentación completa por rango etario y género.
+ *           Absoluto · Movilidad Reducida · Juvenil (16-19) · Libre (20-29)
+ *           Sub Master (30-34) · Sub Master (35-39) · Master A (40-49)
+ *           Master B (50-59) · Master C (60-69) · Master D (70-79)
+ * [V25.1-2] canNext Step 1: bloquea avance si edad calculada < 16 años.
+ * [V25.1-3] Warning visual en Step 1 cuando edad < 16.
  */
 
 import { useState, useEffect, useMemo } from "react";
@@ -32,7 +40,7 @@ import { MapContainer, TileLayer, Polyline, Marker, useMap, Circle } from "react
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-import { registerRunner, calcularEdad, calcularCategoria, type RegistrationFormData } from "@/lib/api";
+import { registerRunner, calcularEdad, type RegistrationFormData } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
 import logoPrincipal from "../assets/logo.png";
@@ -44,6 +52,32 @@ const TileComp   = TileLayer   as any;
 const PolyComp   = Polyline    as any;
 const MarkerComp = Marker      as any;
 const CircleComp = Circle      as any;
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * [V25.1-1] FUNCIÓN DE CATEGORÍAS — SEGMENTACIÓN COMPLETA
+ * ══════════════════════════════════════════════════════════════════════════════ */
+const calcularCategoria = (
+  edad: number,
+  genero: "M" | "F",
+  movilidadReducida: boolean
+): string => {
+  const g = genero === "M" ? "Masculino" : "Femenino";
+
+  // Movilidad Reducida tiene prioridad absoluta — sin distinción de género
+  if (movilidadReducida) return "Movilidad Reducida";
+
+  if (edad >= 16 && edad <= 19) return `Juvenil ${g}`;
+  if (edad >= 20 && edad <= 29) return `Libre ${g}`;
+  if (edad >= 30 && edad <= 34) return `Sub Master (30-34) ${g}`;
+  if (edad >= 35 && edad <= 39) return `Sub Master (35-39) ${g}`;
+  if (edad >= 40 && edad <= 49) return `Master A ${g}`;
+  if (edad >= 50 && edad <= 59) return `Master B ${g}`;
+  if (edad >= 60 && edad <= 69) return `Master C ${g}`;
+  if (edad >= 70 && edad <= 79) return `Master D ${g}`;
+
+  // Fallback: edades ≥ 80 o fuera de rango definido
+  return `Absoluto ${g}`;
+};
 
 /* ══════════════════════════════════════════════════════════════════════════════
  * FLAG DE CONTROL
@@ -137,15 +171,15 @@ const WAYPOINTS = [
       { icon: "C", color: "#eab308" },
     ],
   },
-  { pos: [10.067250, -69.284621] as [number, number], label: "1K",  pois: [{ icon: "♪", color: "#a855f7" }] },
-  { pos: [10.062852, -69.282465] as [number, number], label: "2K",  pois: [] },
-  { pos: [10.061500, -69.276373] as [number, number], label: "3K",  pois: [{ icon: "♪", color: "#a855f7" }] },
-  { pos: [10.064014, -69.288046] as [number, number], label: "4K",  pois: [{ icon: "P", color: "#3b82f6" }] },
+  { pos: [10.067250, -69.284621] as [number, number], label: "9K",  pois: [{ icon: "♪", color: "#a855f7" }] },
+  { pos: [10.062852, -69.282465] as [number, number], label: "8K",  pois: [] },
+  { pos: [10.061500, -69.276373] as [number, number], label: "7K",  pois: [{ icon: "♪", color: "#a855f7" }] },
+  { pos: [10.064014, -69.288046] as [number, number], label: "6K",  pois: [{ icon: "P", color: "#3b82f6" }] },
   { pos: [10.065609, -69.295721] as [number, number], label: "5K",  pois: [{ icon: "♪", color: "#a855f7" }, { icon: "C", color: "#eab308" }] },
-  { pos: [10.073542, -69.296712] as [number, number], label: "6K",  pois: [] },
-  { pos: [10.070855, -69.294501] as [number, number], label: "7K",  pois: [{ icon: "♪", color: "#a855f7" }, { icon: "+", color: "#22c55e" }] },
-  { pos: [10.070609, -69.291723] as [number, number], label: "8K",  pois: [{ icon: "P", color: "#3b82f6" }] },
-  { pos: [10.079514, -69.288873] as [number, number], label: "9K",  pois: [] },
+  { pos: [10.073542, -69.296712] as [number, number], label: "4K",  pois: [] },
+  { pos: [10.070855, -69.294501] as [number, number], label: "3K",  pois: [{ icon: "♪", color: "#a855f7" }, { icon: "+", color: "#22c55e" }] },
+  { pos: [10.070609, -69.291723] as [number, number], label: "2K",  pois: [{ icon: "P", color: "#3b82f6" }] },
+  { pos: [10.079514, -69.288873] as [number, number], label: "1K",  pois: [] },
 ];
 
 // Generador de marcadores compuestos (idéntico a RaceDetail)
@@ -203,7 +237,7 @@ const RealRouteMap = () => {
       >
         <MapBoundsController bounds={bounds} />
 
-        {/* Tile layer Stadia Alidade Smooth Dark — máximo detalle urbano */}
+        {/* Tile layer CartoDB Dark */}
         <TileComp
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           attribution='&copy; <a href="https://carto.com/">CARTO</a>'
@@ -270,10 +304,7 @@ const RealRouteMap = () => {
           backdropFilter: "blur(12px)",
         }}
       >
-        <span
-          className="w-1.5 h-1.5 rounded-full"
-          style={{ background: "#00d4c8" }}
-        />
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#00d4c8" }} />
         <span style={{
           fontSize: "0.6rem",
           fontWeight: 800,
@@ -339,7 +370,6 @@ const RealRouteMap = () => {
         .leaflet-container {
           background: #03070b !important;
         }
-        /* Ocultar atribución de Leaflet para UI limpia */
         .leaflet-control-attribution {
           display: none !important;
         }
@@ -633,7 +663,7 @@ const RegistrationForm = () => {
   /* ── BLOQUEO — EARLY RETURN ─────────────────────────────────────────────── */
   if (!INSCRIPCIONES_ABIERTAS) return <RegistrationLockedScreen />;
 
-  /* ── TODO EL CÓDIGO ORIGINAL DEBAJO — SIN MODIFICACIÓN ─────────────────── */
+  /* ── TODO EL CÓDIGO ORIGINAL DEBAJO — SIN MODIFICACIÓN SALVO LO INDICADO ── */
 
   const [step, setStep]                       = useState(0);
   const [form, setForm]                       = useState<FormData>(initialForm);
@@ -652,10 +682,14 @@ const RegistrationForm = () => {
 
   const navigate = useNavigate();
 
+  // Edad y categoría derivadas del formulario
   const age = form.fechaNacimiento ? calcularEdad(form.fechaNacimiento) : null;
   const category = age !== null && form.genero
     ? calcularCategoria(age, form.genero as "M" | "F", form.movilidadReducida)
     : null;
+
+  // [V25.1-2] Flag: menor de 16 años — bloquea avance en Step 1
+  const esMenorDeEdad = age !== null && age < 16;
 
   useEffect(() => {
     if (step === 2 && exchangeRate === null) {
@@ -758,9 +792,15 @@ const RegistrationForm = () => {
   const update = (field: keyof FormData, value: string | boolean) =>
     setForm((f) => ({ ...f, [field]: value }));
 
+  // [V25.1-2] canNext — Step 1 bloquea si menor de 16 años
   const canNext = () => {
     if (step === 0) return form.nombre && form.apellido && form.cedula && form.email && form.telefono;
-    if (step === 1) return form.fechaNacimiento && form.genero && form.talla;
+    if (step === 1) return (
+      form.fechaNacimiento &&
+      form.genero &&
+      form.talla &&
+      !esMenorDeEdad           // ← NUEVO: bloqueo edad < 16
+    );
     if (step === 2) return form.referenciaPago.length >= 4;
     if (step === 3) return form.contactoEmergencia && form.telefonoEmergencia && form.aceptaDeslinde;
     return false;
@@ -808,7 +848,39 @@ const RegistrationForm = () => {
               <input type="checkbox" checked={form.movilidadReducida} onChange={(e) => update("movilidadReducida", e.target.checked)} className="h-5 w-5 rounded border-white/20 bg-white/5 text-cyan-500 cursor-pointer"/>
             </div>
           </div>
-          {category && <motion.div initial={{ opacity:0,y:10 }} animate={{ opacity:1,y:0 }} className="bg-cyan-500/[0.04] border border-cyan-500/15 p-6 rounded-2xl text-center backdrop-blur-2xl"><p className="text-[9px] font-black uppercase text-cyan-400/50 mb-2">Categoría</p><p className="text-2xl font-black text-cyan-400 uppercase tracking-tighter">{category}</p></motion.div>}
+
+          {/* [V25.1-3] Warning: menor de 16 años */}
+          {esMenorDeEdad && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-start gap-3 p-5 rounded-2xl"
+              style={{ background: "rgba(255,80,80,0.06)", border: "1px solid rgba(255,80,80,0.2)" }}
+            >
+              <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" style={{ color: "#ff6b6b" }}/>
+              <div>
+                <p className="text-[10px] font-black uppercase" style={{ color: "#ff6b6b", letterSpacing: "0.1em" }}>
+                  Edad mínima no alcanzada
+                </p>
+                <p className="text-[10px] text-white/40 font-semibold mt-1 leading-relaxed">
+                  La edad mínima para participar es <span className="text-white/65 font-black">16 años</span>.
+                  Actualmente tienes <span className="text-white/65 font-black">{age} años</span>.
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Categoría calculada — solo si edad válida */}
+          {category && !esMenorDeEdad && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-cyan-500/[0.04] border border-cyan-500/15 p-6 rounded-2xl text-center backdrop-blur-2xl"
+            >
+              <p className="text-[9px] font-black uppercase text-cyan-400/50 mb-2">Categoría Asignada</p>
+              <p className="text-2xl font-black text-cyan-400 uppercase tracking-tighter">{category}</p>
+            </motion.div>
+          )}
         </div>
       ),
     },
