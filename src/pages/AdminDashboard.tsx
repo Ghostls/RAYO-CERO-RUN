@@ -5,7 +5,7 @@ import {
   ShieldCheck, Settings, LogOut, Activity, RefreshCw, Save, CheckCircle,
   Search, CheckSquare, Eye, X, ShieldAlert, FileText, Trash2, Phone,
   Clock, AlertTriangle, Users, Package, Scan, Radio, Zap, BarChart2,
-  ChevronDown, Filter
+  ChevronDown, Filter, UserPlus
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -14,6 +14,7 @@ import { RouteConfig } from '../components/admin/RouteConfig';
 import { ResultsTable } from '../components/admin/ResultsTable';
 import PreRaceButton from '../components/Preracebutton';
 import logoPrincipal from '../assets/logo.png';
+import ModuloInscripcionAdmin from '../components/admin/ModuloInscripcionAdmin';
 
 /* ────────────────────────────────────────────────────────────── */
 /* TYPES & CONSTANTS                                              */
@@ -990,7 +991,7 @@ const EscuadronesList = () => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* TELEMETRÍA RFID — CON SEÑAL PRE-CARRERA                        */
+/* TELEMETRÍA RFID                                                */
 /* ────────────────────────────────────────────────────────────── */
 
 interface SystemStatus {
@@ -1120,8 +1121,6 @@ const TelemetryModule = () => {
             Si la IP cambió, editar la constante TELEMETRY_API en AdminDashboard.tsx
           </p>
         </div>
-
-        {/* Señal pre-carrera disponible aunque el servidor RFID esté offline */}
         <div className="mt-8 bg-black/40 border border-red-500/20 rounded-2xl p-6">
           <p className="text-[9px] text-red-400 font-black uppercase tracking-widest mb-4 flex items-center gap-2">
             <Zap size={12} /> Señal pre-carrera — disponible sin servidor RFID
@@ -1134,7 +1133,6 @@ const TelemetryModule = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in">
-      {/* Status cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Lector RFID', value: status?.llrp_connected ? 'CONECTADO' : status?.demo_mode ? 'DEMO' : 'OFFLINE', color: status?.llrp_connected ? 'green' : status?.demo_mode ? 'yellow' : 'red' },
@@ -1161,7 +1159,6 @@ const TelemetryModule = () => {
         ))}
       </div>
 
-      {/* SSE status */}
       <div className="flex items-center gap-2">
         <span className={`w-2 h-2 rounded-full ${sseConnected ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
         <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">
@@ -1169,13 +1166,10 @@ const TelemetryModule = () => {
         </span>
       </div>
 
-      {/* ── PANEL DE CONTROL DE CARRERA ── */}
       <div className="bg-black/40 border border-white/5 rounded-2xl p-6 space-y-6">
         <h4 className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-2">
           <Radio size={12} className="text-cyan-400" /> Control de Carrera
         </h4>
-
-        {/* Paso 1: Señal pre-carrera */}
         <div>
           <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-3 flex items-center gap-2">
             <span className="w-4 h-4 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 text-[8px] flex items-center justify-center font-black">1</span>
@@ -1183,36 +1177,24 @@ const TelemetryModule = () => {
           </p>
           <PreRaceButton seconds={60} />
         </div>
-
-        {/* Divider */}
         <div className="border-t border-white/5" />
-
-        {/* Paso 2: Disparar pistola */}
         <div>
           <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-3 flex items-center gap-2">
             <span className="w-4 h-4 rounded-full bg-green-500/20 border border-green-500/40 text-green-400 text-[8px] flex items-center justify-center font-black">2</span>
             Pistola de Salida · Registra start_time en Supabase
           </p>
           <div className="flex flex-wrap gap-3">
-            <button
-              onClick={handleRaceStart}
-              disabled={raceStarting}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-50"
-            >
+            <button onClick={handleRaceStart} disabled={raceStarting}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-50">
               {raceStarting ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
               Disparar Pistola
             </button>
-            <button
-              onClick={fetchResults}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-400 font-black uppercase text-xs tracking-widest transition-all border border-cyan-500/20"
-            >
+            <button onClick={fetchResults}
+              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-400 font-black uppercase text-xs tracking-widest transition-all border border-cyan-500/20">
               <RefreshCw size={14} /> Actualizar
             </button>
-            <button
-              onClick={handleReset}
-              disabled={resetting}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-900/30 hover:bg-red-900/50 text-red-400 font-black uppercase text-xs tracking-widest transition-all border border-red-500/20 ml-auto disabled:opacity-50"
-            >
+            <button onClick={handleReset} disabled={resetting}
+              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-900/30 hover:bg-red-900/50 text-red-400 font-black uppercase text-xs tracking-widest transition-all border border-red-500/20 ml-auto disabled:opacity-50">
               {resetting ? <RefreshCw size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
               Reset Tiempos
             </button>
@@ -1220,16 +1202,12 @@ const TelemetryModule = () => {
         </div>
       </div>
 
-      {/* Sub-tabs */}
       <div className="flex gap-1 border-b border-white/5">
         {(['live', 'results'] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveSubTab(tab)}
+          <button key={tab} onClick={() => setActiveSubTab(tab)}
             className={`px-6 py-3 text-xs font-black uppercase tracking-widest transition-all rounded-t-xl ${
               activeSubTab === tab ? 'bg-white/5 text-yellow-400 border-b-2 border-yellow-400' : 'text-gray-500 hover:text-white'
-            }`}
-          >
+            }`}>
             {tab === 'live' ? '📡 Live' : '🏁 Resultados'}
           </button>
         ))}
@@ -1313,7 +1291,7 @@ const TelemetryModule = () => {
 /* ────────────────────────────────────────────────────────────── */
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'race_config' | 'results' | 'teams' | 'kit_delivery' | 'telemetry'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'race_config' | 'results' | 'teams' | 'kit_delivery' | 'telemetry' | 'inscripcion'>('overview');
   const [totalAtletas, setTotalAtletas] = useState(0);
 
   return (
@@ -1338,19 +1316,20 @@ export default function AdminDashboard() {
       <main className="max-w-7xl mx-auto px-6 py-12">
         <div className="flex flex-wrap gap-4 mb-12 border-b border-white/5 pb-6">
           {[
-            { id: 'overview', label: 'Dashboard', icon: null },
+            { id: 'overview',     label: 'Dashboard',       icon: null },
             { id: 'kit_delivery', label: 'Entrega de Kits', icon: <Package size={14} /> },
-            { id: 'telemetry', label: 'Telemetría', icon: <Radio size={14} />, accent: 'yellow' },
-            { id: 'teams', label: 'Escuadrones', icon: null },
-            { id: 'race_config', label: 'Carrera', icon: null },
-            { id: 'results', label: 'Resultados', icon: null },
+            { id: 'telemetry',    label: 'Telemetría',      icon: <Radio size={14} />, accent: 'yellow' },
+            { id: 'inscripcion',  label: 'Inscribir',       icon: <UserPlus size={14} /> },
+            { id: 'teams',        label: 'Escuadrones',     icon: null },
+            { id: 'race_config',  label: 'Carrera',         icon: null },
+            { id: 'results',      label: 'Resultados',      icon: null },
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
               className={`px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all flex items-center gap-2 ${
                 activeTab === tab.id
-                  ? tab.accent === 'yellow'
+                  ? (tab as any).accent === 'yellow'
                     ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20'
                     : 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20'
                   : 'bg-white/5 hover:bg-white/10 text-gray-400'
@@ -1383,6 +1362,7 @@ export default function AdminDashboard() {
 
         {activeTab === 'kit_delivery' && <ModuloEntregaKits />}
         {activeTab === 'telemetry' && <TelemetryModule />}
+        {activeTab === 'inscripcion' && <ModuloInscripcionAdmin />}
         {activeTab === 'teams' && <EscuadronesList />}
         {activeTab === 'race_config' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in slide-in-from-bottom-4">
