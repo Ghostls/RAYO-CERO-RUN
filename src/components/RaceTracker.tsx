@@ -1,13 +1,19 @@
 /**
- * RAYO CERO — RACE TRACKER V2
+ * RAYO CERO — RACE TRACKER V3.0
  * Telemetría GPS en tiempo real con Filtro de Kalman + Supabase Realtime
- * Diseño: consistente con rayocero-run.vercel.app
  * Stack visual: #03070b fondo, cyan #00f2ff acento, tipografía militar italic
+ *
+ * EVOLUCIÓN V3.0:
+ * — GPS en segundo plano via useGpsBackground (Wake Lock API)
+ * — Mapa real Leaflet via RouteMapStrava V3 (prop live=true)
+ * — Banner de aviso iOS/Android integrado
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { GeoKalmanFilter, GeoPoint } from './KalmanFilter';
+import { GeoPoint } from './KalmanFilter';
+import RouteMapStrava from './RouteMapStrava';
+import { useGpsBackground, GpsBackgroundBanner } from './useGpsBackground';
 
 type RaceStatus = 'waiting' | 'in_progress' | 'completed';
 
@@ -44,121 +50,45 @@ const formatFinal = (seconds: number): string => {
   return `${String(m).padStart(2,'0')}:${String(parseFloat(s)).padStart(5,'0')}`;
 };
 
-const RouteMap = ({ points }: { points: GeoPoint[] }) => {
-  if (points.length < 2) return null;
-  const PAD = 40, W = 600, H = 280;
-  const lats = points.map(p => p.lat);
-  const lngs = points.map(p => p.lng);
-  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-  const rLat = maxLat - minLat || 0.001;
-  const rLng = maxLng - minLng || 0.001;
-  const toXY = (lat: number, lng: number) => ({
-    x: PAD + ((lng - minLng) / rLng) * (W - PAD * 2),
-    y: H - PAD - ((lat - minLat) / rLat) * (H - PAD * 2),
-  });
-  const path = points.map((p, i) => {
-    const { x, y } = toXY(p.lat, p.lng);
-    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
-  const start = toXY(points[0].lat, points[0].lng);
-  const end = toXY(points[points.length - 1].lat, points[points.length - 1].lng);
-  const dist = points.reduce((acc, p, i) => {
-    if (i === 0) return 0;
-    const prev = points[i - 1];
-    const R = 6371;
-    const dLat = ((p.lat - prev.lat) * Math.PI) / 180;
-    const dLng = ((p.lng - prev.lng) * Math.PI) / 180;
-    const a = Math.sin(dLat/2)**2 + Math.cos((prev.lat*Math.PI)/180)*Math.cos((p.lat*Math.PI)/180)*Math.sin(dLng/2)**2;
-    return acc + R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  }, 0);
-
-  return (
-    <div style={{ marginTop: 24, borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(0,242,255,0.15)', background: 'rgba(0,0,0,0.4)' }}>
-      <div style={{ padding: '10px 16px', borderBottom: '1px solid rgba(0,242,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: 9, letterSpacing: '0.3em', color: 'rgba(0,242,255,0.6)', fontWeight: 900, textTransform: 'uppercase' }}>📍 Ruta GPS · Kalman</span>
-        <span style={{ fontSize: 9, letterSpacing: '0.2em', color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>{dist.toFixed(2)} KM · {points.length} PTS</span>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
-        <defs>
-          <linearGradient id="rtGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#00f2ff" stopOpacity="0.5" />
-            <stop offset="50%" stopColor="#00f2ff" stopOpacity="1" />
-            <stop offset="100%" stopColor="#ffffff" stopOpacity="0.7" />
-          </linearGradient>
-          <filter id="rtGlow">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-          <filter id="rtGlow2">
-            <feGaussianBlur stdDeviation="6" result="blur" />
-            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        </defs>
-        <path d={path} fill="none" stroke="rgba(0,242,255,0.1)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
-        <path d={path} fill="none" stroke="url(#rtGrad)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" filter="url(#rtGlow)" />
-        <circle cx={start.x} cy={start.y} r={8} fill="rgba(34,197,94,0.2)" filter="url(#rtGlow2)" />
-        <circle cx={start.x} cy={start.y} r={5} fill="#22c55e" />
-        <circle cx={start.x} cy={start.y} r={2.5} fill="white" />
-        <text x={start.x + 12} y={start.y + 4} fill="#22c55e" fontSize="9" fontFamily="monospace" fontWeight="bold">START</text>
-        <circle cx={end.x} cy={end.y} r={8} fill="rgba(0,242,255,0.2)" filter="url(#rtGlow2)" />
-        <circle cx={end.x} cy={end.y} r={5} fill="#00f2ff" />
-        <circle cx={end.x} cy={end.y} r={2.5} fill="white" />
-        <text x={end.x + 12} y={end.y + 4} fill="#00f2ff" fontSize="9" fontFamily="monospace" fontWeight="bold">META</text>
-      </svg>
-    </div>
-  );
-};
-
 export default function RaceTracker({ bibNumber }: Props) {
   const [bib, setBib] = useState<string>(bibNumber?.toString() ?? '');
   const [runner, setRunner] = useState<RunnerState | null>(null);
-  const [gpsPoints, setGpsPoints] = useState<GeoPoint[]>([]);
   const [elapsed, setElapsed] = useState<string>('00:00');
-  const [gpsActive, setGpsActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const watchIdRef = useRef<number | null>(null);
-  const kalmanRef = useRef(new GeoKalmanFilter());
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const channelRef = useRef<any>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const runnerRef = useRef<RunnerState | null>(null);
 
-  const startGPS = useCallback(() => {
-    if (!navigator.geolocation) { setError('GPS no disponible'); return; }
-    kalmanRef.current.reset();
-    setGpsActive(true);
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        const raw: GeoPoint = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: pos.timestamp, accuracy: pos.coords.accuracy, speed: pos.coords.speed ?? undefined };
-        const filtered = kalmanRef.current.filter(raw);
-        setGpsPoints(prev => [...prev, filtered]);
-      },
-      (err) => setError(`GPS: ${err.message}`),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-  }, []);
-
-  const stopGPS = useCallback(async (points: GeoPoint[], runnerData: RunnerState) => {
-    if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
-    setGpsActive(false);
-    if (points.length > 0) {
-      await supabase.from('runners').update({ gps_track: points }).eq('bib_number', runnerData.bib_number);
-    }
-  }, []);
+  // GPS en segundo plano con Wake Lock
+  const {
+    points: gpsPoints,
+    gpsActive,
+    wakeActive,
+    iosWarning,
+    start: startGPS,
+    stop: stopGPS,
+  } = useGpsBackground({ bibNumber: runner?.bib_number ?? null });
 
   const subscribeToRunner = useCallback((bibNum: number) => {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
     channelRef.current = supabase.channel(`runner-${bibNum}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'runners', filter: `bib_number=eq.${bibNum}` }, (payload) => {
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'runners',
+        filter: `bib_number=eq.${bibNum}`,
+      }, (payload) => {
         const updated = payload.new as RunnerState;
+        runnerRef.current = updated;
         setRunner(updated);
         if (updated.race_status === 'in_progress') {
           startGPS();
-          elapsedRef.current = setInterval(() => { if (updated.start_time) setElapsed(formatElapsed(updated.start_time)); }, 1000);
+          elapsedRef.current = setInterval(() => {
+            if (updated.start_time) setElapsed(formatElapsed(updated.start_time));
+          }, 1000);
         }
         if (updated.race_status === 'completed') {
-          setGpsPoints(prev => { stopGPS(prev, updated); return prev; });
+          stopGPS();
           if (elapsedRef.current) clearInterval(elapsedRef.current);
         }
       }).subscribe();
@@ -166,14 +96,16 @@ export default function RaceTracker({ bibNumber }: Props) {
 
   const loadRunner = async (bibNum: number) => {
     setLoading(true); setError(null);
-    const { data, error: err } = await supabase.from('runners')
+    const { data, error: err } = await supabase
+      .from('runners')
       .select('bib_number,nombre,apellido,categoria,race_status,start_time,finish_time,finish_time_seconds,gps_track')
-      .eq('bib_number', bibNum).single();
+      .eq('bib_number', bibNum)
+      .single();
     setLoading(false);
     if (err || !data) { setError(`BIB #${bibNum} no encontrado`); return; }
     const runnerData = { ...data, race_status: data.race_status ?? 'waiting' } as RunnerState;
+    runnerRef.current = runnerData;
     setRunner(runnerData);
-    if (runnerData.gps_track && runnerData.race_status === 'completed') setGpsPoints(runnerData.gps_track);
     subscribeToRunner(bibNum);
     if (runnerData.race_status === 'in_progress' && runnerData.start_time) {
       startGPS();
@@ -185,20 +117,28 @@ export default function RaceTracker({ bibNumber }: Props) {
     if (bibNumber) loadRunner(bibNumber);
     return () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
-      if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
       if (elapsedRef.current) clearInterval(elapsedRef.current);
+      stopGPS();
     };
   }, [bibNumber]);
 
   const forceStart = async () => {
     if (!runner) return;
-    await supabase.from('runners').update({ race_status: 'in_progress', start_time: new Date().toISOString() }).eq('bib_number', runner.bib_number);
+    await supabase.from('runners')
+      .update({ race_status: 'in_progress', start_time: new Date().toISOString() })
+      .eq('bib_number', runner.bib_number);
   };
 
   const forceFinish = async () => {
     if (!runner || !runner.start_time) return;
     const secs = (Date.now() - new Date(runner.start_time).getTime()) / 1000;
-    await supabase.from('runners').update({ race_status: 'completed', finish_time: new Date().toISOString(), finish_time_seconds: Math.round(secs * 100) / 100 }).eq('bib_number', runner.bib_number);
+    await supabase.from('runners')
+      .update({
+        race_status: 'completed',
+        finish_time: new Date().toISOString(),
+        finish_time_seconds: Math.round(secs * 100) / 100,
+      })
+      .eq('bib_number', runner.bib_number);
   };
 
   const statusLabel = { waiting: 'EN ESPERA', in_progress: 'EN CARRERA', completed: 'FINALIZADO' };
@@ -256,11 +196,7 @@ export default function RaceTracker({ bibNumber }: Props) {
 
         .rt-body { padding: 24px; max-width: 480px; margin: 0 auto; }
 
-        .rt-search {
-          display: flex;
-          gap: 10px;
-          margin-bottom: 24px;
-        }
+        .rt-search { display: flex; gap: 10px; margin-bottom: 24px; }
 
         .rt-input {
           flex: 1;
@@ -337,12 +273,7 @@ export default function RaceTracker({ bibNumber }: Props) {
           margin-bottom: 8px;
         }
 
-        .rt-tags {
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-          margin-bottom: 16px;
-        }
+        .rt-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
 
         .rt-tag {
           font-size: 8px;
@@ -356,25 +287,14 @@ export default function RaceTracker({ bibNumber }: Props) {
           color: rgba(0,242,255,0.8);
         }
 
-        .rt-status-row {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
+        .rt-status-row { display: flex; align-items: center; gap: 8px; }
 
-        .rt-dot {
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          flex-shrink: 0;
-        }
-
+        .rt-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
         .rt-dot.in_progress {
           background: #22c55e;
           box-shadow: 0 0 6px #22c55e;
           animation: rt-pulse 1.5s infinite;
         }
-
         .rt-dot.completed { background: #00f2ff; box-shadow: 0 0 6px #00f2ff; }
         .rt-dot.waiting { background: rgba(255,255,255,0.2); }
 
@@ -417,15 +337,8 @@ export default function RaceTracker({ bibNumber }: Props) {
           color: white;
         }
 
-        .rt-timer.running {
-          color: #22c55e;
-          text-shadow: 0 0 40px rgba(34,197,94,0.3);
-        }
-
-        .rt-timer.finished {
-          color: #00f2ff;
-          text-shadow: 0 0 40px rgba(0,242,255,0.3);
-        }
+        .rt-timer.running { color: #22c55e; text-shadow: 0 0 40px rgba(34,197,94,0.3); }
+        .rt-timer.finished { color: #00f2ff; text-shadow: 0 0 40px rgba(0,242,255,0.3); }
 
         .rt-gps-bar {
           display: flex;
@@ -457,11 +370,7 @@ export default function RaceTracker({ bibNumber }: Props) {
           align-items: center;
         }
 
-        .rt-gps-count {
-          font-size: 9px;
-          color: rgba(34,197,94,0.5);
-          letter-spacing: 0.1em;
-        }
+        .rt-gps-count { font-size: 9px; color: rgba(34,197,94,0.5); letter-spacing: 0.1em; }
 
         .rt-sim {
           margin-top: 24px;
@@ -478,11 +387,7 @@ export default function RaceTracker({ bibNumber }: Props) {
           margin-bottom: 12px;
         }
 
-        .rt-sim-btns {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 10px;
-        }
+        .rt-sim-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
         .rt-btn-start {
           padding: 12px;
@@ -534,14 +439,8 @@ export default function RaceTracker({ bibNumber }: Props) {
           text-align: center;
         }
 
-        .rt-empty {
-          text-align: center;
-          padding: 48px 0;
-          color: rgba(0,242,255,0.2);
-        }
-
+        .rt-empty { text-align: center; padding: 48px 0; color: rgba(0,242,255,0.2); }
         .rt-empty-icon { font-size: 36px; margin-bottom: 12px; }
-
         .rt-empty-text {
           font-size: 9px;
           letter-spacing: 0.35em;
@@ -569,7 +468,11 @@ export default function RaceTracker({ bibNumber }: Props) {
                 onChange={e => setBib(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && bib && loadRunner(parseInt(bib))}
               />
-              <button className="rt-btn" onClick={() => bib && loadRunner(parseInt(bib))} disabled={loading || !bib}>
+              <button
+                className="rt-btn"
+                onClick={() => bib && loadRunner(parseInt(bib))}
+                disabled={loading || !bib}
+              >
                 {loading ? '...' : 'Cargar'}
               </button>
             </div>
@@ -594,9 +497,12 @@ export default function RaceTracker({ bibNumber }: Props) {
 
               {/* GPS bar */}
               {gpsActive && (
-                <div className="rt-gps-bar" style={{ marginTop: 16 }}>
-                  <div className="rt-gps-text"><span className="rt-gps-dot" />GPS Kalman activo</div>
-                  <span className="rt-gps-count">{gpsPoints.length} pts</span>
+                <div style={{ marginTop: 12 }}>
+                  <GpsBackgroundBanner
+                    gpsActive={gpsActive}
+                    wakeActive={wakeActive}
+                    iosWarning={iosWarning}
+                  />
                 </div>
               )}
 
@@ -614,19 +520,25 @@ export default function RaceTracker({ bibNumber }: Props) {
                 </div>
               </div>
 
-              {/* Route map */}
-              {gpsPoints.length >= 2 && <RouteMap points={gpsPoints} />}
+              {/* Route map — RouteMapStrava unificado */}
+              {gpsPoints.length >= 2 && <RouteMapStrava points={gpsPoints} live={true} />}
 
               {/* Simulators */}
               <div className="rt-sim">
                 <div className="rt-sim-label">[ modo prueba ]</div>
                 <div className="rt-sim-btns">
-                  <button className="rt-btn-start" onClick={forceStart}
-                    disabled={runner.race_status === 'in_progress' || runner.race_status === 'completed'}>
+                  <button
+                    className="rt-btn-start"
+                    onClick={forceStart}
+                    disabled={runner.race_status === 'in_progress' || runner.race_status === 'completed'}
+                  >
                     🚀 Forzar Salida
                   </button>
-                  <button className="rt-btn-finish" onClick={forceFinish}
-                    disabled={runner.race_status !== 'in_progress'}>
+                  <button
+                    className="rt-btn-finish"
+                    onClick={forceFinish}
+                    disabled={runner.race_status !== 'in_progress'}
+                  >
                     🏁 Forzar Llegada
                   </button>
                 </div>

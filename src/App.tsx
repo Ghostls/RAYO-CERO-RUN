@@ -1,12 +1,8 @@
 /**
- * RAYO CERO — CORE ROUTER V7.3 (STABLE EVOLUTION - VALKYRON SHIELD)
+ * RAYO CERO — CORE ROUTER V7.4 (STABLE EVOLUTION - VALKYRON SHIELD)
  * Senior Dev: MIA / Gemini (Valkyron Group)
  * CEO: Lualdo Sciscioli
- * Grado: Operativo / Militar
- * REGLA DE ORO: Código completo sin omisiones.
- * EVOLUCIÓN V7.3: Integración TrackerLanding PWA para corredores.
- *   - /tracker        → TrackerLanding (mini PWA corredor: BIB → GPS → timer → mapa)
- *   - /tracker/:bib   → RaceTracker (monitor admin por dorsal específico)
+ * EVOLUCIÓN V7.4: Rutas del Portal del Atleta (/acceso, /perfil)
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -35,6 +31,10 @@ import RacesSection from "./components/RacesSection";
 import RaceTracker from "./components/RaceTracker";
 import TrackerLanding from "./components/TrackerLanding";
 
+// PORTAL DEL ATLETA — Módulo Strava
+import AthleteAuth from "./components/AthleteAuth";
+import AthleteProfile from "./components/Athleteprofile";
+
 const queryClient = new QueryClient();
 
 // ── Wrapper para RaceTracker con useParams ────────────────────
@@ -43,20 +43,20 @@ const TrackerPage = () => {
   return <RaceTracker bibNumber={parseInt(bib ?? '0')} />;
 };
 
-// ── Componente Wrapper para manejar la lógica de visibilidad de UI Global ──
+// ── Lógica de visibilidad de UI Global ──
 const AppContent = ({ session, loading }: { session: any; loading: boolean }) => {
   const location = useLocation();
 
-  // Rutas donde se oculta Navbar y Footer
   const isAdminRoute =
     location.pathname.startsWith('/admin') ||
     location.pathname === '/v-access' ||
-    location.pathname.startsWith('/tracker');
+    location.pathname.startsWith('/tracker') ||
+    location.pathname === '/acceso' ||
+    location.pathname === '/perfil';
 
   return (
     <div className="min-h-screen bg-[#03070b] text-white flex flex-col selection:bg-cyan-500/30">
 
-      {/* NAVEGACIÓN GLOBAL TÁCTICA - Se oculta en rutas Admin y Tracker */}
       {!isAdminRoute && <Navbar />}
 
       <main className="flex-grow">
@@ -70,11 +70,13 @@ const AppContent = ({ session, loading }: { session: any; loading: boolean }) =>
 
           {/* TELEMETRÍA GPS — Mini PWA para corredores */}
           <Route path="/tracker" element={<TrackerLanding />} />
-
-          {/* TELEMETRÍA GPS — Monitor admin por dorsal */}
           <Route path="/tracker/:bib" element={<TrackerPage />} />
 
-          {/* ACCESO ADMINISTRATIVO (OCULTO & BLINDADO) */}
+          {/* PORTAL DEL ATLETA — Login sin contraseña + Perfil */}
+          <Route path="/acceso" element={<AthleteAuth />} />
+          <Route path="/perfil" element={<AthleteProfile />} />
+
+          {/* ACCESO ADMINISTRATIVO */}
           <Route
             path="/v-access"
             element={
@@ -92,7 +94,7 @@ const AppContent = ({ session, loading }: { session: any; loading: boolean }) =>
             }
           />
 
-          {/* PROTECCIÓN DE RUTA: DASHBOARD M.I.A */}
+          {/* DASHBOARD ADMIN */}
           <Route
             path="/admin-dashboard"
             element={
@@ -110,12 +112,11 @@ const AppContent = ({ session, loading }: { session: any; loading: boolean }) =>
             }
           />
 
-          {/* Manejo de Error 404 */}
+          {/* 404 */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
 
-      {/* PIE DE PÁGINA OPERATIVO - Se oculta en rutas Admin y Tracker */}
       {!isAdminRoute && <Footer />}
 
     </div>

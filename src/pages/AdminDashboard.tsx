@@ -12,6 +12,7 @@ import autoTable from 'jspdf-autotable';
 import { RaceForm } from '../components/admin/RaceForm';
 import { RouteConfig } from '../components/admin/RouteConfig';
 import { ResultsTable } from '../components/admin/ResultsTable';
+import PreRaceButton from '../components/Preracebutton';
 import logoPrincipal from '../assets/logo.png';
 
 /* ────────────────────────────────────────────────────────────── */
@@ -39,7 +40,6 @@ interface Runner {
 const BUCKET = 'comprobantes-pago';
 const TELEMETRY_API = 'http://localhost:8090';
 
-/* ── CATEGORY ORDER CANÓNICO (alineado con DB post-migración V25.1) ── */
 const CATEGORY_ORDER: string[] = [
   'Movilidad Reducida',
   'Juvenil Masculino',
@@ -62,40 +62,36 @@ const CATEGORY_ORDER: string[] = [
   'Absoluto Femenino',
 ];
 
-/* ── RGB táctica por categoría ── */
 const getCategoryColor = (categoria: string): [number, number, number] => {
   const c = categoria.toLowerCase();
-  if (c.includes('movilidad')) return [168, 85, 247];   // purple
-  if (c.includes('juvenil')) return [34, 211, 238];     // cyan
-  if (c.includes('libre')) return [251, 191, 36];       // amber
-  if (c.includes('30-34')) return [52, 211, 153];       // emerald
-  if (c.includes('35-39')) return [16, 185, 129];       // green
-  if (c.includes('master a')) return [249, 115, 22];    // orange
-  if (c.includes('master b')) return [239, 68, 68];     // red
-  if (c.includes('master c')) return [236, 72, 153];    // pink
-  if (c.includes('master d')) return [99, 102, 241];    // indigo
-  // fallback semántico por género
-  if (c.includes('masculino') || c.includes(' m')) return [59, 130, 246];  // blue
-  if (c.includes('femenino') || c.includes(' f')) return [244, 114, 182];  // pink-300
-  return [156, 163, 175]; // gray
+  if (c.includes('movilidad')) return [168, 85, 247];
+  if (c.includes('juvenil')) return [34, 211, 238];
+  if (c.includes('libre')) return [251, 191, 36];
+  if (c.includes('30-34')) return [52, 211, 153];
+  if (c.includes('35-39')) return [16, 185, 129];
+  if (c.includes('master a')) return [249, 115, 22];
+  if (c.includes('master b')) return [239, 68, 68];
+  if (c.includes('master c')) return [236, 72, 153];
+  if (c.includes('master d')) return [99, 102, 241];
+  if (c.includes('masculino') || c.includes(' m')) return [59, 130, 246];
+  if (c.includes('femenino') || c.includes(' f')) return [244, 114, 182];
+  return [156, 163, 175];
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* HELPERS FÍSICO-MATEMÁTICOS                                     */
+/* HELPERS                                                        */
 /* ────────────────────────────────────────────────────────────── */
 
 const parseTimeToSeconds = (timeVal: any): number => {
   if (!timeVal) return 0;
   if (typeof timeVal === 'string') {
     const parts = timeVal.split(':');
-    if (parts.length === 3) {
+    if (parts.length === 3)
       return parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseFloat(parts[2]);
-    }
     return 0;
   }
-  if (typeof timeVal === 'object') {
+  if (typeof timeVal === 'object')
     return (timeVal.hours || 0) * 3600 + (timeVal.minutes || 0) * 60 + (timeVal.seconds || 0);
-  }
   return 0;
 };
 
@@ -104,7 +100,7 @@ const formatSeconds = (totalSeconds: number): string => {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = Math.floor(totalSeconds % 60);
-  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
 };
 
 const getComprobantePublicUrl = async (
@@ -125,7 +121,8 @@ const getComprobantePublicUrl = async (
     if (error || !files || files.length === 0) break;
     const found = files.find(f => {
       const file = f.name.toLowerCase();
-      return file.includes(cedula.toLowerCase()) || (referencia_pago && file.includes(referencia_pago.toLowerCase()));
+      return file.includes(cedula.toLowerCase()) ||
+        (referencia_pago && file.includes(referencia_pago.toLowerCase()));
     });
     if (found) {
       const { data } = supabase.storage.from(BUCKET).getPublicUrl(found.name);
@@ -138,7 +135,7 @@ const getComprobantePublicUrl = async (
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* PDF EXPORT — GENERADOR SEGMENTADO V47.3 (DARK THEME + FIX)     */
+/* PDF EXPORT                                                     */
 /* ────────────────────────────────────────────────────────────── */
 
 type PDFMode = 'segmented' | 'specific' | 'general';
@@ -153,8 +150,6 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
 
-  // ── INYECCIÓN ATÓMICA DE FONDO NEGRO ────────────────────────
-  // Sobrescribimos addPage para que CADA vez que autoTable agregue una página, nazca negra.
   const originalAddPage = doc.addPage.bind(doc);
   (doc as any).addPage = function(...args: any[]) {
     originalAddPage(...args);
@@ -163,47 +158,39 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
     return this;
   };
 
-  // Pintamos la página 1 manualmente (porque ya fue creada al instanciar)
   doc.setFillColor(5, 5, 5);
   doc.rect(0, 0, pageW, pageH, 'F');
 
-  // ── Datos para reporte ──────────────────────────────────────
   const categoryCounts: Record<string, number> = {};
   atletas.forEach(a => {
     const cat = a.categoria || 'Sin categoría';
     categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
   });
 
-  // ── Portada Mejorada ────────────────────────────────────────
-  // Logo Centrado
   try {
     const img = new Image();
     img.src = logoPrincipal;
     doc.addImage(img, 'PNG', pageW / 2 - 20, 15, 40, 14);
   } catch {}
 
-  // Branding Title
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(36);
-  doc.setTextColor(34, 211, 238); // Cyan-400
+  doc.setTextColor(34, 211, 238);
   doc.text('RAYOCERO', pageW / 2, 42, { align: 'center' });
 
-  // Subtítulo
   doc.setFontSize(12);
-  doc.setTextColor(200, 200, 200); 
+  doc.setTextColor(200, 200, 200);
   doc.text('NIGHT FEST · 06 JUN 2026 · 06:00 PM', pageW / 2, 50, { align: 'center' });
-  
+
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.setTextColor(120, 120, 120);
   doc.text('Monumento al Sol, Barquisimeto · Valkyron Group', pageW / 2, 56, { align: 'center' });
 
-  // Línea divisoria central
   doc.setDrawColor(34, 211, 238);
   doc.setLineWidth(0.5);
   doc.line(20, 64, pageW - 20, 64);
 
-  // Título del reporte
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(255, 255, 255);
@@ -213,7 +200,6 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
     'LISTADO GENERAL DE ATLETAS';
   doc.text(reportTitle, pageW / 2, 75, { align: 'center' });
 
-  // KPIs
   const totalFiltered = atletas.filter(a => selectedCategories.includes(a.categoria || 'Sin categoría')).length;
   const pagadosFiltered = atletas.filter(a => selectedCategories.includes(a.categoria || 'Sin categoría') && a.pago_verificado).length;
 
@@ -223,15 +209,13 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
   doc.text(`Pagos verificados: ${pagadosFiltered}`, 14, 90);
   doc.text(`Generado: ${new Date().toLocaleString('es-VE')}`, pageW - 14, 85, { align: 'right' });
 
-  // ── Barras proporcionales por categoría ─────────────────────
-  let barY = 100; // Bajamos el inicio por la nueva cabecera
+  let barY = 100;
   doc.setFontSize(9);
   doc.setTextColor(255, 255, 255);
   doc.text('DISTRIBUCIÓN POR CATEGORÍA', 14, barY - 4);
 
   const maxCount = Math.max(...Object.values(categoryCounts), 1);
   const barMaxWidth = pageW - 28 - 40;
-
   const categoriesForBars = CATEGORY_ORDER.filter(cat => categoryCounts[cat]);
   const otherCats = Object.keys(categoryCounts).filter(cat => !CATEGORY_ORDER.includes(cat));
   const allCatsForBars = [...categoriesForBars, ...otherCats];
@@ -240,43 +224,26 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
     const count = categoryCounts[cat] || 0;
     const barWidth = (count / maxCount) * barMaxWidth;
     const [r, g, b] = getCategoryColor(cat);
-
-    // Fondo gris oscuro para la pista de la barra
     doc.setFillColor(20, 20, 20);
     doc.rect(14, barY, barMaxWidth, 5, 'F');
-    // Barra de color real
     doc.setFillColor(r, g, b);
     doc.rect(14, barY, Math.max(barWidth, 1), 5, 'F');
-
-    // Label de Categoría
     doc.setFontSize(7);
     doc.setTextColor(200, 200, 200);
     doc.text(cat.length > 30 ? cat.substring(0, 28) + '…' : cat, 16, barY + 3.8);
-
-    // Conteo (Texto colored alignment)
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(r, g, b);
     doc.text(String(count), pageW - 14, barY + 3.8, { align: 'right' });
     doc.setFont('helvetica', 'normal');
-
     barY += 8;
-    if (barY > pageH - 20) {
-      doc.addPage();
-      barY = 20; // El monkey-patch ya pinta de negro
-    }
+    if (barY > pageH - 20) { doc.addPage(); barY = 20; }
   });
 
-  // ── Secciones por categoría ──────────────────────────────────
   const categoriesToRender = selectedCategories.filter(cat => CATEGORY_ORDER.includes(cat));
-  
-  // Asegurar que categorías personalizadas no queden fuera
   selectedCategories.forEach(cat => {
-    if (!CATEGORY_ORDER.includes(cat) && !categoriesToRender.includes(cat)) {
+    if (!CATEGORY_ORDER.includes(cat) && !categoriesToRender.includes(cat))
       categoriesToRender.push(cat);
-    }
   });
-
-  // Ordenar canónicamente
   categoriesToRender.sort((a, b) => {
     const indexA = CATEGORY_ORDER.indexOf(a);
     const indexB = CATEGORY_ORDER.indexOf(b);
@@ -289,25 +256,19 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
     const catAtletas = atletas
       .filter(a => (a.categoria || 'Sin categoría') === categoria)
       .sort((a, b) => Number(a.bib_number ?? 9999) - Number(b.bib_number ?? 9999));
-
     if (catAtletas.length === 0) return;
 
-    doc.addPage(); // Se crea y automáticamente es fondo negro
+    doc.addPage();
     const [r, g, b] = getCategoryColor(categoria);
-
-    // Header de categoría (Franja de color)
     doc.setFillColor(r, g, b);
     doc.rect(0, 0, pageW, 20, 'F');
-    
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
-    doc.setTextColor(0, 0, 0); // Texto negro imponente sobre el color de la categoría
+    doc.setTextColor(0, 0, 0);
     doc.text(categoria.toUpperCase(), pageW / 2, 13, { align: 'center' });
-
     doc.setFontSize(9);
     doc.text(`${catAtletas.length} ATLETAS`, pageW - 14, 13, { align: 'right' });
 
-    // Tabla
     const rows = catAtletas.map((a, idx) => [
       String(idx + 1),
       a.bib_number ? `#${a.bib_number}` : '---',
@@ -319,32 +280,24 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
     ]);
 
     autoTable(doc, {
-      startY: 25, // Empezar justo debajo del header de color
+      startY: 25,
       head: [['#', 'Dorsal', 'Atleta', 'Cédula', 'Teléfono', 'Talla', 'Pago']],
       body: rows,
       theme: 'plain',
       styles: {
-        fontSize: 8,
-        cellPadding: 3,
-        textColor: [255, 255, 255], // BLANCO PERFECTO PARA TEXTO
-        lineColor: [40, 40, 40],    // Divisorias gris oscuro
-        lineWidth: 0.1,
-        fillColor: [5, 5, 5],       // Fondo de celda negro
+        fontSize: 8, cellPadding: 3,
+        textColor: [255, 255, 255],
+        lineColor: [40, 40, 40], lineWidth: 0.1,
+        fillColor: [5, 5, 5],
       },
       headStyles: {
-        fillColor: [r, g, b],       // Color de cabecera igual a la categoría
-        textColor: [0, 0, 0],       // Letras negras en la cabecera
-        fontStyle: 'bold',
-        fontSize: 8,
+        fillColor: [r, g, b], textColor: [0, 0, 0],
+        fontStyle: 'bold', fontSize: 8,
       },
-      alternateRowStyles: {
-        fillColor: [15, 15, 15],    // Gris sutil para intercalar filas
-      },
-      // No necesitamos hook didDrawPage gracias al patch atómico global
+      alternateRowStyles: { fillColor: [15, 15, 15] },
     });
   });
 
-  // ── Footer Dinámico en todas las páginas ──────────────────────
   const totalPages = (doc.internal as any).getNumberOfPages?.() ?? 1;
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
@@ -357,16 +310,11 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
   doc.save(`RAYOCERO_${suffix}_${Date.now()}.pdf`);
 };
 
-/* ────────────────────────────────────────────────────────────── */
-/* PDF EXPORT MODAL                                               */
-/* ────────────────────────────────────────────────────────────── */
-
 const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, onClose }) => {
   const [mode, setMode] = useState<PDFMode>('segmented');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Categorías presentes en la base actual
   const availableCategories = useMemo(() => {
     const cats = new Set(atletas.map(a => a.categoria || 'Sin categoría'));
     return CATEGORY_ORDER.filter(c => cats.has(c));
@@ -376,9 +324,8 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, onClose }) => 
     setIsGenerating(true);
     try {
       let categoriesToInclude: string[] = [];
-      if (mode === 'segmented') {
-        categoriesToInclude = availableCategories;
-      } else if (mode === 'specific') {
+      if (mode === 'segmented') categoriesToInclude = availableCategories;
+      else if (mode === 'specific') {
         if (!selectedCategory) { alert('Selecciona una categoría.'); setIsGenerating(false); return; }
         categoriesToInclude = [selectedCategory];
       } else {
@@ -449,10 +396,7 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, onClose }) => 
         )}
 
         <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3 rounded-xl bg-white/5 font-bold hover:bg-white/10 transition-all text-xs uppercase"
-          >
+          <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-white/5 font-bold hover:bg-white/10 transition-all text-xs uppercase">
             Cancelar
           </button>
           <button
@@ -471,7 +415,7 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, onClose }) => 
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* MÓDULO TÁCTICO: ENTREGA DE KITS Y APROVISIONAMIENTO RFID       */
+/* MÓDULO ENTREGA DE KITS Y RFID                                  */
 /* ────────────────────────────────────────────────────────────── */
 
 const ModuloEntregaKits = () => {
@@ -512,19 +456,14 @@ const ModuloEntregaKits = () => {
       e.preventDefault();
       if (!activeRunner || !epcInput) return;
       setIsLoading(true);
-      const { error } = await supabase
-        .from('runners')
-        .update({ rfid_epc: epcInput })
-        .eq('id', activeRunner.id);
+      const { error } = await supabase.from('runners').update({ rfid_epc: epcInput }).eq('id', activeRunner.id);
       setIsLoading(false);
       if (error) {
         setStatusMsg({ text: `Falla de enlace: ${error.message}`, type: 'error' });
         setEpcInput('');
       } else {
         setStatusMsg({ text: `APROVISIONAMIENTO EXITOSO: Chip asignado al Dorsal #${activeRunner.bib_number}`, type: 'success' });
-        setBibInput('');
-        setEpcInput('');
-        setActiveRunner(null);
+        setBibInput(''); setEpcInput(''); setActiveRunner(null);
       }
     }
   };
@@ -550,13 +489,11 @@ const ModuloEntregaKits = () => {
       )}
       <form onSubmit={searchRunner} className="flex gap-4 mb-8">
         <div className="flex-1">
-          <label className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-2 block">
-            Número de Dorsal Físico
-          </label>
+          <label className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-2 block">Número de Dorsal Físico</label>
           <input
             type="number"
             value={bibInput}
-            onChange={(e) => setBibInput(e.target.value)}
+            onChange={e => setBibInput(e.target.value)}
             disabled={activeRunner !== null}
             className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-2xl font-black text-white outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50"
             placeholder="Ej: 0001"
@@ -601,7 +538,7 @@ const ModuloEntregaKits = () => {
               ref={epcInputRef}
               type="text"
               value={epcInput}
-              onChange={(e) => setEpcInput(e.target.value)}
+              onChange={e => setEpcInput(e.target.value)}
               onKeyDown={handleEpcScan}
               disabled={isLoading}
               className="w-full bg-transparent border-b-2 border-cyan-500/50 pb-2 text-center text-xl font-mono text-white outline-none focus:border-cyan-400 transition-colors placeholder-cyan-500/20"
@@ -680,12 +617,12 @@ const TasaConfig = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="tasa_bcv_input" className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-2 block">Tasa BCV</label>
-              <input id="tasa_bcv_input" name="tasa_bcv" type="text" value={nuevaTasa} onChange={(e) => setNuevaTasa(e.target.value)}
+              <input id="tasa_bcv_input" name="tasa_bcv" type="text" value={nuevaTasa} onChange={e => setNuevaTasa(e.target.value)}
                 className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-cyan-500/50 transition-colors" />
             </div>
             <div>
               <label htmlFor="costo_usd_input" className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-2 block">Inscripción USD</label>
-              <input id="costo_usd_input" name="costo_usd" type="text" value={nuevoCostoUSD} onChange={(e) => setNuevoCostoUSD(e.target.value)}
+              <input id="costo_usd_input" name="costo_usd" type="text" value={nuevoCostoUSD} onChange={e => setNuevoCostoUSD(e.target.value)}
                 className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-cyan-500/50 transition-colors" />
             </div>
           </div>
@@ -800,7 +737,7 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
       const url = await getComprobantePublicUrl(atleta.cedula, atleta.referencia_pago, atleta.comprobante_url || atleta.comprobante_path);
       if (!url) setStatusMsg(`Archivo no detectado — V-${atleta.cedula}`);
       else setComprobanteUrl(url);
-    } catch (err) { setStatusMsg('Error de enlace visual'); } finally { setImgLoading(false); }
+    } catch { setStatusMsg('Error de enlace visual'); } finally { setImgLoading(false); }
   };
 
   const filteredAtletas = useMemo(() => {
@@ -822,12 +759,10 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
             <input
-              id="filter_atletas"
-              name="filter_atletas"
-              type="text"
+              id="filter_atletas" name="filter_atletas" type="text"
               placeholder="Filtrar base..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={e => setSearchTerm(e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-10 pr-4 text-[10px] uppercase font-bold outline-none focus:border-cyan-500/30 transition-all"
             />
           </div>
@@ -900,15 +835,11 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
         </div>
       </div>
 
-      {/* PDF Export Modal */}
-      {showPDFModal && (
-        <PDFExportModal atletas={atletas} onClose={() => setShowPDFModal(false)} />
-      )}
+      {showPDFModal && <PDFExportModal atletas={atletas} onClose={() => setShowPDFModal(false)} />}
 
-      {/* Comprobante Inspector Modal */}
       {selectedAtleta && createPortal(
         <div onClick={() => setSelectedAtleta(null)} className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/95 p-4 backdrop-blur-sm">
-          <div onClick={(e) => e.stopPropagation()} className="bg-[#0a0f14] border border-cyan-400/20 rounded-3xl w-full max-w-6xl overflow-hidden flex flex-col md:flex-row shadow-2xl animate-in zoom-in-95">
+          <div onClick={e => e.stopPropagation()} className="bg-[#0a0f14] border border-cyan-400/20 rounded-3xl w-full max-w-6xl overflow-hidden flex flex-col md:flex-row shadow-2xl animate-in zoom-in-95">
             <div className="flex-1 bg-black flex items-center justify-center p-4 min-h-[400px]">
               {imgLoading ? (
                 <div className="text-center"><RefreshCw className="animate-spin text-cyan-400 mb-4" size={40} /><p className="text-cyan-400 text-xs uppercase">Enlazando Hangar...</p></div>
@@ -949,7 +880,6 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
         </div>, document.body
       )}
 
-      {/* Delete Confirm Modal */}
       {athleteToDelete && createPortal(
         <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
           <div className="bg-[#0a0a0a] border border-red-500/30 rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95">
@@ -973,7 +903,7 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* ESCUADRONES LIST                                               */
+/* ESCUADRONES                                                    */
 /* ────────────────────────────────────────────────────────────── */
 
 const EscuadronesList = () => {
@@ -1010,7 +940,7 @@ const EscuadronesList = () => {
         });
         processedTeams.sort((a, b) => { if (a.totalSeconds === 0) return 1; if (b.totalSeconds === 0) return -1; return a.totalSeconds - b.totalSeconds; });
         setEquipos(processedTeams);
-      } catch (err) { console.error('[MIA_SQUAD_ERROR]', err); } finally { setLoading(false); }
+      } catch (err) { console.error(err); } finally { setLoading(false); }
     };
     fetchEquipos();
   }, []);
@@ -1060,7 +990,7 @@ const EscuadronesList = () => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* TELEMETRÍA RFID — MÓDULO V46                                   */
+/* TELEMETRÍA RFID — CON SEÑAL PRE-CARRERA                        */
 /* ────────────────────────────────────────────────────────────── */
 
 interface SystemStatus {
@@ -1111,7 +1041,7 @@ const TelemetryModule = () => {
       try {
         const res = await fetch(`${TELEMETRY_API}/status`, { signal: AbortSignal.timeout(3000) });
         if (res.ok) { setStatus(await res.json()); setApiOnline(true); }
-        else { setApiOnline(false); }
+        else setApiOnline(false);
       } catch { setApiOnline(false); setStatus(null); }
     };
     fetchStatus();
@@ -1167,8 +1097,7 @@ const TelemetryModule = () => {
     setResetting(true);
     try {
       await fetch(`${TELEMETRY_API}/race/reset`, { method: 'POST' });
-      setResults([]);
-      setEvents([]);
+      setResults([]); setEvents([]);
     } catch { alert('❌ Error en reset'); }
     finally { setResetting(false); }
   };
@@ -1191,19 +1120,28 @@ const TelemetryModule = () => {
             Si la IP cambió, editar la constante TELEMETRY_API en AdminDashboard.tsx
           </p>
         </div>
+
+        {/* Señal pre-carrera disponible aunque el servidor RFID esté offline */}
+        <div className="mt-8 bg-black/40 border border-red-500/20 rounded-2xl p-6">
+          <p className="text-[9px] text-red-400 font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+            <Zap size={12} /> Señal pre-carrera — disponible sin servidor RFID
+          </p>
+          <PreRaceButton seconds={60} />
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6 animate-in fade-in">
+      {/* Status cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Lector RFID', value: status?.llrp_connected ? 'CONECTADO' : status?.demo_mode ? 'DEMO' : 'OFFLINE', color: status?.llrp_connected ? 'green' : status?.demo_mode ? 'yellow' : 'red' },
           { label: 'Corredores con chip', value: String(status?.runners_with_chip ?? 0), color: 'cyan' },
           { label: 'Carrera', value: status?.race_started ? 'EN CURSO' : 'EN ESPERA', color: status?.race_started ? 'green' : 'gray' },
           { label: 'Antenas activas', value: status?.antennas?.join(', ') ?? '—', color: 'cyan' },
-        ].map((card) => (
+        ].map(card => (
           <div key={card.label} className={`bg-black/40 border rounded-2xl p-4 ${
             card.color === 'green' ? 'border-green-500/20' :
             card.color === 'yellow' ? 'border-yellow-500/20' :
@@ -1223,6 +1161,7 @@ const TelemetryModule = () => {
         ))}
       </div>
 
+      {/* SSE status */}
       <div className="flex items-center gap-2">
         <span className={`w-2 h-2 rounded-full ${sseConnected ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
         <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">
@@ -1230,29 +1169,67 @@ const TelemetryModule = () => {
         </span>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <button onClick={handleRaceStart} disabled={raceStarting}
-          className="flex items-center gap-2 px-6 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-50">
-          {raceStarting ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
-          Disparar Pistola
-        </button>
-        <button onClick={fetchResults}
-          className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-400 font-black uppercase text-xs tracking-widest transition-all border border-cyan-500/20">
-          <RefreshCw size={14} /> Actualizar
-        </button>
-        <button onClick={handleReset} disabled={resetting}
-          className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-900/30 hover:bg-red-900/50 text-red-400 font-black uppercase text-xs tracking-widest transition-all border border-red-500/20 ml-auto disabled:opacity-50">
-          {resetting ? <RefreshCw size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
-          Reset Tiempos
-        </button>
+      {/* ── PANEL DE CONTROL DE CARRERA ── */}
+      <div className="bg-black/40 border border-white/5 rounded-2xl p-6 space-y-6">
+        <h4 className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-2">
+          <Radio size={12} className="text-cyan-400" /> Control de Carrera
+        </h4>
+
+        {/* Paso 1: Señal pre-carrera */}
+        <div>
+          <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-3 flex items-center gap-2">
+            <span className="w-4 h-4 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 text-[8px] flex items-center justify-center font-black">1</span>
+            Alerta Pre-Carrera · Enviar 1 minuto antes
+          </p>
+          <PreRaceButton seconds={60} />
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-white/5" />
+
+        {/* Paso 2: Disparar pistola */}
+        <div>
+          <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-3 flex items-center gap-2">
+            <span className="w-4 h-4 rounded-full bg-green-500/20 border border-green-500/40 text-green-400 text-[8px] flex items-center justify-center font-black">2</span>
+            Pistola de Salida · Registra start_time en Supabase
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={handleRaceStart}
+              disabled={raceStarting}
+              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-50"
+            >
+              {raceStarting ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
+              Disparar Pistola
+            </button>
+            <button
+              onClick={fetchResults}
+              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-400 font-black uppercase text-xs tracking-widest transition-all border border-cyan-500/20"
+            >
+              <RefreshCw size={14} /> Actualizar
+            </button>
+            <button
+              onClick={handleReset}
+              disabled={resetting}
+              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-900/30 hover:bg-red-900/50 text-red-400 font-black uppercase text-xs tracking-widest transition-all border border-red-500/20 ml-auto disabled:opacity-50"
+            >
+              {resetting ? <RefreshCw size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
+              Reset Tiempos
+            </button>
+          </div>
+        </div>
       </div>
 
+      {/* Sub-tabs */}
       <div className="flex gap-1 border-b border-white/5">
         {(['live', 'results'] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveSubTab(tab)}
+          <button
+            key={tab}
+            onClick={() => setActiveSubTab(tab)}
             className={`px-6 py-3 text-xs font-black uppercase tracking-widest transition-all rounded-t-xl ${
               activeSubTab === tab ? 'bg-white/5 text-yellow-400 border-b-2 border-yellow-400' : 'text-gray-500 hover:text-white'
-            }`}>
+            }`}
+          >
             {tab === 'live' ? '📡 Live' : '🏁 Resultados'}
           </button>
         ))}
@@ -1264,7 +1241,6 @@ const TelemetryModule = () => {
             <div className="py-16 text-center">
               <Radio size={32} className="text-gray-700 mx-auto mb-3" />
               <p className="text-gray-600 text-xs uppercase font-black tracking-widest">Esperando cruces de chips...</p>
-              <p className="text-gray-700 text-[9px] mt-1">El primer tag aparecerá aquí en tiempo real</p>
             </div>
           ) : events.map((ev, i) => {
             if (ev.type === 'race_start') return (
@@ -1314,7 +1290,7 @@ const TelemetryModule = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {results.map((r) => (
+                {results.map(r => (
                   <tr key={r.bib_number} className="hover:bg-white/[0.02] transition-colors">
                     <td className="p-4 text-gray-500 font-black text-sm">{r.position}</td>
                     <td className="p-4 text-cyan-400 font-black text-sm">#{r.bib_number}</td>
@@ -1333,7 +1309,7 @@ const TelemetryModule = () => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* MAIN DASHBOARD HQ — V47.3                                      */
+/* MAIN DASHBOARD                                                 */
 /* ────────────────────────────────────────────────────────────── */
 
 export default function AdminDashboard() {
@@ -1360,7 +1336,6 @@ export default function AdminDashboard() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 py-12">
-        {/* ── Tab Bar ── */}
         <div className="flex flex-wrap gap-4 mb-12 border-b border-white/5 pb-6">
           {[
             { id: 'overview', label: 'Dashboard', icon: null },
@@ -1387,7 +1362,6 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {/* ── Tab Content ── */}
         {activeTab === 'overview' && (
           <>
             <TasaConfig />
@@ -1408,17 +1382,13 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === 'kit_delivery' && <ModuloEntregaKits />}
-
         {activeTab === 'telemetry' && <TelemetryModule />}
-
         {activeTab === 'teams' && <EscuadronesList />}
-
         {activeTab === 'race_config' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in slide-in-from-bottom-4">
             <RaceForm /><RouteConfig />
           </div>
         )}
-
         {activeTab === 'results' && (
           <div className="animate-in fade-in"><ResultsTable /></div>
         )}

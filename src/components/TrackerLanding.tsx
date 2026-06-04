@@ -1,13 +1,16 @@
 /**
- * RAYO CERO — TRACKER LANDING V2
+ * RAYO CERO — TRACKER LANDING V2.1
  * Mini PWA para corredores: BIB → GPS → Timer en vivo → Mapa resultado
- * Diseño: Liquid Glass Morph + RouteMapStrava integrado
+ * Diseño: Liquid Glass Morph + RouteMapStrava V3 (Leaflet tiles reales)
  * Valkyron Group — 2026
+ *
+ * EVOLUCIÓN V2.1: StravaMap SVG inline reemplazado por RouteMapStrava V3
  */
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { GeoKalmanFilter, GeoPoint } from './KalmanFilter';
+import RouteMapStrava from './RouteMapStrava';
 
 type RaceStatus = 'waiting' | 'in_progress' | 'completed';
 type AppStep = 'bib_input' | 'gps_request' | 'waiting' | 'running' | 'finished';
@@ -51,192 +54,6 @@ const calcDist = (pts: GeoPoint[]): number => pts.reduce((acc, p, i) => {
   return acc + R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }, 0);
 
-const calcPace = (distKm: number, pts: GeoPoint[]): string => {
-  if (distKm < 0.01 || pts.length < 2) return '--:--';
-  const totalSec = (pts[pts.length - 1].timestamp - pts[0].timestamp) / 1000;
-  const paceSecPerKm = totalSec / distKm;
-  const m = Math.floor(paceSecPerKm / 60);
-  const s = Math.floor(paceSecPerKm % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
-};
-
-/* ─── Strava Route Map ───────────────────────────────────────── */
-const StravaMap = ({ points }: { points: GeoPoint[] }) => {
-  if (points.length < 2) return null;
-
-  const W = 800, H = 340, PAD = 44;
-
-  const { path, segments, startPt, endPt, dist, pace, hasSpeed, durationStr } = useMemo(() => {
-    const lats = points.map(p => p.lat);
-    const lngs = points.map(p => p.lng);
-    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-    const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-    const rLat = maxLat - minLat || 0.0001;
-    const rLng = maxLng - minLng || 0.0001;
-    const mapW = W - PAD * 2;
-    const mapH = H - PAD * 2;
-    const scaleX = mapW / rLng;
-    const scaleY = mapH / rLat;
-    const scale = Math.min(scaleX, scaleY);
-    const offX = (mapW - rLng * scale) / 2;
-    const offY = (mapH - rLat * scale) / 2;
-
-    const toXY = (lat: number, lng: number) => ({
-      x: PAD + offX + (lng - minLng) * scale,
-      y: PAD + offY + mapH - (lat - minLat) * scale,
-    });
-
-    const speeds = points.map(p => (p.speed ?? 0) * 3.6);
-    const maxSpd = Math.max(...speeds, 1);
-    const hs = speeds.some(s => s > 0.1);
-
-    const pathStr = points.map((p, i) => {
-      const { x, y } = toXY(p.lat, p.lng);
-      return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(' ');
-
-    const segs = points.slice(1).map((p, i) => {
-      const prev = points[i];
-      const p1 = toXY(prev.lat, prev.lng);
-      const p2 = toXY(p.lat, p.lng);
-      const spd = hs ? (p.speed ?? 0) * 3.6 : 0;
-      const ratio = Math.min(spd / maxSpd, 1);
-      let color = '#00f2ff';
-      if (hs) {
-        if (ratio < 0.33) color = `hsl(${200 + ratio * 180},80%,60%)`;
-        else if (ratio < 0.66) color = `hsl(${60 - (ratio - 0.33) * 90},90%,55%)`;
-        else color = `hsl(${10},85%,55%)`;
-      }
-      return { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, color };
-    });
-
-    const s = toXY(points[0].lat, points[0].lng);
-    const e = toXY(points[points.length - 1].lat, points[points.length - 1].lng);
-    const d = calcDist(points);
-    const pc = calcPace(d, points);
-    const durSec = (points[points.length - 1].timestamp - points[0].timestamp) / 1000;
-    const durStr = durSec > 3600
-      ? `${Math.floor(durSec / 3600)}h ${Math.floor((durSec % 3600) / 60)}m`
-      : `${Math.floor(durSec / 60)}m ${Math.floor(durSec % 60)}s`;
-
-    return { path: pathStr, segments: segs, startPt: s, endPt: e, dist: d, pace: pc, hasSpeed: hs, durationStr: durStr };
-  }, [points]);
-
-  return (
-    <div style={{
-      borderRadius: 20,
-      overflow: 'hidden',
-      background: 'rgba(0,5,10,0.8)',
-      border: '1px solid rgba(0,242,255,0.15)',
-      backdropFilter: 'blur(20px)',
-      marginTop: 20,
-    }}>
-      {/* Map header */}
-      <div style={{
-        padding: '10px 16px',
-        borderBottom: '1px solid rgba(0,242,255,0.08)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        background: 'rgba(0,242,255,0.03)',
-      }}>
-        <span style={{ fontSize: 9, color: 'rgba(0,242,255,0.7)', fontWeight: 900, letterSpacing: '0.3em', textTransform: 'uppercase' }}>
-          📍 Tu Ruta GPS
-        </span>
-        {hasSpeed && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.15em' }}>LENTO</span>
-            <div style={{ width: 36, height: 3, borderRadius: 2, background: 'linear-gradient(90deg, #4a9eff, #ffdd44, #ff5544)' }} />
-            <span style={{ fontSize: 7, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.15em' }}>RÁPIDO</span>
-          </div>
-        )}
-        <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.2)', letterSpacing: '0.1em' }}>{points.length} pts</span>
-      </div>
-
-      {/* SVG Map */}
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block', background: 'radial-gradient(ellipse at center, rgba(0,20,40,0.8) 0%, rgba(0,5,10,1) 100%)' }}>
-        <defs>
-          <filter id="sm-glow">
-            <feGaussianBlur stdDeviation="2.5" result="b" />
-            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-          <filter id="lg-glow">
-            <feGaussianBlur stdDeviation="6" result="b" />
-            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-          <filter id="halo">
-            <feGaussianBlur stdDeviation="12" result="b" />
-            <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        </defs>
-
-        {/* Grid */}
-        {[0.25, 0.5, 0.75].map(t => (
-          <g key={t}>
-            <line x1={PAD} y1={PAD + t * (H - PAD * 2)} x2={W - PAD} y2={PAD + t * (H - PAD * 2)}
-              stroke="rgba(0,242,255,0.04)" strokeWidth="1" strokeDasharray="6,12" />
-            <line x1={PAD + t * (W - PAD * 2)} y1={PAD} x2={PAD + t * (W - PAD * 2)} y2={H - PAD}
-              stroke="rgba(0,242,255,0.04)" strokeWidth="1" strokeDasharray="6,12" />
-          </g>
-        ))}
-
-        {/* Outer halo */}
-        <path d={path} fill="none" stroke="rgba(0,242,255,0.04)" strokeWidth="20" strokeLinecap="round" strokeLinejoin="round" />
-        {/* Inner glow */}
-        <path d={path} fill="none" stroke="rgba(0,242,255,0.08)" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
-
-        {/* Route — color by speed or uniform */}
-        {hasSpeed ? (
-          segments.map((seg, i) => (
-            <line key={i} x1={seg.x1} y1={seg.y1} x2={seg.x2} y2={seg.y2}
-              stroke={seg.color} strokeWidth="3" strokeLinecap="round" filter="url(#sm-glow)" />
-          ))
-        ) : (
-          <path d={path} fill="none" stroke="#00f2ff" strokeWidth="3"
-            strokeLinecap="round" strokeLinejoin="round" filter="url(#sm-glow)" />
-        )}
-
-        {/* Start */}
-        <circle cx={startPt.x} cy={startPt.y} r={12} fill="rgba(34,197,94,0.12)" filter="url(#halo)" />
-        <circle cx={startPt.x} cy={startPt.y} r={7} fill="#22c55e" filter="url(#sm-glow)" />
-        <circle cx={startPt.x} cy={startPt.y} r={3} fill="white" />
-        <rect x={startPt.x + 11} y={startPt.y - 10} width={50} height={18} rx={5} fill="rgba(34,197,94,0.9)" />
-        <text x={startPt.x + 36} y={startPt.y + 3} fill="white" fontSize="9" fontFamily="monospace" fontWeight="bold" textAnchor="middle">SALIDA</text>
-
-        {/* Finish */}
-        <circle cx={endPt.x} cy={endPt.y} r={12} fill="rgba(0,242,255,0.12)" filter="url(#halo)" />
-        <circle cx={endPt.x} cy={endPt.y} r={7} fill="#00f2ff" filter="url(#sm-glow)" />
-        <circle cx={endPt.x} cy={endPt.y} r={3} fill="#03070b" />
-        <rect x={endPt.x + 11} y={endPt.y - 10} width={42} height={18} rx={5} fill="rgba(0,200,220,0.9)" />
-        <text x={endPt.x + 32} y={endPt.y + 3} fill="#03070b" fontSize="9" fontFamily="monospace" fontWeight="bold" textAnchor="middle">META</text>
-      </svg>
-
-      {/* Stats bar */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', borderTop: '1px solid rgba(0,242,255,0.08)' }}>
-        {[
-          { label: 'Distancia', value: `${dist.toFixed(2)} km` },
-          { label: 'Ritmo', value: `${pace} /km` },
-          { label: 'Duración', value: durationStr },
-        ].map((stat, i) => (
-          <div key={i} style={{
-            padding: '12px 8px',
-            textAlign: 'center',
-            borderRight: i < 2 ? '1px solid rgba(0,242,255,0.08)' : 'none',
-            background: i === 1 ? 'rgba(0,242,255,0.02)' : 'transparent',
-          }}>
-            <div style={{ fontSize: 7, letterSpacing: '0.25em', color: 'rgba(255,255,255,0.2)', textTransform: 'uppercase', marginBottom: 3 }}>
-              {stat.label}
-            </div>
-            <div style={{ fontFamily: "'Barlow Condensed', sans-serif", fontSize: 17, fontWeight: 900, fontStyle: 'italic', color: '#00f2ff' }}>
-              {stat.value}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 /* ─── Main Component ─────────────────────────────────────────── */
 export default function TrackerLanding() {
   const [step, setStep] = useState<AppStep>('bib_input');
@@ -252,7 +69,7 @@ export default function TrackerLanding() {
   const watchIdRef = useRef<number | null>(null);
   const kalmanRef = useRef(new GeoKalmanFilter());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const channelRef = useRef<any>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const startGPS = useCallback(() => {
     if (!navigator.geolocation) { setGpsStatus('error'); setGpsError('GPS no disponible'); return; }
@@ -348,7 +165,6 @@ export default function TrackerLanding() {
           overflow-x: hidden;
         }
 
-        /* ── GLASS MIXIN ── */
         .glass {
           background: rgba(255,255,255,0.03);
           backdrop-filter: blur(24px) saturate(180%);
@@ -373,7 +189,6 @@ export default function TrackerLanding() {
           background: linear-gradient(90deg, transparent, rgba(0,242,255,0.4), transparent);
         }
 
-        /* ── HEADER ── */
         .tl-header {
           background: rgba(0,0,0,0.5);
           backdrop-filter: blur(30px);
@@ -401,13 +216,11 @@ export default function TrackerLanding() {
           color: rgba(0,242,255,0.6);
         }
 
-        /* ── BODY ── */
         .tl-body {
           flex: 1; display: flex; flex-direction: column;
           padding: 28px 20px; max-width: 460px; margin: 0 auto; width: 100%;
         }
 
-        /* ── BIB INPUT ── */
         .tl-bib-section {
           flex: 1; display: flex; flex-direction: column;
           justify-content: center; gap: 28px;
@@ -452,7 +265,6 @@ export default function TrackerLanding() {
         }
         .tl-bib-input::placeholder { color: rgba(255,255,255,0.07); }
 
-        /* ── BUTTONS ── */
         .tl-btn-cyan {
           width: 100%; padding: 20px;
           background: #00f2ff; border: none; border-radius: 16px;
@@ -464,7 +276,7 @@ export default function TrackerLanding() {
           -webkit-appearance: none;
           box-shadow: 0 0 20px rgba(0,242,255,0.2);
         }
-        .tl-btn-cyan:active { transform: scale(0.98); box-shadow: 0 0 10px rgba(0,242,255,0.1); }
+        .tl-btn-cyan:active { transform: scale(0.98); }
         .tl-btn-cyan:disabled { opacity: 0.3; cursor: not-allowed; }
 
         .tl-btn-green {
@@ -499,7 +311,6 @@ export default function TrackerLanding() {
           letter-spacing: 0.1em; text-align: center;
         }
 
-        /* ── GPS REQUEST ── */
         .tl-gps-section {
           flex: 1; display: flex; flex-direction: column;
           justify-content: center; gap: 20px;
@@ -552,7 +363,6 @@ export default function TrackerLanding() {
           color: rgba(255,255,255,0.35); line-height: 1.7;
         }
 
-        /* ── WAITING ── */
         .tl-waiting-section {
           flex: 1; display: flex; flex-direction: column;
           align-items: center; justify-content: center;
@@ -626,7 +436,6 @@ export default function TrackerLanding() {
           color: #22c55e; font-weight: 700; text-transform: uppercase;
         }
 
-        /* ── RUNNING ── */
         .tl-running-section {
           flex: 1; display: flex; flex-direction: column;
           align-items: center; justify-content: center;
@@ -670,16 +479,12 @@ export default function TrackerLanding() {
           color: rgba(255,255,255,0.08); text-transform: uppercase;
         }
 
-        /* ── FINISHED ── */
         .tl-finished-section {
           flex: 1; display: flex; flex-direction: column;
           gap: 14px; padding-bottom: 24px;
         }
 
-        .tl-finish-hero {
-          text-align: center; padding: 20px 0 8px;
-        }
-
+        .tl-finish-hero { text-align: center; padding: 20px 0 8px; }
         .tl-finish-medal { font-size: 52px; margin-bottom: 6px; }
 
         .tl-finish-title {
@@ -761,7 +566,6 @@ export default function TrackerLanding() {
       `}</style>
 
       <div className="tl-root">
-        {/* Header */}
         <div className="tl-header">
           <div className="tl-brand">RAYO<span>CERO</span></div>
           <div className="tl-step-pill">
@@ -779,9 +583,7 @@ export default function TrackerLanding() {
           {step === 'bib_input' && (
             <div className="tl-bib-section">
               <div>
-                <div className="tl-hero-title">
-                  Ingresa tu<br /><span className="cyan">Dorsal</span>
-                </div>
+                <div className="tl-hero-title">Ingresa tu<br /><span className="cyan">Dorsal</span></div>
                 <div className="tl-hero-sub">RayoCero We Run · Telemetría GPS</div>
               </div>
               <div className="tl-input-group">
@@ -826,12 +628,8 @@ export default function TrackerLanding() {
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <button className="tl-btn-green" onClick={handleActivateGPS}>
-                  ✓ Activar GPS y esperar salida
-                </button>
-                <button className="tl-btn-ghost" onClick={() => setStep('bib_input')}>
-                  ← Cambiar dorsal
-                </button>
+                <button className="tl-btn-green" onClick={handleActivateGPS}>✓ Activar GPS y esperar salida</button>
+                <button className="tl-btn-ghost" onClick={() => setStep('bib_input')}>← Cambiar dorsal</button>
               </div>
             </div>
           )}
@@ -839,9 +637,7 @@ export default function TrackerLanding() {
           {/* PASO 3: WAITING */}
           {step === 'waiting' && runner && (
             <div className="tl-waiting-section">
-              <div className="tl-radar">
-                <div className="tl-radar-icon">⚡</div>
-              </div>
+              <div className="tl-radar"><div className="tl-radar-icon">⚡</div></div>
               <div>
                 <div style={{ fontSize: 9, letterSpacing: '0.3em', color: 'rgba(255,255,255,0.15)', textTransform: 'uppercase', marginBottom: 10, textAlign: 'center' }}>
                   {runner.nombre} · BIB #{runner.bib_number}
@@ -913,7 +709,15 @@ export default function TrackerLanding() {
                 )}
               </div>
 
-              {gpsPoints.length >= 2 && <StravaMap points={gpsPoints} />}
+              {/* MAPA REAL — RouteMapStrava V3 con Leaflet tiles */}
+              {gpsPoints.length >= 2 && (
+                <RouteMapStrava
+                  points={gpsPoints}
+                  athleteName={`${runner.nombre} ${runner.apellido}`}
+                  eventName="WE RUN 10K NIGHT FEST 2026"
+                  showShareCard={true}
+                />
+              )}
 
               <button className="tl-btn-share" onClick={async () => {
                 const text = `⚡ RayoCero We Run\n🏃 ${runner.nombre} ${runner.apellido} — BIB #${runner.bib_number}\n⏱️ ${runner.finish_time_seconds ? formatFinal(runner.finish_time_seconds) : '--'}\n📍 ${calcDist(gpsPoints).toFixed(2)} km\n\nrayocero-run.vercel.app/tracker`;
