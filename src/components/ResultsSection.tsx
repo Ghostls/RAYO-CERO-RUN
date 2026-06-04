@@ -19,7 +19,7 @@ import {
   Medal, Crosshair, CheckCircle, MapPin, Share2, Navigation
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import LazyRouteMapStrava, { type GeoPoint } from "@/components/LazyRouteMapStrava";
+import LazyRouteMapStrava, { type GeoPoint } from "./LazyRouteMapStrava";
 
 /* ─── Types ──────────────────────────────────────────────────── */
 interface RunnerResultData {
