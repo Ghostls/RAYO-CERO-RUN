@@ -17,23 +17,48 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
-// IMPORTACIONES DE PÁGINAS
-import Index from "./pages/Index";
-import RaceDetail from "./pages/RaceDetail";
-import NotFound from "./pages/NotFound";
-import AdminLogin from "./pages/AdminLogin";
-import AdminDashboard from "./pages/AdminDashboard";
+import { lazy, Suspense } from "react";
 
-// IMPORTACIONES DE MÓDULOS ESPECÍFICOS OPERATIVOS
-import RegistrationForm from "./components/RegistrationForm";
-import ResultsSection from "./components/ResultsSection";
-import RacesSection from "./components/RacesSection";
-import RaceTracker from "./components/RaceTracker";
-import TrackerLanding from "./components/TrackerLanding";
+// Skeleton global de carga
+const PageLoader = () => (
+  <div className="h-screen flex items-center justify-center bg-[#03070b]">
+    <div style={{ textAlign: 'center' }}>
+      <div style={{
+        width: 36, height: 36, margin: '0 auto 12px',
+        border: '2px solid rgba(0,242,255,0.15)',
+        borderTopColor: '#00f2ff',
+        borderRadius: '50%',
+        animation: 'spin 0.8s linear infinite',
+      }} />
+      <div style={{ fontSize: 9, letterSpacing: '0.3em', color: 'rgba(0,242,255,0.4)', textTransform: 'uppercase', fontWeight: 700 }}>
+        Cargando...
+      </div>
+    </div>
+    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+  </div>
+);
 
-// PORTAL DEL ATLETA — Módulo Strava
-import AthleteAuth from "./components/AthleteAuth";
-import AthleteProfile from "./components/Athleteprofile";
+const wrap = (Component: React.ComponentType) => (
+  <Suspense fallback={<PageLoader />}><Component /></Suspense>
+);
+
+// PÁGINAS — lazy load (no bloquean el bundle inicial)
+const Index = lazy(() => import("./pages/Index"));
+const RaceDetail = lazy(() => import("./pages/RaceDetail"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+
+// MÓDULOS ESPECÍFICOS — lazy load
+const RegistrationForm = lazy(() => import("./components/RegistrationForm"));
+const ResultsSection = lazy(() => import("./components/ResultsSection"));
+const RacesSection = lazy(() => import("./components/RacesSection"));
+const RaceTracker = lazy(() => import("./components/RaceTracker"));
+const TrackerLanding = lazy(() => import("./components/TrackerLanding"));
+
+// PORTAL DEL ATLETA — lazy load
+const AthleteAuth = lazy(() => import("./components/AthleteAuth"));
+const AthleteProfile = lazy(() => import("./components/Athleteprofile"));
 
 const queryClient = new QueryClient();
 
@@ -62,19 +87,19 @@ const AppContent = ({ session, loading }: { session: any; loading: boolean }) =>
       <main className="flex-grow">
         <Routes>
           {/* RUTAS PÚBLICAS */}
-          <Route path="/" element={<Index />} />
-          <Route path="/carreras" element={<RacesSection />} />
-          <Route path="/carrera/:id" element={<RaceDetail />} />
-          <Route path="/registro" element={<RegistrationForm />} />
-          <Route path="/resultados" element={<ResultsSection />} />
+          <Route path="/" element={wrap(Index)} />
+          <Route path="/carreras" element={wrap(RacesSection)} />
+          <Route path="/carrera/:id" element={wrap(RaceDetail)} />
+          <Route path="/registro" element={wrap(RegistrationForm)} />
+          <Route path="/resultados" element={wrap(ResultsSection)} />
 
           {/* TELEMETRÍA GPS — Mini PWA para corredores */}
-          <Route path="/tracker" element={<TrackerLanding />} />
+          <Route path="/tracker" element={wrap(TrackerLanding)} />
           <Route path="/tracker/:bib" element={<TrackerPage />} />
 
           {/* PORTAL DEL ATLETA — Login sin contraseña + Perfil */}
-          <Route path="/acceso" element={<AthleteAuth />} />
-          <Route path="/perfil" element={<AthleteProfile />} />
+          <Route path="/acceso" element={wrap(AthleteAuth)} />
+          <Route path="/perfil" element={wrap(AthleteProfile)} />
 
           {/* ACCESO ADMINISTRATIVO */}
           <Route
@@ -113,7 +138,7 @@ const AppContent = ({ session, loading }: { session: any; loading: boolean }) =>
           />
 
           {/* 404 */}
-          <Route path="*" element={<NotFound />} />
+          <Route path="*" element={wrap(NotFound)} />
         </Routes>
       </main>
 

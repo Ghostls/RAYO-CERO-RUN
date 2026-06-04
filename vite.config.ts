@@ -1,37 +1,27 @@
-/**
- * RAYO CERO — VITE BUILD CONFIGURATION (STABLE V2.2 - EMERGENCY ROLLBACK)
- * Senior Dev: MIA / Gemini (Valkyron Group)
- * CEO: Lualdo Sciscioli
- * FIX: Retorno a optimización automática segura para evitar colisión de React.
- */
-
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import path from "path";
-import { componentTagger } from "lovable-tagger";
-
-// https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  server: {
-    host: "::",
-    port: 8080,
-    hmr: {
-      overlay: false,
-    },
-  },
-  plugins: [
-    react(), 
-    mode === "development" && componentTagger()
-  ].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
-  // MIA PROTOCOL: Retorno a optimización base segura
-  build: {
-    target: 'esnext',
-    cssCodeSplit: true,
-    chunkSizeWarningLimit: 1500, 
-  }
-}));
+[{
+	"resource": "/c:/Users/LSciscioli/Desktop/liquid-race-flow-main/src/components/ResultsSection.tsx",
+	"owner": "typescript",
+	"code": "2307",
+	"severity": 8,
+	"message": "Cannot find module '@/components/LazyRouteMapStrava' or its corresponding type declarations.",
+	"source": "ts",
+	"startLineNumber": 22,
+	"startColumn": 51,
+	"endLineNumber": 22,
+	"endColumn": 84,
+	"modelVersionId": 4,
+	"origin": "extHost1"
+},{
+	"resource": "/c:/Users/LSciscioli/Desktop/liquid-race-flow-main/src/components/ResultsSection.tsx",
+	"owner": "typescript",
+	"code": "2552",
+	"severity": 8,
+	"message": "Cannot find name 'RouteMapStrava'. Did you mean 'LazyRouteMapStrava'?",
+	"source": "ts",
+	"startLineNumber": 782,
+	"startColumn": 22,
+	"endLineNumber": 782,
+	"endColumn": 36,
+	"modelVersionId": 4,
+	"origin": "extHost1"
+}]

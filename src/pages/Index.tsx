@@ -1,19 +1,20 @@
 /**
- * RAYO CERO — HOME CORE MODULE (STABLE V7.7 - INTEGRATED HUD EDITION)
+ * RAYO CERO — HOME CORE MODULE (STABLE V7.9.3 - INTEGRATED HUD EDITION)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Diseñador / Operativo
- * * EVOLUCIÓN V7.7 (FUSION RECONCILIATION):
- * - FULL SCALE FLYER INTEGRATION: Consolidación del contenedor ampliado (max-w-7xl) para el flyer de inscripciones.
- * - CONSECUTIVE PRICE MODULE: Inyección limpia y consecutiva del asset 'precio.png' con transiciones Framer Motion unificadas.
- * - SYNTAX & TYPE BLINDAJE: Conservación estricta de parches en el carrusel infinito y tipado de componentes.
+ * * EVOLUCIÓN V7.9.3 (ATHLETE AUTH ROUTING FIX):
+ * - TERMINAL DE ACCESO: Enrutamiento apuntando estrictamente a "/acceso".
+ * - FÍSICA APLICADA: Calibración balística (stiffness: 278, damping: 27) para feedback táctil.
+ * - FULL SCALE FLYER INTEGRATION: Consolidación del contenedor ampliado para el flyer de inscripciones.
+ * - CONSECUTIVE PRICE MODULE: Inyección limpia y consecutiva del asset 'precio.png'.
  * - REGLA DE ORO RESPETADA: Evolución estructural sin omisiones. Se mantienen patrocinadores, estados y secciones íntegras.
  */
 
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Zap, ShieldCheck, Trophy, ArrowRight, Activity, Crosshair, Map } from "lucide-react";
+import { Zap, ShieldCheck, Trophy, ArrowRight, Activity, Crosshair, Map, Smartphone } from "lucide-react";
 
 // Componentes del Ecosistema
 import HeroSection from "@/components/HeroSection";
@@ -23,30 +24,16 @@ import RacesSection from "@/components/RacesSection";
 import logoValkyron from "@/assets/12.png";
 import logoWeRun from "@/assets/we-run-logo.png"; 
 import flyerInscripciones from "@/assets/flier_inscripciones_abiertas.png"; 
-import flyerPrecios from "@/assets/precio.png"; // Asset de costos e inscripción integrado
+import flyerPrecios from "@/assets/precio.png"; 
 
 // Mapeo dinámico secuencial para los 22 patrocinadores externos (Sponsor 1 al 22)
-import logo1 from "@/assets/1.png";
-import logo2 from "@/assets/2.png";
-import logo3 from "@/assets/3.png";
-import logo4 from "@/assets/4.png";
-import logo5 from "@/assets/5.png";
-import logo6 from "@/assets/6.png";
-import logo7 from "@/assets/7.png";
-import logo8 from "@/assets/8.png";
-import logo9 from "@/assets/9.png";
-import logo10 from "@/assets/10.png";
-import logo11 from "@/assets/11.png";
-import logo12 from "@/assets/12.png";
-import logo13 from "@/assets/13.png";
-import logo14 from "@/assets/14.png";
-import logo15 from "@/assets/15.png";
-import logo16 from "@/assets/16.png";
-import logo17 from "@/assets/17.png";
-import logo18 from "@/assets/18.png";
-import logo19 from "@/assets/19.png";
-import logo20 from "@/assets/20.png";
-import logo21 from "@/assets/21.png";
+import logo1 from "@/assets/1.png"; import logo2 from "@/assets/2.png"; import logo3 from "@/assets/3.png"; 
+import logo4 from "@/assets/4.png"; import logo5 from "@/assets/5.png"; import logo6 from "@/assets/6.png"; 
+import logo7 from "@/assets/7.png"; import logo8 from "@/assets/8.png"; import logo9 from "@/assets/9.png"; 
+import logo10 from "@/assets/10.png"; import logo11 from "@/assets/11.png"; import logo12 from "@/assets/12.png"; 
+import logo13 from "@/assets/13.png"; import logo14 from "@/assets/14.png"; import logo15 from "@/assets/15.png"; 
+import logo16 from "@/assets/16.png"; import logo17 from "@/assets/17.png"; import logo18 from "@/assets/18.png"; 
+import logo19 from "@/assets/19.png"; import logo20 from "@/assets/20.png"; import logo21 from "@/assets/21.png"; 
 import logo22 from "@/assets/22.png";
 
 const sponsorsList = [
@@ -263,7 +250,37 @@ const Index = () => {
 
         <div className="flex flex-col gap-6">
           
-          {/* Panel: Inscripción */}
+          {/* Panel 01: Acceso Mini APK / Autenticación de Runners */}
+          <Link to="/acceso" className="group">
+            <motion.div 
+              whileHover={{ scale: 1.015 }}
+              whileTap={{ scale: 0.985 }}
+              transition={{ type: "spring", stiffness: 278, damping: 27, mass: 1 }}
+              className="w-full bg-[#03070b]/60 border border-[#50E8E3]/30 rounded-[2.5rem] p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 backdrop-blur-3xl hover:bg-[#50E8E3]/5 hover:border-[#50E8E3]/60 transition-all duration-500 shadow-[0_0_40px_rgba(80,232,227,0.15)] relative overflow-hidden"
+            >
+              {/* Overlay táctico escáner */}
+              <div className="absolute inset-0 bg-[linear-gradient(transparent_50%,rgba(80,232,227,0.03)_50%)] bg-[length:100%_4px] pointer-events-none" />
+              
+              <div className="flex items-center gap-6 md:gap-8 w-full md:w-auto text-center md:text-left relative z-10">
+                <div className="p-5 bg-[#50E8E3]/10 border border-[#50E8E3]/30 rounded-2xl group-hover:bg-[#50E8E3] group-hover:text-black transition-colors duration-500 shrink-0 mx-auto md:mx-0 shadow-[0_0_15px_rgba(80,232,227,0.2)]">
+                  <Smartphone className="h-8 w-8 text-[#50E8E3] group-hover:text-black" />
+                </div>
+                <div>
+                  <h3 className="text-2xl md:text-3xl font-black italic text-[#50E8E3] tracking-tighter mb-2">
+                    LOGIN MINI APK
+                  </h3>
+                  <p className="text-[10px] font-bold text-[#50E8E3]/60 uppercase tracking-widest">
+                    Acceso encriptado para runners y telemetría de carrera.
+                  </p>
+                </div>
+              </div>
+              <div className="h-12 w-12 rounded-full bg-[#50E8E3]/10 border border-[#50E8E3]/30 flex items-center justify-center group-hover:bg-[#50E8E3] group-hover:text-black transition-colors duration-500 shrink-0 relative z-10">
+                <ArrowRight className="h-5 w-5 text-[#50E8E3] group-hover:text-black" />
+              </div>
+            </motion.div>
+          </Link>
+
+          {/* Panel 02: Inscripción */}
           <Link to="/registro" className="group">
             <motion.div 
               whileHover={{ scale: 1.01 }}
@@ -289,7 +306,7 @@ const Index = () => {
             </motion.div>
           </Link>
 
-          {/* Panel: Resultados */}
+          {/* Panel 03: Resultados */}
           <Link to="/resultados" className="group">
             <motion.div 
               whileHover={{ scale: 1.01 }}

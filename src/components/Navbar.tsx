@@ -1,18 +1,21 @@
 /**
- * RAYO CERO — NAVIGATION CORE V5 (EQUIPOS UPDATE)
+ * RAYO CERO — NAVIGATION CORE V6.3 (ROUTING FIX - VALKYRON SHIELD)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Operativo / Diseñador
- * Evolución: Integración de Módulo de Equipos (TeamRegistration) y UI Refinement.
+ * Evolución: Enrutamiento oficial corregido a "/acceso" (AthleteAuth Module)
  */
 
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Trophy, UserPlus, Home, Zap, Calendar, Users } from "lucide-react";
+import { 
+  Menu, X, Trophy, UserPlus, Home, Zap, 
+  Calendar, Users, Smartphone 
+} from "lucide-react";
 
 import logoPng from "@/assets/logo.png";
-import TeamRegistration from "@/components/TeamRegistration"; // FIX: Ruta corregida con alias @
+import TeamRegistration from "@/components/TeamRegistration";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -27,7 +30,6 @@ const Navbar = () => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Cierra el menú móvil automáticamente al cambiar de ruta
   useEffect(() => {
     setIsMobileMenuOpen(false);
   }, [location]);
@@ -80,12 +82,12 @@ const Navbar = () => {
           </Link>
 
           {/* DESKTOP NAVIGATION (Liquid Glass Pill) */}
-          <div className="hidden md:flex items-center gap-2 bg-white/[0.03] border border-white/10 p-1.5 rounded-2xl backdrop-blur-xl shadow-[0_0_30px_rgba(255,255,255,0.02)]">
+          <div className="hidden lg:flex items-center gap-2 bg-white/[0.03] border border-white/10 p-1.5 rounded-2xl backdrop-blur-xl shadow-[0_0_30px_rgba(255,255,255,0.02)]">
             {navLinks.map((link) => (
               <Link
                 key={link.name}
                 to={link.path}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black tracking-widest transition-all duration-300 ${
+                className={`flex items-center gap-2 px-5 py-3 rounded-xl text-[10px] font-black tracking-widest transition-all duration-300 ${
                   isActive(link.path)
                     ? "bg-white text-black shadow-[0_0_20px_rgba(255,255,255,0.2)] scale-105"
                     : "text-white/50 hover:text-white hover:bg-white/5"
@@ -94,23 +96,45 @@ const Navbar = () => {
                 {link.icon} {link.name}
               </Link>
             ))}
+
+            <div className="h-6 w-[1px] bg-white/10 mx-1" />
             
-            {/* ACCESO TÁCTICO: ARMA TU TEAM (DESKTOP) */}
+            {/* TERMINAL DE ACCESO: ATHLETE AUTH (Ruta /acceso) */}
+            <Link
+              to="/acceso"
+              className={`flex items-center gap-2 px-5 py-3 rounded-xl text-[10px] font-black tracking-widest transition-all duration-300 ${
+                isActive("/acceso")
+                ? "bg-[#50E8E3] text-black shadow-[0_0_20px_rgba(80,232,227,0.3)]"
+                : "text-[#50E8E3] bg-[#50E8E3]/10 border border-[#50E8E3]/20 hover:bg-[#50E8E3] hover:text-black"
+              }`}
+            >
+              <Smartphone className="h-4 w-4" /> ATHLETE AUTH
+            </Link>
+
+            {/* ACCESO TÁCTICO: ARMA TU TEAM */}
             <button
               onClick={() => setIsTeamModalOpen(true)}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl text-[10px] font-black tracking-widest text-cyan-400 bg-cyan-400/10 border border-cyan-400/20 hover:bg-cyan-400 hover:text-[#03070b] transition-all duration-300"
+              className="flex items-center gap-2 px-5 py-3 rounded-xl text-[10px] font-black tracking-widest text-white/70 bg-white/5 border border-white/10 hover:bg-white hover:text-[#03070b] transition-all duration-300"
             >
-              <Users className="h-4 w-4" /> ARMA TU TEAM
+              <Users className="h-4 w-4" /> TEAM
             </button>
           </div>
 
-          {/* MOBILE MENU TRIGGER */}
-          <button
-            className="md:hidden p-4 bg-white/5 border border-white/10 rounded-2xl text-white active:scale-95 transition-transform"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          >
-            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
+          {/* MOBILE MENU TRIGGER & QUICK AUTH */}
+          <div className="flex items-center gap-3 lg:hidden">
+            <Link 
+              to="/acceso" 
+              className="p-3 bg-[#50E8E3]/10 border border-[#50E8E3]/20 rounded-xl text-[#50E8E3] active:scale-90 transition-transform"
+            >
+              <Smartphone className="h-5 w-5" />
+            </Link>
+            <button
+              className="p-3 bg-white/5 border border-white/10 rounded-xl text-white active:scale-95 transition-transform"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
         </div>
 
         {/* MOBILE OVERLAY */}
@@ -120,7 +144,7 @@ const Navbar = () => {
               initial={{ opacity: 0, x: 50 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 50 }}
-              className="absolute top-0 right-0 w-3/4 h-screen bg-[#03070b] border-l border-white/10 md:hidden p-10 flex flex-col gap-6 shadow-[-20px_0_50px_rgba(0,0,0,0.8)]"
+              className="absolute top-0 right-0 w-3/4 h-screen bg-[#03070b] border-l border-white/10 lg:hidden p-10 flex flex-col gap-6 shadow-[-20px_0_50px_rgba(0,0,0,0.8)]"
             >
               <div className="flex justify-end mb-10">
                  <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-white/5 rounded-full border border-white/10">
@@ -144,12 +168,22 @@ const Navbar = () => {
                   </Link>
                 ))}
 
+                {/* BOTÓN ATHLETE AUTH MOBILE */}
+                <Link
+                  to="/acceso"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center justify-between p-6 rounded-2xl font-black text-xs tracking-widest bg-[#50E8E3]/10 border border-[#50E8E3]/20 text-[#50E8E3]"
+                >
+                  ATHLETE AUTH
+                  <Smartphone className="h-4 w-4" />
+                </Link>
+
                 <button
                   onClick={() => {
                     setIsMobileMenuOpen(false);
                     setIsTeamModalOpen(true);
                   }}
-                  className="flex items-center justify-between p-6 rounded-2xl font-black text-xs tracking-widest bg-cyan-400/10 border border-cyan-400/20 text-cyan-400 hover:bg-cyan-400 hover:text-[#03070b] transition-all"
+                  className="flex items-center justify-between p-6 rounded-2xl font-black text-xs tracking-widest bg-white/5 border border-white/10 text-white/70"
                 >
                   ARMA TU TEAM
                   <Users className="h-4 w-4" />
@@ -160,7 +194,6 @@ const Navbar = () => {
         </AnimatePresence>
       </nav>
 
-      {/* RENDERIZADO DEL MODAL MIA DE EQUIPOS */}
       <TeamRegistration 
         isOpen={isTeamModalOpen} 
         onClose={() => setIsTeamModalOpen(false)} 

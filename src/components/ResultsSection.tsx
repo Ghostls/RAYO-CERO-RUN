@@ -19,7 +19,7 @@ import {
   Medal, Crosshair, CheckCircle, MapPin, Share2, Navigation
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import RouteMapStrava, { type GeoPoint } from "@/components/RouteMapStrava";
+import LazyRouteMapStrava, { type GeoPoint } from "@/components/LazyRouteMapStrava";
 
 /* ─── Types ──────────────────────────────────────────────────── */
 interface RunnerResultData {
@@ -779,7 +779,7 @@ const ResultsSection = () => {
                       <MapPin size={10} />
                       Ruta GPS — Filtro Kalman activo
                     </div>
-                    <RouteMapStrava
+                    <LazyRouteMapStrava
                       points={result.gpsTrack}
                       athleteName={result.name}
                       eventName="WE RUN 10K NIGHT FEST 2026"

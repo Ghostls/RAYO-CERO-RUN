@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { GeoKalmanFilter, GeoPoint } from './KalmanFilter';
-import RouteMapStrava from './RouteMapStrava';
+import LazyRouteMapStrava from './LazyRouteMapStrava';
 
 type RaceStatus = 'waiting' | 'in_progress' | 'completed';
 type AppStep = 'bib_input' | 'gps_request' | 'waiting' | 'running' | 'finished';
@@ -711,7 +711,7 @@ export default function TrackerLanding() {
 
               {/* MAPA REAL — RouteMapStrava V3 con Leaflet tiles */}
               {gpsPoints.length >= 2 && (
-                <RouteMapStrava
+                <LazyRouteMapStrava
                   points={gpsPoints}
                   athleteName={`${runner.nombre} ${runner.apellido}`}
                   eventName="WE RUN 10K NIGHT FEST 2026"
