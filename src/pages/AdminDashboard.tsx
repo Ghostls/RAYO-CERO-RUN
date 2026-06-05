@@ -5,7 +5,7 @@ import {
   ShieldCheck, Settings, LogOut, Activity, RefreshCw, Save, CheckCircle,
   Search, CheckSquare, Eye, X, ShieldAlert, FileText, Trash2, Phone,
   Clock, AlertTriangle, Users, Package, Scan, Radio, Zap, BarChart2,
-  ChevronDown, Filter, UserPlus
+  ChevronDown, Filter, UserPlus, Gift
 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -36,6 +36,7 @@ interface Runner {
   comprobante_path?: string;
   pago_verificado?: boolean;
   rfid_epc?: string | null;
+  kit_entregado?: boolean;
 }
 
 const BUCKET = 'comprobantes-pago';
@@ -278,11 +279,12 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
       a.telefono || 'N/A',
       a.talla_camiseta || 'N/A',
       a.pago_verificado ? '✓' : '—',
+      a.kit_entregado ? '✓' : '—',
     ]);
 
     autoTable(doc, {
       startY: 25,
-      head: [['#', 'Dorsal', 'Atleta', 'Cédula', 'Teléfono', 'Talla', 'Pago']],
+      head: [['#', 'Dorsal', 'Atleta', 'Cédula', 'Teléfono', 'Talla', 'Pago', 'Kit']],
       body: rows,
       theme: 'plain',
       styles: {
@@ -562,6 +564,242 @@ const ModuloEntregaKits = () => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
+/* MÓDULO CHEQUEO DE KITS                                         */
+/* ────────────────────────────────────────────────────────────── */
+
+const ModuloChequeoKits = () => {
+  const [bibInput, setBibInput] = useState<string>('');
+  const [activeRunner, setActiveRunner] = useState<Runner | null>(null);
+  const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [stats, setStats] = useState({ total: 0, entregados: 0, pendientes: 0 });
+  const bibInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    const { data } = await supabase
+      .from('runners')
+      .select('kit_entregado');
+    if (data) {
+      const entregados = data.filter(r => r.kit_entregado).length;
+      setStats({ total: data.length, entregados, pendientes: data.length - entregados });
+    }
+  };
+
+  const searchRunner = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!bibInput.trim()) return;
+    setIsLoading(true);
+    setStatusMsg(null);
+    setActiveRunner(null);
+
+    const { data, error } = await supabase
+      .from('runners')
+      .select('id, bib_number, nombre, apellido, cedula, categoria, talla_camiseta, kit_entregado, pago_verificado')
+      .eq('bib_number', parseInt(bibInput, 10))
+      .single();
+
+    setIsLoading(false);
+
+    if (error || !data) {
+      setStatusMsg({ text: `Dorsal #${bibInput} no encontrado.`, type: 'error' });
+      return;
+    }
+
+    setActiveRunner(data as Runner);
+
+    if (data.kit_entregado) {
+      setStatusMsg({ text: `⚠️ ALERTA: El kit del Dorsal #${data.bib_number} ya fue entregado anteriormente.`, type: 'error' });
+    } else {
+      setStatusMsg({ text: `Atleta identificado. Confirme la entrega del kit.`, type: 'info' });
+    }
+  };
+
+  const confirmarEntrega = async () => {
+    if (!activeRunner) return;
+    setIsLoading(true);
+    const { error } = await supabase
+      .from('runners')
+      .update({ kit_entregado: true })
+      .eq('id', activeRunner.id);
+    setIsLoading(false);
+
+    if (error) {
+      setStatusMsg({ text: `Error: ${error.message}`, type: 'error' });
+    } else {
+      setStatusMsg({ text: `✅ KIT ENTREGADO — Dorsal #${activeRunner.bib_number} · ${activeRunner.nombre} ${activeRunner.apellido}`, type: 'success' });
+      setActiveRunner(null);
+      setBibInput('');
+      fetchStats();
+      setTimeout(() => {
+        setStatusMsg(null);
+        bibInputRef.current?.focus();
+      }, 2500);
+    }
+  };
+
+  const deshacerEntrega = async () => {
+    if (!activeRunner) return;
+    setIsLoading(true);
+    const { error } = await supabase
+      .from('runners')
+      .update({ kit_entregado: false })
+      .eq('id', activeRunner.id);
+    setIsLoading(false);
+    if (!error) {
+      setStatusMsg({ text: `Entrega revertida para Dorsal #${activeRunner.bib_number}`, type: 'info' });
+      setActiveRunner(null);
+      setBibInput('');
+      fetchStats();
+    }
+  };
+
+  const pct = stats.total > 0 ? Math.round((stats.entregados / stats.total) * 100) : 0;
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in">
+
+      {/* ── Stats bar ── */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-black/40 border border-white/10 rounded-2xl p-6 text-center">
+          <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-1">Total</p>
+          <p className="text-4xl font-black italic text-white">{stats.total}</p>
+        </div>
+        <div className="bg-black/40 border border-green-500/20 rounded-2xl p-6 text-center">
+          <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-1">Entregados</p>
+          <p className="text-4xl font-black italic text-green-400">{stats.entregados}</p>
+        </div>
+        <div className="bg-black/40 border border-yellow-500/20 rounded-2xl p-6 text-center">
+          <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-1">Pendientes</p>
+          <p className="text-4xl font-black italic text-yellow-400">{stats.pendientes}</p>
+        </div>
+      </div>
+
+      {/* ── Barra de progreso ── */}
+      <div className="bg-black/40 border border-white/10 rounded-2xl p-6">
+        <div className="flex justify-between items-center mb-3">
+          <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Progreso de Entrega</p>
+          <p className="text-lg font-black italic text-white">{pct}%</p>
+        </div>
+        <div className="h-3 bg-white/5 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-cyan-500 to-green-400 rounded-full transition-all duration-700"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* ── Búsqueda ── */}
+      <div className="bg-black/40 border border-amber-500/20 rounded-2xl p-8 relative overflow-hidden">
+        <div className="absolute top-0 right-0 bg-amber-500/10 text-amber-400 font-black text-xs px-4 py-2 rounded-bl-2xl border-b border-l border-amber-500/20">
+          CHEQUEO DE KITS
+        </div>
+        <h3 className="text-xl font-black text-white uppercase italic tracking-widest flex items-center gap-3 mb-8">
+          <Gift className="text-amber-400" /> Entrega de Kit
+        </h3>
+
+        {statusMsg && (
+          <div className={`p-4 mb-6 rounded-xl border font-mono text-xs uppercase font-bold tracking-wider ${
+            statusMsg.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+            statusMsg.type === 'error'   ? 'bg-red-500/10 border-red-500/30 text-red-400' :
+            'bg-amber-500/10 border-amber-500/30 text-amber-400'
+          }`}>
+            {statusMsg.text}
+          </div>
+        )}
+
+        <form onSubmit={searchRunner} className="flex gap-4 mb-6">
+          <div className="flex-1">
+            <label className="text-[10px] text-amber-400 font-black uppercase tracking-widest mb-2 block">Número de Dorsal</label>
+            <input
+              ref={bibInputRef}
+              type="number"
+              value={bibInput}
+              onChange={e => setBibInput(e.target.value)}
+              className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-2xl font-black text-white outline-none focus:border-amber-500/50 transition-colors"
+              placeholder="Ej: 0001"
+              autoFocus
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              type="submit"
+              disabled={!bibInput.trim() || isLoading}
+              className="h-[64px] px-8 flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-[0.2em] transition-all disabled:opacity-50"
+            >
+              {isLoading ? <RefreshCw className="animate-spin" size={18} /> : <Search size={18} />}
+              Buscar
+            </button>
+          </div>
+        </form>
+
+        {/* ── Runner card ── */}
+        {activeRunner && (
+          <div className="border-t border-white/10 pt-6 space-y-4 animate-in slide-in-from-bottom-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2 bg-white/[0.02] border border-white/5 p-5 rounded-xl">
+                <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-2">Atleta</p>
+                <p className="text-2xl font-black text-white uppercase">{activeRunner.nombre} {activeRunner.apellido}</p>
+                <div className="flex items-center gap-3 mt-2">
+                  <span className="text-xs text-cyan-400 font-mono">V-{activeRunner.cedula}</span>
+                  <span className="text-[8px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded font-black uppercase">
+                    {activeRunner.categoria || 'SIN CAT'}
+                  </span>
+                  {activeRunner.pago_verificado && (
+                    <span className="text-[8px] bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 rounded font-black uppercase flex items-center gap-1">
+                      <ShieldCheck size={10} /> PAGO OK
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="bg-white/[0.02] border border-white/5 p-5 rounded-xl flex flex-col items-center justify-center">
+                <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-1">Talla</p>
+                <p className="text-4xl font-black italic text-amber-400">{activeRunner.talla_camiseta || 'N/A'}</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              {!activeRunner.kit_entregado ? (
+                <button
+                  onClick={confirmarEntrega}
+                  disabled={isLoading}
+                  className="flex-1 py-4 rounded-xl bg-green-500 hover:bg-green-400 text-black font-black uppercase text-sm tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                >
+                  {isLoading ? <RefreshCw size={18} className="animate-spin" /> : <CheckCircle size={18} />}
+                  Confirmar Entrega de Kit
+                </button>
+              ) : (
+                <>
+                  <div className="flex-1 py-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3">
+                    <CheckCircle size={18} /> Kit Ya Entregado
+                  </div>
+                  <button
+                    onClick={deshacerEntrega}
+                    disabled={isLoading}
+                    className="px-6 py-4 rounded-xl bg-white/5 hover:bg-red-500/10 text-red-400 border border-red-500/20 font-black uppercase text-xs tracking-widest transition-all"
+                  >
+                    Revertir
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => { setActiveRunner(null); setBibInput(''); setStatusMsg(null); }}
+                className="px-6 py-4 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 font-black uppercase text-xs tracking-widest transition-all"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ────────────────────────────────────────────────────────────── */
 /* TASA CONFIG                                                    */
 /* ────────────────────────────────────────────────────────────── */
 
@@ -678,6 +916,7 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
   const [athleteToDelete, setAthleteToDelete] = useState<Runner | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isTogglingPayment, setIsTogglingPayment] = useState<string | null>(null);
+  const [isTogglingKit, setIsTogglingKit] = useState<string | null>(null);
   const [showPDFModal, setShowPDFModal] = useState(false);
 
   const fetchAtletas = async () => {
@@ -701,6 +940,17 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
       setAtletas(prev => prev.map(a => a.id === id ? { ...a, pago_verificado: newStatus } : a));
       if (selectedAtleta?.id === id) setSelectedAtleta(prev => prev ? { ...prev, pago_verificado: newStatus } : null);
     } catch (err: any) { alert(`ERROR: ${err.message}`); } finally { setIsTogglingPayment(null); }
+  };
+
+  const toggleKitEntregado = async (id: string, currentStatus: boolean | undefined) => {
+    setIsTogglingKit(id);
+    const newStatus = !currentStatus;
+    try {
+      const { error } = await supabase.from('runners').update({ kit_entregado: newStatus }).eq('id', id);
+      if (error) throw error;
+      setAtletas(prev => prev.map(a => a.id === id ? { ...a, kit_entregado: newStatus } : a));
+      if (selectedAtleta?.id === id) setSelectedAtleta(prev => prev ? { ...prev, kit_entregado: newStatus } : null);
+    } catch (err: any) { alert(`ERROR: ${err.message}`); } finally { setIsTogglingKit(null); }
   };
 
   const handleDeleteAthlete = async () => {
@@ -747,16 +997,27 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
     );
   }, [atletas, searchTerm]);
 
+  const kitsEntregados = atletas.filter(a => a.kit_entregado).length;
+
   return (
     <div className="relative text-white">
       <div className="bg-black/40 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
         <div className="p-6 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
-          <button
-            onClick={() => setShowPDFModal(true)}
-            className="px-4 py-2 rounded-lg bg-white/5 text-cyan-400 border border-cyan-400/20 hover:bg-cyan-400 hover:text-black flex items-center gap-2 text-[10px] uppercase font-black transition-all"
-          >
-            <FileText size={14} /> Exportar PDF
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowPDFModal(true)}
+              className="px-4 py-2 rounded-lg bg-white/5 text-cyan-400 border border-cyan-400/20 hover:bg-cyan-400 hover:text-black flex items-center gap-2 text-[10px] uppercase font-black transition-all"
+            >
+              <FileText size={14} /> Exportar PDF
+            </button>
+            {/* ── Indicador kits ── */}
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <Gift size={14} className="text-amber-400" />
+              <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">
+                Kits: {kitsEntregados}/{atletas.length}
+              </span>
+            </div>
+          </div>
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
             <input
@@ -788,6 +1049,7 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
                     <div className="font-bold text-xs uppercase flex items-center gap-2">
                       {a.nombre} {a.apellido}
                       {a.pago_verificado && <ShieldCheck size={12} className="text-green-500" />}
+                      {a.kit_entregado && <Gift size={12} className="text-amber-400" />}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-[9px] text-gray-500 font-mono">V-{a.cedula}</span>
@@ -814,17 +1076,27 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
                   </td>
                   <td className="p-4">
                     <div className="flex items-center justify-center gap-2">
-                      <button onClick={() => inspectComprobante(a)} className="p-2 rounded-lg bg-white/5 hover:bg-cyan-500 hover:text-black transition-all">
+                      <button onClick={() => inspectComprobante(a)} className="p-2 rounded-lg bg-white/5 hover:bg-cyan-500 hover:text-black transition-all" title="Ver comprobante">
                         <Eye size={16} />
                       </button>
                       <button
                         onClick={() => toggleVerificacionPago(a.id, a.pago_verificado)}
                         disabled={isTogglingPayment === a.id}
                         className={`p-2 rounded-lg transition-all border ${a.pago_verificado ? 'bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500 hover:text-black' : 'bg-white/5 text-gray-500 border-transparent hover:bg-white/10 hover:text-white'}`}
+                        title="Verificar pago"
                       >
                         {isTogglingPayment === a.id ? <RefreshCw size={16} className="animate-spin" /> : <CheckSquare size={16} />}
                       </button>
-                      <button onClick={() => setAthleteToDelete(a)} className="p-2 rounded-lg bg-white/5 hover:bg-red-500 hover:text-black text-red-500 transition-all">
+                      {/* ── Botón Kit ── */}
+                      <button
+                        onClick={() => toggleKitEntregado(a.id, a.kit_entregado)}
+                        disabled={isTogglingKit === a.id}
+                        className={`p-2 rounded-lg transition-all border ${a.kit_entregado ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500 hover:text-black' : 'bg-white/5 text-gray-500 border-transparent hover:bg-amber-500/20 hover:text-amber-400'}`}
+                        title={a.kit_entregado ? 'Kit entregado — click para revertir' : 'Marcar kit entregado'}
+                      >
+                        {isTogglingKit === a.id ? <RefreshCw size={16} className="animate-spin" /> : <Gift size={16} />}
+                      </button>
+                      <button onClick={() => setAthleteToDelete(a)} className="p-2 rounded-lg bg-white/5 hover:bg-red-500 hover:text-black text-red-500 transition-all" title="Eliminar">
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -868,6 +1140,22 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Teléfono</p><p className="text-white font-mono">{selectedAtleta.telefono || 'SIN REGISTRO'}</p></div>
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Talla Reservada</p><p className="text-white font-mono uppercase">{selectedAtleta.talla_camiseta || 'NO ESPECIFICADA'}</p></div>
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Referencia</p><p className="text-green-400 font-mono break-all">{selectedAtleta.referencia_pago || 'PENDIENTE'}</p></div>
+                {/* Kit status en modal */}
+                <div className={`p-4 rounded-xl border flex items-center justify-between ${selectedAtleta.kit_entregado ? 'bg-amber-500/10 border-amber-500/30' : 'bg-white/[0.03] border-white/5'}`}>
+                  <div>
+                    <p className="text-gray-500 text-[9px] uppercase">Kit</p>
+                    <p className={`font-black text-sm uppercase ${selectedAtleta.kit_entregado ? 'text-amber-400' : 'text-gray-500'}`}>
+                      {selectedAtleta.kit_entregado ? 'Entregado ✓' : 'Pendiente'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => toggleKitEntregado(selectedAtleta.id, selectedAtleta.kit_entregado)}
+                    disabled={isTogglingKit === selectedAtleta.id}
+                    className={`p-2 rounded-lg transition-all ${selectedAtleta.kit_entregado ? 'bg-amber-500/20 text-amber-400' : 'bg-white/5 text-gray-500 hover:text-amber-400'}`}
+                  >
+                    {isTogglingKit === selectedAtleta.id ? <RefreshCw size={14} className="animate-spin" /> : <Gift size={14} />}
+                  </button>
+                </div>
                 <button
                   onClick={() => toggleVerificacionPago(selectedAtleta.id, selectedAtleta.pago_verificado)}
                   disabled={isTogglingPayment === selectedAtleta.id}
@@ -1291,7 +1579,7 @@ const TelemetryModule = () => {
 /* ────────────────────────────────────────────────────────────── */
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'race_config' | 'results' | 'teams' | 'kit_delivery' | 'telemetry' | 'inscripcion'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'race_config' | 'results' | 'teams' | 'kit_delivery' | 'kit_chequeo' | 'telemetry' | 'inscripcion'>('overview');
   const [totalAtletas, setTotalAtletas] = useState(0);
 
   return (
@@ -1316,22 +1604,25 @@ export default function AdminDashboard() {
       <main className="max-w-7xl mx-auto px-6 py-12">
         <div className="flex flex-wrap gap-4 mb-12 border-b border-white/5 pb-6">
           {[
-            { id: 'overview',     label: 'Dashboard',       icon: null },
-            { id: 'kit_delivery', label: 'Entrega de Kits', icon: <Package size={14} /> },
-            { id: 'telemetry',    label: 'Telemetría',      icon: <Radio size={14} />, accent: 'yellow' },
-            { id: 'inscripcion',  label: 'Inscribir',       icon: <UserPlus size={14} /> },
-            { id: 'teams',        label: 'Escuadrones',     icon: null },
-            { id: 'race_config',  label: 'Carrera',         icon: null },
-            { id: 'results',      label: 'Resultados',      icon: null },
+            { id: 'overview',     label: 'Dashboard',    icon: null },
+            { id: 'kit_delivery', label: 'RFID',         icon: <Package size={14} /> },
+            { id: 'kit_chequeo',  label: 'Entrega Kits', icon: <Gift size={14} />, accent: 'amber' },
+            { id: 'telemetry',    label: 'Telemetría',   icon: <Radio size={14} />, accent: 'yellow' },
+            { id: 'inscripcion',  label: 'Inscribir',    icon: <UserPlus size={14} /> },
+            { id: 'teams',        label: 'Escuadrones',  icon: null },
+            { id: 'race_config',  label: 'Carrera',      icon: null },
+            { id: 'results',      label: 'Resultados',   icon: null },
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
               className={`px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all flex items-center gap-2 ${
                 activeTab === tab.id
-                  ? (tab as any).accent === 'yellow'
-                    ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20'
-                    : 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20'
+                  ? (tab as any).accent === 'amber'
+                    ? 'bg-amber-400 text-black shadow-lg shadow-amber-400/20'
+                    : (tab as any).accent === 'yellow'
+                      ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20'
+                      : 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20'
                   : 'bg-white/5 hover:bg-white/10 text-gray-400'
               }`}
             >
@@ -1361,10 +1652,11 @@ export default function AdminDashboard() {
         )}
 
         {activeTab === 'kit_delivery' && <ModuloEntregaKits />}
-        {activeTab === 'telemetry' && <TelemetryModule />}
-        {activeTab === 'inscripcion' && <ModuloInscripcionAdmin />}
-        {activeTab === 'teams' && <EscuadronesList />}
-        {activeTab === 'race_config' && (
+        {activeTab === 'kit_chequeo'  && <ModuloChequeoKits />}
+        {activeTab === 'telemetry'    && <TelemetryModule />}
+        {activeTab === 'inscripcion'  && <ModuloInscripcionAdmin />}
+        {activeTab === 'teams'        && <EscuadronesList />}
+        {activeTab === 'race_config'  && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in slide-in-from-bottom-4">
             <RaceForm /><RouteConfig />
           </div>
