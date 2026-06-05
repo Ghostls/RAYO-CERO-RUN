@@ -13,10 +13,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'leaflet': ['leaflet'],
-          'framer-motion': ['framer-motion'],
-          'supabase': ['@supabase/supabase-js'],
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          "leaflet": ["leaflet"],
+          "framer-motion": ["framer-motion"],
+          "supabase": ["@supabase/supabase-js"],
+          "react-vendor": ["react", "react-dom", "react-router-dom"],
         },
       },
     },
@@ -24,12 +24,11 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: [
-      'react',
-      'react-dom',
-      'react-router-dom',
-      '@supabase/supabase-js',
-      'leaflet',        // ✅ FIX: movido de exclude → include
+      "react",
+      "react-dom",
+      "react-router-dom",
+      "@supabase/supabase-js",
+      "leaflet",
     ],
-    // exclude eliminado — no excluir leaflet
   },
 });
