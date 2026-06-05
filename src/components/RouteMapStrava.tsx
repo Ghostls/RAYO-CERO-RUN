@@ -1,23 +1,23 @@
 /**
- * RAYOCERO — ROUTE MAP STRAVA V3.0
+ * RAYOCERO — ROUTE MAP STRAVA V3.2
  * Build: VALKYRON ATLAS — REAL TILES
  * CEO: Lualdo Sciscioli | Valkyron Group
  *
- * EVOLUCIÓN V3:
- * ─ Mapa real con tiles CartoDB Dark (Barquisimeto visible)
- * ─ Polyline coloreada por velocidad sobre mapa real
- * ─ Replay con marcador animado sobre el mapa
- * ─ Pace chart por segmentos
- * ─ Stats HUD flotantes
- * ─ Share card opcional
- * ─ GeoPoint exportado
- * ─ prop live=true para RaceTracker
- *
- * DEPENDENCIA: npm install leaflet @types/leaflet
+ * CHANGELOG V3.2:
+ * ─ FIX CRÍTICO V3.1: import * as L → import L from 'leaflet' con workaround Vite
+ * ─ FIX: L.divIcon / L.map / L.polyline etc. no disponibles con import * as L en Vite
+ * ─ SOLUCIÓN: import Leaflet directamente y re-exportar como L para compatibilidad total
+ * ─ FIX: import 'leaflet/dist/leaflet.css' mantenido
+ * ─ Todo lo demás de V3.0 intacto (Regla de Oro)
  */
 
 import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import L from 'leaflet';
+import Leaflet from 'leaflet';
+import type { Map, Polyline, Marker } from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Alias L para compatibilidad con el resto del código
+const L = Leaflet;
 
 /* ─── Types ─────────────────────────────────────────────────── */
 export interface GeoPoint {
@@ -129,7 +129,6 @@ const CSS = `
   }
 
   .rm3-hud-right { display:flex; align-items:center; gap:10px; }
-
   .rm3-legend { display:flex; align-items:center; gap:5px; }
 
   .rm3-legend-bar {
@@ -142,7 +141,6 @@ const CSS = `
   .rm3-pts { font-size:9px; color:rgba(255,255,255,0.25); letter-spacing:0.08em; }
 
   .rm3-map { height: 320px; width: 100%; position: relative; z-index: 0; }
-
   .rm3-map .leaflet-tile { filter: brightness(0.85) saturate(0.7); }
 
   .rm3-map .leaflet-control-attribution {
@@ -357,15 +355,15 @@ export default function RouteMapStrava({
   showShareCard = false,
   live = false,
 }: Props) {
-  const mapRef = useRef<L.Map | null>(null);
+  const mapRef = useRef<Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const polylinesRef = useRef<L.Polyline[]>([]);
-  const startMarkerRef = useRef<L.Marker | null>(null);
-  const endMarkerRef = useRef<L.Marker | null>(null);
-  const replayMarkerRef = useRef<L.Marker | null>(null);
+  const polylinesRef = useRef<Polyline[]>([]);
+  const startMarkerRef = useRef<Marker | null>(null);
+  const endMarkerRef = useRef<Marker | null>(null);
+  const replayMarkerRef = useRef<Marker | null>(null);
   const prevPointsLenRef = useRef(0);
-  const ghostLinesRef = useRef<L.Polyline[]>([]);
-  const activeLinesRef = useRef<L.Polyline[]>([]);
+  const ghostLinesRef = useRef<Polyline[]>([]);
+  const activeLinesRef = useRef<Polyline[]>([]);
 
   const [replayProgress, setReplayProgress] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -440,7 +438,6 @@ export default function RouteMapStrava({
     const map = mapRef.current;
     if (!map || !hasPoints || !stats) return;
 
-    // En modo live solo agregar nuevos segmentos (no redibujar todo)
     if (live && prevPointsLenRef.current > 0 && points.length > prevPointsLenRef.current) {
       const newPoints = points.slice(prevPointsLenRef.current - 1);
       for (let i = 1; i < newPoints.length; i++) {
@@ -453,13 +450,11 @@ export default function RouteMapStrava({
         }).addTo(map);
         polylinesRef.current.push(seg);
       }
-      // Mover marcador META al último punto
       endMarkerRef.current?.setLatLng([points[points.length - 1].lat, points[points.length - 1].lng]);
       prevPointsLenRef.current = points.length;
       return;
     }
 
-    // Redibujo completo
     polylinesRef.current.forEach(p => map.removeLayer(p));
     polylinesRef.current = [];
     startMarkerRef.current && map.removeLayer(startMarkerRef.current);
@@ -467,12 +462,10 @@ export default function RouteMapStrava({
 
     const latlngs: [number, number][] = points.map(p => [p.lat, p.lng]);
 
-    // Halo bajo toda la ruta
     polylinesRef.current.push(
       L.polyline(latlngs, { color: 'rgba(0,200,255,0.06)', weight: 16, lineCap: 'round' }).addTo(map)
     );
 
-    // Ruta fantasma (atenuada, siempre visible)
     ghostLinesRef.current.forEach(l => map.removeLayer(l));
     ghostLinesRef.current = [];
     for (let i = 1; i < points.length; i++) {
@@ -484,7 +477,6 @@ export default function RouteMapStrava({
       ghostLinesRef.current.push(ghost);
     }
 
-    // Active lines container (vacío inicialmente, se llena en replay)
     activeLinesRef.current.forEach(l => map.removeLayer(l));
     activeLinesRef.current = [];
 
@@ -515,7 +507,6 @@ export default function RouteMapStrava({
     setReplayProgress(startP);
     startTimeRef.current = performance.now() - startP * REPLAY_DURATION;
 
-    // Limpiar líneas activas anteriores
     activeLinesRef.current.forEach(l => mapRef.current?.removeLayer(l));
     activeLinesRef.current = [];
     let lastActiveIdx = 0;
@@ -525,7 +516,6 @@ export default function RouteMapStrava({
       setReplayProgress(progress);
       const idx = Math.min(Math.floor(progress * (points.length - 1)), points.length - 1);
 
-      // Iluminar segmentos nuevos progresivamente
       if (mapRef.current && idx > lastActiveIdx) {
         for (let i = lastActiveIdx + 1; i <= idx; i++) {
           if (i >= points.length) break;
@@ -568,7 +558,6 @@ export default function RouteMapStrava({
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
   }, []);
 
-  // Reset replay — limpiar líneas activas y volver a estado inicial
   const resetReplay = useCallback(() => {
     pauseReplay();
     setReplayProgress(0);
@@ -655,7 +644,6 @@ export default function RouteMapStrava({
 
         <div className="rm3-scrubber-wrap">
           <div className="rm3-scrubber-row">
-            {/* Play/Pause */}
             <button className="rm3-play-btn"
               onClick={() => isPlaying ? pauseReplay() : startReplay()}
               aria-label={isPlaying ? 'Pausar' : 'Reproducir'}
@@ -672,25 +660,19 @@ export default function RouteMapStrava({
               )}
             </button>
 
-            {/* Reset */}
-            <button className="rm3-reset-btn"
-              onClick={resetReplay}
-              aria-label="Reiniciar"
-            >
+            <button className="rm3-reset-btn" onClick={resetReplay} aria-label="Reiniciar">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M1 6A5 5 0 1 0 6 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                 <path d="M1 1V6H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
 
-            {/* Track */}
             <div className="rm3-track"
               onClick={e => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 const p = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
                 setReplayProgress(p);
                 pauseReplay();
-                // Limpiar y redibujar hasta ese punto
                 activeLinesRef.current.forEach(l => mapRef.current?.removeLayer(l));
                 activeLinesRef.current = [];
                 const targetIdx = Math.min(Math.floor(p * (points.length - 1)), points.length - 1);
@@ -711,26 +693,17 @@ export default function RouteMapStrava({
               <div className="rm3-fill" style={{ width: `${replayProgress * 100}%` }} />
             </div>
 
-            {/* Tiempo */}
             <span className="rm3-total-time">
-              {replayProgress > 0.01
-                ? `${replayTime} / ${totalTime}`
-                : totalTime
-              }
+              {replayProgress > 0.01 ? `${replayTime} / ${totalTime}` : totalTime}
             </span>
           </div>
 
-          {/* Label replay */}
           {!isPlaying && replayProgress < 0.01 && (
             <div style={{
-              textAlign: 'center',
-              marginTop: 6,
-              fontSize: 8,
-              letterSpacing: '0.2em',
-              color: 'rgba(0,242,255,0.4)',
+              textAlign: 'center', marginTop: 6, fontSize: 8,
+              letterSpacing: '0.2em', color: 'rgba(0,242,255,0.4)',
               textTransform: 'uppercase',
-              fontFamily: "'Barlow Condensed', sans-serif",
-              fontStyle: 'italic',
+              fontFamily: "'Barlow Condensed', sans-serif", fontStyle: 'italic',
             }}>
               ▶ REPRODUCIR RUTA GPS
             </div>
