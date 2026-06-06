@@ -66,7 +66,7 @@ export const registrationSchema = z.object({
     return edad >= 16 && edad <= 99; // Ajustado a 16 años (Mínimo Juvenil)
   }, "Edad permitida: 16+ años"),
   genero: z.enum(["M", "F"]),
-  talla: z.enum(["XS", "S", "M", "L", "XL", "XXL"]),
+  talla: z.enum(["XS", "S", "M", "L", "XL", "XXL",  "NA"]),
   movilidadReducida: z.boolean().default(false), // <-- INYECCIÓN TÁCTICA ZOD
   referenciaPago: z.string().min(4, "Referencia bancaria inválida"),
   contactoEmergencia: z.string().min(3),

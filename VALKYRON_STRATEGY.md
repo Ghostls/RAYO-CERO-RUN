@@ -239,7 +239,7 @@ export const registrationSchema = z.object({
     return age >= 14 && age <= 80;
   }, 'Edad fuera del rango permitido (14-80 años)'),
   genero: z.enum(['M', 'F']),
-  talla: z.enum(['XS', 'S', 'M', 'L', 'XL', 'XXL']),
+  talla: z.enum(['XS', 'S', 'M', 'L', 'XL', 'XXL','N/A',]),
   contactoEmergencia: z.string().min(3).max(100),
   telefonoEmergencia: z.string().regex(/^\+?[\d\s\-()]{7,15}$/),
   aceptaDeslinde: z.literal(true, { errorMap: () => ({ message: 'Debe aceptar el deslinde' }) }),

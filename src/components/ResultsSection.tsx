@@ -1,7 +1,12 @@
 /**
- * RAYOCERO — RESULTS SECTION V1.1
+ * RAYOCERO — RESULTS SECTION V1.2
  * Módulo de consulta de tiempos para corredores
  * CEO: Lualdo Sciscioli | Valkyron Group
+ *
+ * CHANGELOG V1.2:
+ * ─ Barra de sponsors integrada en la card de resultado
+ * ─ Logos 15.png y 22.png desde /assets con fondo pill glassmorphism
+ * ─ Sponsor strip visible siempre que hay un runner cargado
  *
  * CHANGELOG V1.1:
  * ─ Integración RouteMapStrava — mapa GPS del corredor si tiene gps_track
@@ -71,6 +76,12 @@ const parseGpsTrack = (raw: string | null): GeoPoint[] => {
   } catch { /* noop */ }
   return [];
 };
+
+/* ─── Sponsors ──────────────────────────────────────────────── */
+const SPONSORS = [
+  { src: 'src/assets/15.png', alt: 'Sponsor 15' },
+  { src: 'src/assets/22.png', alt: 'Sponsor 22' },
+];
 
 /* ─── CSS ───────────────────────────────────────────────────── */
 const CSS = `
@@ -205,9 +216,46 @@ const CSS = `
   }
 
   .rs-athlete-row {
-    display: grid; grid-template-columns: 1fr auto;
-    gap: 3rem; align-items: start;
+    display: grid; grid-template-columns: auto auto 1fr;
+    gap: 2.5rem; align-items: center;
     margin-bottom: 3rem; position: relative;
+  }
+
+  .rs-sponsors-center {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+    gap: 8px;
+    align-self: stretch;
+  }
+
+  .rs-sponsor-pill-sm {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 22px;
+    background: rgba(255,255,255,0.055);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 6px;
+    backdrop-filter: blur(10px);
+    transition: border-color 0.2s, background 0.2s, transform 0.2s;
+    flex: 1;
+  }
+
+  .rs-sponsor-pill-sm:hover {
+    border-color: rgba(0,242,255,0.2);
+    background: rgba(255,255,255,0.09);
+    transform: translateY(-2px);
+  }
+
+  .rs-sponsor-pill-sm img {
+    height: 60px;
+    width: auto;
+    max-width: 180px;
+    object-fit: contain;
+    filter: brightness(1.1) contrast(1.05);
+    display: block;
   }
 
   .rs-athlete-meta {
@@ -328,6 +376,102 @@ const CSS = `
   .rs-stat-value.accent { color: #00f2ff; }
   .rs-stat-unit { font-size: 0.7rem; color: rgba(255,255,255,0.25); font-style: italic; margin-left: 4px; }
 
+  /* ── Sponsors inline (columna de status) ──────────────────── */
+  .rs-sponsors-inline {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 6px;
+    align-items: flex-end;
+  }
+
+  .rs-sponsor-pill-sm {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    background: rgba(255,255,255,0.055);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 5px;
+    backdrop-filter: blur(10px);
+    transition: border-color 0.2s, background 0.2s, transform 0.2s;
+    min-width: 120px;
+  }
+
+  .rs-sponsor-pill-sm:hover {
+    border-color: rgba(0,242,255,0.18);
+    background: rgba(255,255,255,0.08);
+    transform: translateY(-1px);
+  }
+
+  .rs-sponsor-pill-sm img {
+    height: 38px;
+    width: auto;
+    max-width: 140px;
+    object-fit: contain;
+    filter: brightness(1.1) contrast(1.05);
+    display: block;
+  }
+
+  /* ── Sponsors strip (legacy — no longer used) ──────────────── */
+  .rs-sponsors-strip {
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .rs-sponsors-eyebrow {
+    font-size: 7px; font-weight: 700; letter-spacing: 0.4em;
+    color: rgba(255,255,255,0.18); text-transform: uppercase;
+    display: flex; align-items: center; gap: 10px;
+  }
+
+  .rs-sponsors-eyebrow::before,
+  .rs-sponsors-eyebrow::after {
+    content: ''; flex: 1;
+    height: 1px; background: rgba(255,255,255,0.06);
+  }
+
+  .rs-sponsors-logos {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5rem;
+    flex-wrap: wrap;
+  }
+
+  .rs-sponsor-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px 32px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    backdrop-filter: blur(8px);
+    transition: border-color 0.2s, background 0.2s, transform 0.2s;
+    min-width: 140px;
+  }
+
+  .rs-sponsor-pill:hover {
+    border-color: rgba(0,242,255,0.2);
+    background: rgba(255,255,255,0.09);
+    transform: translateY(-2px);
+  }
+
+  .rs-sponsor-pill img {
+    height: 44px;
+    width: auto;
+    max-width: 160px;
+    object-fit: contain;
+    filter: brightness(1.1) contrast(1.05);
+    display: block;
+  }
+
+  /* ── Map ──────────────────────────────────────────────────── */
   .rs-map-section {
     border-top: 1px solid rgba(255,255,255,0.05);
     padding-top: 2rem; margin-bottom: 2rem;
@@ -368,6 +512,9 @@ const CSS = `
     .rs-card { padding: 0 1.25rem 4rem; }
     .rs-stats-grid { grid-template-columns: repeat(2, 1fr); }
     .rs-athlete-row { grid-template-columns: 1fr; gap: 1.5rem; }
+    .rs-sponsors-center { flex-direction: row; align-items: center; justify-content: flex-start; gap: 1rem; align-self: auto; }
+    .rs-sponsor-pill-sm { flex: unset; padding: 10px 18px; }
+    .rs-sponsor-pill-sm img { height: 36px; }
     .rs-status-col { align-items: flex-start; flex-direction: row; flex-wrap: wrap; }
     .rs-time-hero { grid-template-columns: 1fr; gap: 1.5rem; }
     .rs-bib-watermark { display: none; }
@@ -376,6 +523,9 @@ const CSS = `
     .rs-time-value { font-size: clamp(3rem, 15vw, 6rem); }
     .rs-search-input { font-size: 2rem; padding: 16px 20px; }
     .rs-search-btn { padding: 16px 20px; font-size: 0.75rem; }
+    .rs-sponsor-pill { padding: 12px 24px; min-width: 110px; }
+    .rs-sponsor-pill img { height: 36px; }
+    .rs-sponsors-logos { gap: 1.5rem; }
   }
 `;
 
@@ -457,7 +607,7 @@ export default function ResultsSection() {
         <div className="rs-header">
           <div className="rs-eyebrow">
             <span className="rs-eyebrow-dot" />
-            <span className="rs-eyebrow-text">WE RUN 10K NIGHT FEST · 2026</span>
+            <span className="rs-eyebrow-text">WE RUN RAYOCERO 10K NIGHT FEST · 2026</span>
           </div>
           <h1 className="rs-title">
             <span style={{ display: 'block' }}>MIS</span>
@@ -531,6 +681,7 @@ export default function ResultsSection() {
 
                 {/* Atleta + estado */}
                 <div className="rs-athlete-row">
+                  {/* Nombre */}
                   <div>
                     <div className="rs-athlete-meta">
                       <span>DORSAL #{runner.bib_number}</span>
@@ -543,6 +694,16 @@ export default function ResultsSection() {
                     <div className="rs-athlete-name-last">{runner.apellido}</div>
                   </div>
 
+                  {/* Sponsors — centro */}
+                  <div className="rs-sponsors-center">
+                    {SPONSORS.map((sp) => (
+                      <div key={sp.src} className="rs-sponsor-pill-sm">
+                        <img src={sp.src} alt={sp.alt} />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Status + compartir */}
                   <div className="rs-status-col">
                     <div className={`rs-status-badge ${status?.cls}`}>
                       <span style={{
@@ -567,7 +728,7 @@ export default function ResultsSection() {
                 {/* Tiempo hero */}
                 <div className="rs-time-hero">
                   <div>
-                    <div className="rs-time-label">TIEMPO OFICIAL · WE RUN 10K</div>
+                    <div className="rs-time-label">TIEMPO OFICIAL · WE RUN RAYOCERO 10K</div>
                     <div className={`rs-time-value ${hasTime ? 'has-time' : ''}`}>
                       {hasTime ? formatTime(runner.finish_time_seconds!) : '--:--:--'}
                     </div>
@@ -637,7 +798,7 @@ export default function ResultsSection() {
                       <RouteMapStrava
                         points={gpsPoints}
                         athleteName={`${runner.nombre} ${runner.apellido}`}
-                        eventName="WE RUN 10K NIGHT FEST"
+                        eventName="WE RUN RAYOCERO 10K NIGHT FEST"
                         showShareCard={true}
                       />
                     </Suspense>
