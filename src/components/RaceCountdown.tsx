@@ -1,15 +1,12 @@
 /**
  * RAYOCERO — RACE COUNTDOWN MODULE
- * Build: V1.0 — VALKYRON LAUNCH
+ * Build: V1.1 — VALKYRON LAUNCH
  * CEO: Lualdo Sciscioli | Valkyron Group
  *
- * Experiencia inmersiva pre-carrera:
- * ─ Suscripción Supabase Realtime a tabla race_signals
- * ─ Al recibir 'pre_race_warning': pantalla titila + cuenta regresiva 60s
- * ─ Vibración del móvil en momentos clave
- * ─ Logo RayoCero animado
- * ─ Al llegar a 0: transición a "¡ARRANCA!" y cierra
- * ─ Hook useRaceSignal exportado para usar en cualquier componente
+ * CHANGELOG V1.1:
+ * ─ useRaceSignal: polling cada 4s como fallback para atletas sin Supabase Auth
+ * ─ Doble canal: postgres_changes (Realtime) + polling SELECT (sin auth)
+ * ─ Deduplicación por id para evitar doble disparo
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -34,6 +31,10 @@ export function useRaceSignal({ onSignal }: UseRaceSignalOptions = {}) {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
+    let lastId: string | null = null;
+    let lastChecked = new Date().toISOString();
+
+    // ── Canal 1: Realtime postgres_changes (para clientes con auth) ──
     channelRef.current = supabase
       .channel('race_signals_broadcast')
       .on(
@@ -41,13 +42,34 @@ export function useRaceSignal({ onSignal }: UseRaceSignalOptions = {}) {
         { event: 'INSERT', schema: 'public', table: 'race_signals' },
         (payload) => {
           const signal = payload.new as RaceSignal;
+          if (signal.id === lastId) return; // deduplicar
+          lastId = signal.id;
           onSignal?.(signal);
         }
       )
       .subscribe();
 
+    // ── Canal 2: Polling cada 4s (para atletas sin Supabase Auth) ──
+    const poll = setInterval(async () => {
+      const { data } = await supabase
+        .from('race_signals')
+        .select('*')
+        .gt('created_at', lastChecked)
+        .order('created_at', { ascending: true });
+
+      if (data && data.length > 0) {
+        lastChecked = data[data.length - 1].created_at;
+        data.forEach(signal => {
+          if (signal.id === lastId) return; // deduplicar
+          lastId = signal.id;
+          onSignal?.(signal as RaceSignal);
+        });
+      }
+    }, 4000);
+
     return () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
+      clearInterval(poll);
     };
   }, [onSignal]);
 }
@@ -122,7 +144,6 @@ const CSS = `
     animation: rc-fade-out 0.8s ease forwards;
   }
 
-  /* Scan line */
   .rc-scan-line {
     position: absolute;
     left: 0; right: 0;
@@ -132,7 +153,6 @@ const CSS = `
     pointer-events: none;
   }
 
-  /* Grid */
   .rc-grid {
     position: absolute;
     inset: 0;
@@ -143,7 +163,6 @@ const CSS = `
     pointer-events: none;
   }
 
-  /* Logo */
   .rc-logo-wrap {
     position: relative;
     margin-bottom: 2rem;
@@ -185,7 +204,6 @@ const CSS = `
     letter-spacing: -0.02em;
   }
 
-  /* Brand */
   .rc-brand {
     font-style: italic;
     font-weight: 900;
@@ -208,7 +226,6 @@ const CSS = `
     text-align: center;
   }
 
-  /* Countdown */
   .rc-countdown-wrap {
     display: flex;
     flex-direction: column;
@@ -231,9 +248,9 @@ const CSS = `
     animation: rc-number-in 0.25s ease;
   }
 
-  .rc-number.large { font-size: clamp(7rem, 28vw, 10rem); }
+  .rc-number.large  { font-size: clamp(7rem, 28vw, 10rem); }
   .rc-number.medium { font-size: clamp(8rem, 32vw, 12rem); color: #fbbf24; }
-  .rc-number.small { font-size: clamp(9rem, 36vw, 14rem); color: #f87171; }
+  .rc-number.small  { font-size: clamp(9rem, 36vw, 14rem); color: #f87171; }
 
   .rc-seconds-label {
     font-size: 0.8rem;
@@ -243,7 +260,6 @@ const CSS = `
     margin-top: -0.5rem;
   }
 
-  /* Progress arc */
   .rc-arc-wrap {
     position: relative;
     margin: 0.5rem 0 1rem;
@@ -254,7 +270,6 @@ const CSS = `
     transform-origin: center;
   }
 
-  /* GO */
   .rc-go {
     font-style: italic;
     font-weight: 900;
@@ -279,7 +294,6 @@ const CSS = `
     opacity: 0;
   }
 
-  /* Bottom bar */
   .rc-bottom {
     position: absolute;
     bottom: 2rem;
@@ -316,32 +330,21 @@ const CSS = `
   }
 `;
 
-/* ─── Arc Progress Component ─────────────────────────────────── */
+/* ─── Arc Progress ───────────────────────────────────────────── */
 function ArcProgress({ seconds, total = 60 }: { seconds: number; total?: number }) {
   const r = 56;
   const circumference = 2 * Math.PI * r;
-  const progress = seconds / total;
-  const dashOffset = circumference * (1 - progress);
-
+  const dashOffset = circumference * (1 - seconds / total);
   const color = seconds > 20 ? '#00f2ff' : seconds > 10 ? '#fbbf24' : '#f87171';
 
   return (
     <div className="rc-arc-wrap">
       <svg width="140" height="140" className="rc-arc">
+        <circle cx="70" cy="70" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="4" />
         <circle
           cx="70" cy="70" r={r}
-          fill="none"
-          stroke="rgba(255,255,255,0.06)"
-          strokeWidth="4"
-        />
-        <circle
-          cx="70" cy="70" r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={dashOffset}
+          fill="none" stroke={color} strokeWidth="4" strokeLinecap="round"
+          strokeDasharray={circumference} strokeDashoffset={dashOffset}
           style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.3s ease' }}
         />
       </svg>
@@ -365,35 +368,28 @@ export default function RaceCountdown({
   const [phase, setPhase] = useState<'countdown' | 'go' | 'closing'>('countdown');
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Vibración en momentos clave
   const vibrate = useCallback((pattern: number[]) => {
     if ('vibrate' in navigator) navigator.vibrate(pattern);
   }, []);
 
   useEffect(() => {
-    // Vibración inicial — 3 pulsos de bienvenida
     vibrate([100, 50, 100, 50, 100]);
 
     intervalRef.current = setInterval(() => {
       setSeconds(prev => {
         const next = prev - 1;
-
-        // Vibraciones en momentos clave
         if (next === 30) vibrate([200, 100, 200]);
         if (next === 10) vibrate([300, 100, 300, 100, 300]);
         if (next <= 5 && next > 0) vibrate([150]);
         if (next === 0) vibrate([500, 200, 500, 200, 1000]);
-
         if (next <= 0) {
           clearInterval(intervalRef.current!);
           setPhase('go');
-          // Cerrar automáticamente después de 3 segundos
           setTimeout(() => {
             setPhase('closing');
             setTimeout(() => onDismiss?.(), 800);
           }, 3000);
         }
-
         return Math.max(next, 0);
       });
     }, 1000);
@@ -401,12 +397,10 @@ export default function RaceCountdown({
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [vibrate, onDismiss]);
 
-  // Clase de parpadeo según urgencia
   const flashClass = phase === 'countdown'
     ? seconds <= 10 ? 'flashing-red' : seconds <= 30 ? 'flashing' : ''
     : phase === 'closing' ? 'closing' : '';
 
-  // Tamaño del número
   const numClass = seconds > 20 ? 'large' : seconds > 10 ? 'medium' : 'small';
 
   return (
@@ -418,7 +412,6 @@ export default function RaceCountdown({
 
         {phase === 'countdown' ? (
           <>
-            {/* Logo */}
             <div className="rc-logo-wrap">
               <div className="rc-pulse-ring" />
               <div className="rc-pulse-ring" />
@@ -427,28 +420,16 @@ export default function RaceCountdown({
                 <span className="rc-logo-text">⚡</span>
               </div>
             </div>
-
-            {/* Brand */}
             <div className="rc-brand">RAYO<span>CERO</span></div>
             <div className="rc-event-name">{eventName}</div>
-
-            {/* Countdown */}
             <div className="rc-countdown-wrap">
               <div className="rc-label">La carrera inicia en</div>
               <ArcProgress seconds={seconds} total={totalSeconds} />
-              <div
-                className={`rc-number ${numClass}`}
-                key={seconds}
-              >
-                {seconds}
-              </div>
-              <div className="rc-seconds-label">
-                {seconds === 1 ? 'segundo' : 'segundos'}
-              </div>
+              <div className={`rc-number ${numClass}`} key={seconds}>{seconds}</div>
+              <div className="rc-seconds-label">{seconds === 1 ? 'segundo' : 'segundos'}</div>
             </div>
           </>
         ) : (
-          /* GO! */
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div className="rc-go">¡ARRANCA!</div>
             <div className="rc-go-sub">Da todo — es tu momento</div>
