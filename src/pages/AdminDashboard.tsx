@@ -12,7 +12,6 @@ import autoTable from 'jspdf-autotable';
 import { RaceForm } from '../components/admin/RaceForm';
 import { RouteConfig } from '../components/admin/RouteConfig';
 import { ResultsTable } from '../components/admin/ResultsTable';
-import PreRaceButton from '../components/Preracebutton';
 import logoPrincipal from '../assets/logo.png';
 import ModuloInscripcionAdmin from '../components/admin/ModuloInscripcionAdmin';
 
@@ -40,28 +39,18 @@ interface Runner {
 }
 
 const BUCKET = 'comprobantes-pago';
-const TELEMETRY_API = 'http://localhost:8090';
 
 const CATEGORY_ORDER: string[] = [
   'Movilidad Reducida',
-  'Juvenil Masculino',
-  'Juvenil Femenino',
-  'Libre Masculino',
-  'Libre Femenino',
-  'Sub Master (30-34) Masculino',
-  'Sub Master (30-34) Femenino',
-  'Sub Master (35-39) Masculino',
-  'Sub Master (35-39) Femenino',
-  'Master A Masculino',
-  'Master A Femenino',
-  'Master B Masculino',
-  'Master B Femenino',
-  'Master C Masculino',
-  'Master C Femenino',
-  'Master D Masculino',
-  'Master D Femenino',
-  'Absoluto Masculino',
-  'Absoluto Femenino',
+  'Juvenil Masculino', 'Juvenil Femenino',
+  'Libre Masculino', 'Libre Femenino',
+  'Sub Master (30-34) Masculino', 'Sub Master (30-34) Femenino',
+  'Sub Master (35-39) Masculino', 'Sub Master (35-39) Femenino',
+  'Master A Masculino', 'Master A Femenino',
+  'Master B Masculino', 'Master B Femenino',
+  'Master C Masculino', 'Master C Femenino',
+  'Master D Masculino', 'Master D Femenino',
+  'Absoluto Masculino', 'Absoluto Femenino',
 ];
 
 const getCategoryColor = (categoria: string): [number, number, number] => {
@@ -151,7 +140,6 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-
   const originalAddPage = doc.addPage.bind(doc);
   (doc as any).addPage = function(...args: any[]) {
     originalAddPage(...args);
@@ -159,40 +147,32 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
     this.rect(0, 0, pageW, pageH, 'F');
     return this;
   };
-
   doc.setFillColor(5, 5, 5);
   doc.rect(0, 0, pageW, pageH, 'F');
-
   const categoryCounts: Record<string, number> = {};
   atletas.forEach(a => {
     const cat = a.categoria || 'Sin categoría';
     categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
   });
-
   try {
     const img = new Image();
     img.src = logoPrincipal;
     doc.addImage(img, 'PNG', pageW / 2 - 20, 15, 40, 14);
   } catch {}
-
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(36);
   doc.setTextColor(34, 211, 238);
   doc.text('RAYOCERO', pageW / 2, 42, { align: 'center' });
-
   doc.setFontSize(12);
   doc.setTextColor(200, 200, 200);
   doc.text('NIGHT FEST · 06 JUN 2026 · 06:00 PM', pageW / 2, 50, { align: 'center' });
-
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.setTextColor(120, 120, 120);
   doc.text('Monumento al Sol, Barquisimeto · Valkyron Group', pageW / 2, 56, { align: 'center' });
-
   doc.setDrawColor(34, 211, 238);
   doc.setLineWidth(0.5);
   doc.line(20, 64, pageW - 20, 64);
-
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
   doc.setTextColor(255, 255, 255);
@@ -201,27 +181,22 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
     mode === 'specific' ? `CATEGORÍA: ${selectedCategories[0]?.toUpperCase() ?? ''}` :
     'LISTADO GENERAL DE ATLETAS';
   doc.text(reportTitle, pageW / 2, 75, { align: 'center' });
-
   const totalFiltered = atletas.filter(a => selectedCategories.includes(a.categoria || 'Sin categoría')).length;
   const pagadosFiltered = atletas.filter(a => selectedCategories.includes(a.categoria || 'Sin categoría') && a.pago_verificado).length;
-
   doc.setFontSize(9);
   doc.setTextColor(156, 163, 175);
   doc.text(`Total atletas en reporte: ${totalFiltered}`, 14, 85);
   doc.text(`Pagos verificados: ${pagadosFiltered}`, 14, 90);
   doc.text(`Generado: ${new Date().toLocaleString('es-VE')}`, pageW - 14, 85, { align: 'right' });
-
   let barY = 100;
   doc.setFontSize(9);
   doc.setTextColor(255, 255, 255);
   doc.text('DISTRIBUCIÓN POR CATEGORÍA', 14, barY - 4);
-
   const maxCount = Math.max(...Object.values(categoryCounts), 1);
   const barMaxWidth = pageW - 28 - 40;
   const categoriesForBars = CATEGORY_ORDER.filter(cat => categoryCounts[cat]);
   const otherCats = Object.keys(categoryCounts).filter(cat => !CATEGORY_ORDER.includes(cat));
   const allCatsForBars = [...categoriesForBars, ...otherCats];
-
   allCatsForBars.forEach((cat) => {
     const count = categoryCounts[cat] || 0;
     const barWidth = (count / maxCount) * barMaxWidth;
@@ -240,7 +215,6 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
     barY += 8;
     if (barY > pageH - 20) { doc.addPage(); barY = 20; }
   });
-
   const categoriesToRender = selectedCategories.filter(cat => CATEGORY_ORDER.includes(cat));
   selectedCategories.forEach(cat => {
     if (!CATEGORY_ORDER.includes(cat) && !categoriesToRender.includes(cat))
@@ -253,13 +227,11 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
     if (indexB === -1) return -1;
     return indexA - indexB;
   });
-
   categoriesToRender.forEach((categoria) => {
     const catAtletas = atletas
       .filter(a => (a.categoria || 'Sin categoría') === categoria)
       .sort((a, b) => Number(a.bib_number ?? 9999) - Number(b.bib_number ?? 9999));
     if (catAtletas.length === 0) return;
-
     doc.addPage();
     const [r, g, b] = getCategoryColor(categoria);
     doc.setFillColor(r, g, b);
@@ -270,7 +242,6 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
     doc.text(categoria.toUpperCase(), pageW / 2, 13, { align: 'center' });
     doc.setFontSize(9);
     doc.text(`${catAtletas.length} ATLETAS`, pageW - 14, 13, { align: 'right' });
-
     const rows = catAtletas.map((a, idx) => [
       String(idx + 1),
       a.bib_number ? `#${a.bib_number}` : '---',
@@ -281,26 +252,16 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
       a.pago_verificado ? '✓' : '—',
       a.kit_entregado ? '✓' : '—',
     ]);
-
     autoTable(doc, {
       startY: 25,
       head: [['#', 'Dorsal', 'Atleta', 'Cédula', 'Teléfono', 'Talla', 'Pago', 'Kit']],
       body: rows,
       theme: 'plain',
-      styles: {
-        fontSize: 8, cellPadding: 3,
-        textColor: [255, 255, 255],
-        lineColor: [40, 40, 40], lineWidth: 0.1,
-        fillColor: [5, 5, 5],
-      },
-      headStyles: {
-        fillColor: [r, g, b], textColor: [0, 0, 0],
-        fontStyle: 'bold', fontSize: 8,
-      },
+      styles: { fontSize: 8, cellPadding: 3, textColor: [255, 255, 255], lineColor: [40, 40, 40], lineWidth: 0.1, fillColor: [5, 5, 5] },
+      headStyles: { fillColor: [r, g, b], textColor: [0, 0, 0], fontStyle: 'bold', fontSize: 8 },
       alternateRowStyles: { fillColor: [15, 15, 15] },
     });
   });
-
   const totalPages = (doc.internal as any).getNumberOfPages?.() ?? 1;
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
@@ -308,7 +269,6 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
     doc.setTextColor(80, 80, 80);
     doc.text(`RAYOCERO · Valkyron Group · Pág ${i}/${totalPages}`, pageW / 2, pageH - 5, { align: 'center' });
   }
-
   const suffix = mode === 'general' ? 'GENERAL' : mode === 'specific' ? selectedCategories[0]?.replace(/\s+/g, '_').toUpperCase() : 'SEGMENTADO';
   doc.save(`RAYOCERO_${suffix}_${Date.now()}.pdf`);
 };
@@ -317,12 +277,10 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, onClose }) => 
   const [mode, setMode] = useState<PDFMode>('segmented');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
-
   const availableCategories = useMemo(() => {
     const cats = new Set(atletas.map(a => a.categoria || 'Sin categoría'));
     return CATEGORY_ORDER.filter(c => cats.has(c));
   }, [atletas]);
-
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
@@ -341,7 +299,6 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, onClose }) => 
       setIsGenerating(false);
     }
   };
-
   return createPortal(
     <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/90 p-4 backdrop-blur-md">
       <div className="bg-[#0a0a0a] border border-cyan-500/30 rounded-3xl p-8 max-w-lg w-full shadow-2xl animate-in zoom-in-95">
@@ -352,22 +309,14 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, onClose }) => 
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-white"><X size={20} /></button>
         </div>
-
         <div className="space-y-3 mb-6">
           {[
             { id: 'segmented' as PDFMode, label: 'Segmentado por categoría', desc: `Portada con barras + sección por cada categoría (${availableCategories.length} categorías, ${atletas.length} atletas)` },
             { id: 'specific' as PDFMode, label: 'Categoría específica', desc: 'Exporta solo una categoría seleccionada' },
             { id: 'general' as PDFMode, label: 'Lista general', desc: 'Todos los atletas en una sola tabla sin segmentar' },
           ].map(opt => (
-            <button
-              key={opt.id}
-              onClick={() => setMode(opt.id)}
-              className={`w-full text-left p-4 rounded-2xl border transition-all ${
-                mode === opt.id
-                  ? 'bg-cyan-500/10 border-cyan-500/40 text-white'
-                  : 'bg-white/[0.02] border-white/5 text-gray-400 hover:border-white/10'
-              }`}
-            >
+            <button key={opt.id} onClick={() => setMode(opt.id)}
+              className={`w-full text-left p-4 rounded-2xl border transition-all ${mode === opt.id ? 'bg-cyan-500/10 border-cyan-500/40 text-white' : 'bg-white/[0.02] border-white/5 text-gray-400 hover:border-white/10'}`}>
               <div className="flex items-center gap-3">
                 <div className={`w-3 h-3 rounded-full border-2 flex-shrink-0 ${mode === opt.id ? 'bg-cyan-400 border-cyan-400' : 'border-gray-600'}`} />
                 <div>
@@ -378,35 +327,23 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, onClose }) => 
             </button>
           ))}
         </div>
-
         {mode === 'specific' && (
           <div className="mb-6 animate-in slide-in-from-top-2">
             <label className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-2 block">Categoría</label>
             <div className="relative">
-              <select
-                value={selectedCategory}
-                onChange={e => setSelectedCategory(e.target.value)}
-                className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-white text-xs font-bold outline-none focus:border-cyan-500/50 appearance-none cursor-pointer"
-              >
+              <select value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)}
+                className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-3 text-white text-xs font-bold outline-none focus:border-cyan-500/50 appearance-none cursor-pointer">
                 <option value="">— Seleccionar —</option>
-                {availableCategories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
+                {availableCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
               </select>
               <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
             </div>
           </div>
         )}
-
         <div className="flex gap-3">
-          <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-white/5 font-bold hover:bg-white/10 transition-all text-xs uppercase">
-            Cancelar
-          </button>
-          <button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="flex-1 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase text-xs tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-          >
+          <button onClick={onClose} className="flex-1 py-3 rounded-xl bg-white/5 font-bold hover:bg-white/10 transition-all text-xs uppercase">Cancelar</button>
+          <button onClick={handleGenerate} disabled={isGenerating}
+            className="flex-1 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase text-xs tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2">
             {isGenerating ? <RefreshCw size={14} className="animate-spin" /> : <FileText size={14} />}
             {isGenerating ? 'Generando...' : 'Generar PDF'}
           </button>
@@ -432,23 +369,13 @@ const ModuloEntregaKits = () => {
   const searchRunner = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!bibInput) return;
-    setIsLoading(true);
-    setStatusMsg(null);
-    setActiveRunner(null);
-    const { data, error } = await supabase
-      .from('runners')
+    setIsLoading(true); setStatusMsg(null); setActiveRunner(null);
+    const { data, error } = await supabase.from('runners')
       .select('id, bib_number, nombre, apellido, cedula, categoria, rfid_epc, talla_camiseta')
-      .eq('bib_number', parseInt(bibInput, 10))
-      .single();
+      .eq('bib_number', parseInt(bibInput, 10)).single();
     setIsLoading(false);
-    if (error || !data) {
-      setStatusMsg({ text: `Objetivo DORSAL #${bibInput} no localizado en la base.`, type: 'error' });
-      return;
-    }
-    if (data.rfid_epc) {
-      setStatusMsg({ text: `ALERTA: El dorsal ${data.bib_number} ya posee el chip enlazado (${data.rfid_epc}).`, type: 'error' });
-      return;
-    }
+    if (error || !data) { setStatusMsg({ text: `Objetivo DORSAL #${bibInput} no localizado en la base.`, type: 'error' }); return; }
+    if (data.rfid_epc) { setStatusMsg({ text: `ALERTA: El dorsal ${data.bib_number} ya posee el chip enlazado (${data.rfid_epc}).`, type: 'error' }); return; }
     setActiveRunner(data as Runner);
     setStatusMsg({ text: 'Identidad confirmada. Proceda a escanear el chip RFID sobre el sensor HID.', type: 'info' });
     setTimeout(() => epcInputRef.current?.focus(), 100);
@@ -461,30 +388,17 @@ const ModuloEntregaKits = () => {
       setIsLoading(true);
       const { error } = await supabase.from('runners').update({ rfid_epc: epcInput }).eq('id', activeRunner.id);
       setIsLoading(false);
-      if (error) {
-        setStatusMsg({ text: `Falla de enlace: ${error.message}`, type: 'error' });
-        setEpcInput('');
-      } else {
-        setStatusMsg({ text: `APROVISIONAMIENTO EXITOSO: Chip asignado al Dorsal #${activeRunner.bib_number}`, type: 'success' });
-        setBibInput(''); setEpcInput(''); setActiveRunner(null);
-      }
+      if (error) { setStatusMsg({ text: `Falla de enlace: ${error.message}`, type: 'error' }); setEpcInput(''); }
+      else { setStatusMsg({ text: `APROVISIONAMIENTO EXITOSO: Chip asignado al Dorsal #${activeRunner.bib_number}`, type: 'success' }); setBibInput(''); setEpcInput(''); setActiveRunner(null); }
     }
   };
 
   return (
     <div className="max-w-4xl mx-auto bg-black/40 border border-cyan-500/20 rounded-2xl p-8 shadow-2xl relative overflow-hidden animate-in fade-in">
-      <div className="absolute top-0 right-0 bg-cyan-500/10 text-cyan-400 font-black text-xs px-4 py-2 rounded-bl-2xl border-b border-l border-cyan-500/20">
-        ENLACE RFID ACTIVO
-      </div>
-      <h3 className="text-xl font-black text-white uppercase italic tracking-widest flex items-center gap-3 mb-8">
-        <Package className="text-cyan-400" /> Centro de Aprovisionamiento
-      </h3>
+      <div className="absolute top-0 right-0 bg-cyan-500/10 text-cyan-400 font-black text-xs px-4 py-2 rounded-bl-2xl border-b border-l border-cyan-500/20">ENLACE RFID ACTIVO</div>
+      <h3 className="text-xl font-black text-white uppercase italic tracking-widest flex items-center gap-3 mb-8"><Package className="text-cyan-400" /> Centro de Aprovisionamiento</h3>
       {statusMsg && (
-        <div className={`p-4 mb-8 rounded-xl border backdrop-blur-md font-mono text-xs uppercase font-bold tracking-wider ${
-          statusMsg.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
-          statusMsg.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
-          'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
-        }`}>
+        <div className={`p-4 mb-8 rounded-xl border backdrop-blur-md font-mono text-xs uppercase font-bold tracking-wider ${statusMsg.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' : statusMsg.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'}`}>
           {statusMsg.type === 'success' && <CheckCircle size={16} className="inline mr-2 mb-1" />}
           {statusMsg.type === 'error' && <AlertTriangle size={16} className="inline mr-2 mb-1" />}
           {statusMsg.text}
@@ -493,24 +407,14 @@ const ModuloEntregaKits = () => {
       <form onSubmit={searchRunner} className="flex gap-4 mb-8">
         <div className="flex-1">
           <label className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-2 block">Número de Dorsal Físico</label>
-          <input
-            type="number"
-            value={bibInput}
-            onChange={e => setBibInput(e.target.value)}
-            disabled={activeRunner !== null}
+          <input type="number" value={bibInput} onChange={e => setBibInput(e.target.value)} disabled={activeRunner !== null}
             className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-2xl font-black text-white outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50"
-            placeholder="Ej: 0001"
-            autoFocus
-          />
+            placeholder="Ej: 0001" autoFocus />
         </div>
         <div className="flex items-end">
-          <button
-            type="submit"
-            disabled={!bibInput || isLoading || activeRunner !== null}
-            className="h-[64px] px-8 flex items-center justify-center gap-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-[0.2em] transition-all disabled:opacity-50"
-          >
-            {isLoading && !activeRunner ? <RefreshCw className="animate-spin" size={18} /> : <Search size={18} />}
-            Localizar
+          <button type="submit" disabled={!bibInput || isLoading || activeRunner !== null}
+            className="h-[64px] px-8 flex items-center justify-center gap-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-black uppercase tracking-[0.2em] transition-all disabled:opacity-50">
+            {isLoading && !activeRunner ? <RefreshCw className="animate-spin" size={18} /> : <Search size={18} />} Localizar
           </button>
         </div>
       </form>
@@ -537,25 +441,13 @@ const ModuloEntregaKits = () => {
             <label className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-4 flex items-center gap-2">
               <Scan size={14} /> Interceptación de Código EPC
             </label>
-            <input
-              ref={epcInputRef}
-              type="text"
-              value={epcInput}
-              onChange={e => setEpcInput(e.target.value)}
-              onKeyDown={handleEpcScan}
-              disabled={isLoading}
+            <input ref={epcInputRef} type="text" value={epcInput} onChange={e => setEpcInput(e.target.value)} onKeyDown={handleEpcScan} disabled={isLoading}
               className="w-full bg-transparent border-b-2 border-cyan-500/50 pb-2 text-center text-xl font-mono text-white outline-none focus:border-cyan-400 transition-colors placeholder-cyan-500/20"
-              placeholder="[ APROXIME EL CHIP AL LECTOR USB ]"
-            />
+              placeholder="[ APROXIME EL CHIP AL LECTOR USB ]" />
             <p className="text-center text-[9px] text-gray-500 uppercase mt-4 tracking-widest">El sensor ejecutará el enlace automáticamente al leer el tag.</p>
           </div>
           <div className="flex justify-end">
-            <button
-              onClick={() => { setActiveRunner(null); setBibInput(''); }}
-              className="text-[10px] uppercase font-black tracking-widest text-red-500 hover:text-red-400 transition-colors"
-            >
-              [ Abortar Secuencia ]
-            </button>
+            <button onClick={() => { setActiveRunner(null); setBibInput(''); }} className="text-[10px] uppercase font-black tracking-widest text-red-500 hover:text-red-400 transition-colors">[ Abortar Secuencia ]</button>
           </div>
         </div>
       )}
@@ -575,14 +467,10 @@ const ModuloChequeoKits = () => {
   const [stats, setStats] = useState({ total: 0, entregados: 0, pendientes: 0 });
   const bibInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
+  useEffect(() => { fetchStats(); }, []);
 
   const fetchStats = async () => {
-    const { data } = await supabase
-      .from('runners')
-      .select('kit_entregado');
+    const { data } = await supabase.from('runners').select('kit_entregado');
     if (data) {
       const entregados = data.filter(r => r.kit_entregado).length;
       setStats({ total: data.length, entregados, pendientes: data.length - entregados });
@@ -592,77 +480,42 @@ const ModuloChequeoKits = () => {
   const searchRunner = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!bibInput.trim()) return;
-    setIsLoading(true);
-    setStatusMsg(null);
-    setActiveRunner(null);
-
-    const { data, error } = await supabase
-      .from('runners')
+    setIsLoading(true); setStatusMsg(null); setActiveRunner(null);
+    const { data, error } = await supabase.from('runners')
       .select('id, bib_number, nombre, apellido, cedula, categoria, talla_camiseta, kit_entregado, pago_verificado')
-      .eq('bib_number', parseInt(bibInput, 10))
-      .single();
-
+      .eq('bib_number', parseInt(bibInput, 10)).single();
     setIsLoading(false);
-
-    if (error || !data) {
-      setStatusMsg({ text: `Dorsal #${bibInput} no encontrado.`, type: 'error' });
-      return;
-    }
-
+    if (error || !data) { setStatusMsg({ text: `Dorsal #${bibInput} no encontrado.`, type: 'error' }); return; }
     setActiveRunner(data as Runner);
-
-    if (data.kit_entregado) {
-      setStatusMsg({ text: `⚠️ ALERTA: El kit del Dorsal #${data.bib_number} ya fue entregado anteriormente.`, type: 'error' });
-    } else {
-      setStatusMsg({ text: `Atleta identificado. Confirme la entrega del kit.`, type: 'info' });
-    }
+    if (data.kit_entregado) setStatusMsg({ text: `⚠️ ALERTA: El kit del Dorsal #${data.bib_number} ya fue entregado anteriormente.`, type: 'error' });
+    else setStatusMsg({ text: `Atleta identificado. Confirme la entrega del kit.`, type: 'info' });
   };
 
   const confirmarEntrega = async () => {
     if (!activeRunner) return;
     setIsLoading(true);
-    const { error } = await supabase
-      .from('runners')
-      .update({ kit_entregado: true })
-      .eq('id', activeRunner.id);
+    const { error } = await supabase.from('runners').update({ kit_entregado: true }).eq('id', activeRunner.id);
     setIsLoading(false);
-
-    if (error) {
-      setStatusMsg({ text: `Error: ${error.message}`, type: 'error' });
-    } else {
+    if (error) { setStatusMsg({ text: `Error: ${error.message}`, type: 'error' }); }
+    else {
       setStatusMsg({ text: `✅ KIT ENTREGADO — Dorsal #${activeRunner.bib_number} · ${activeRunner.nombre} ${activeRunner.apellido}`, type: 'success' });
-      setActiveRunner(null);
-      setBibInput('');
-      fetchStats();
-      setTimeout(() => {
-        setStatusMsg(null);
-        bibInputRef.current?.focus();
-      }, 2500);
+      setActiveRunner(null); setBibInput(''); fetchStats();
+      setTimeout(() => { setStatusMsg(null); bibInputRef.current?.focus(); }, 2500);
     }
   };
 
   const deshacerEntrega = async () => {
     if (!activeRunner) return;
     setIsLoading(true);
-    const { error } = await supabase
-      .from('runners')
-      .update({ kit_entregado: false })
-      .eq('id', activeRunner.id);
+    const { error } = await supabase.from('runners').update({ kit_entregado: false }).eq('id', activeRunner.id);
     setIsLoading(false);
-    if (!error) {
-      setStatusMsg({ text: `Entrega revertida para Dorsal #${activeRunner.bib_number}`, type: 'info' });
-      setActiveRunner(null);
-      setBibInput('');
-      fetchStats();
-    }
+    if (!error) { setStatusMsg({ text: `Entrega revertida para Dorsal #${activeRunner.bib_number}`, type: 'info' }); setActiveRunner(null); setBibInput(''); fetchStats(); }
   };
 
   const pct = stats.total > 0 ? Math.round((stats.entregados / stats.total) * 100) : 0;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in">
-
-      {/* ── Stats bar ── */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-black/40 border border-white/10 rounded-2xl p-6 text-center">
           <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-1">Total</p>
@@ -677,66 +530,37 @@ const ModuloChequeoKits = () => {
           <p className="text-4xl font-black italic text-yellow-400">{stats.pendientes}</p>
         </div>
       </div>
-
-      {/* ── Barra de progreso ── */}
       <div className="bg-black/40 border border-white/10 rounded-2xl p-6">
         <div className="flex justify-between items-center mb-3">
           <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest">Progreso de Entrega</p>
           <p className="text-lg font-black italic text-white">{pct}%</p>
         </div>
         <div className="h-3 bg-white/5 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-cyan-500 to-green-400 rounded-full transition-all duration-700"
-            style={{ width: `${pct}%` }}
-          />
+          <div className="h-full bg-gradient-to-r from-cyan-500 to-green-400 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
         </div>
       </div>
-
-      {/* ── Búsqueda ── */}
       <div className="bg-black/40 border border-amber-500/20 rounded-2xl p-8 relative overflow-hidden">
-        <div className="absolute top-0 right-0 bg-amber-500/10 text-amber-400 font-black text-xs px-4 py-2 rounded-bl-2xl border-b border-l border-amber-500/20">
-          CHEQUEO DE KITS
-        </div>
-        <h3 className="text-xl font-black text-white uppercase italic tracking-widest flex items-center gap-3 mb-8">
-          <Gift className="text-amber-400" /> Entrega de Kit
-        </h3>
-
+        <div className="absolute top-0 right-0 bg-amber-500/10 text-amber-400 font-black text-xs px-4 py-2 rounded-bl-2xl border-b border-l border-amber-500/20">CHEQUEO DE KITS</div>
+        <h3 className="text-xl font-black text-white uppercase italic tracking-widest flex items-center gap-3 mb-8"><Gift className="text-amber-400" /> Entrega de Kit</h3>
         {statusMsg && (
-          <div className={`p-4 mb-6 rounded-xl border font-mono text-xs uppercase font-bold tracking-wider ${
-            statusMsg.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
-            statusMsg.type === 'error'   ? 'bg-red-500/10 border-red-500/30 text-red-400' :
-            'bg-amber-500/10 border-amber-500/30 text-amber-400'
-          }`}>
+          <div className={`p-4 mb-6 rounded-xl border font-mono text-xs uppercase font-bold tracking-wider ${statusMsg.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' : statusMsg.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-400'}`}>
             {statusMsg.text}
           </div>
         )}
-
         <form onSubmit={searchRunner} className="flex gap-4 mb-6">
           <div className="flex-1">
             <label className="text-[10px] text-amber-400 font-black uppercase tracking-widest mb-2 block">Número de Dorsal</label>
-            <input
-              ref={bibInputRef}
-              type="number"
-              value={bibInput}
-              onChange={e => setBibInput(e.target.value)}
+            <input ref={bibInputRef} type="number" value={bibInput} onChange={e => setBibInput(e.target.value)}
               className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-2xl font-black text-white outline-none focus:border-amber-500/50 transition-colors"
-              placeholder="Ej: 0001"
-              autoFocus
-            />
+              placeholder="Ej: 0001" autoFocus />
           </div>
           <div className="flex items-end">
-            <button
-              type="submit"
-              disabled={!bibInput.trim() || isLoading}
-              className="h-[64px] px-8 flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-[0.2em] transition-all disabled:opacity-50"
-            >
-              {isLoading ? <RefreshCw className="animate-spin" size={18} /> : <Search size={18} />}
-              Buscar
+            <button type="submit" disabled={!bibInput.trim() || isLoading}
+              className="h-[64px] px-8 flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-[0.2em] transition-all disabled:opacity-50">
+              {isLoading ? <RefreshCw className="animate-spin" size={18} /> : <Search size={18} />} Buscar
             </button>
           </div>
         </form>
-
-        {/* ── Runner card ── */}
         {activeRunner && (
           <div className="border-t border-white/10 pt-6 space-y-4 animate-in slide-in-from-bottom-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -745,14 +569,8 @@ const ModuloChequeoKits = () => {
                 <p className="text-2xl font-black text-white uppercase">{activeRunner.nombre} {activeRunner.apellido}</p>
                 <div className="flex items-center gap-3 mt-2">
                   <span className="text-xs text-cyan-400 font-mono">V-{activeRunner.cedula}</span>
-                  <span className="text-[8px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded font-black uppercase">
-                    {activeRunner.categoria || 'SIN CAT'}
-                  </span>
-                  {activeRunner.pago_verificado && (
-                    <span className="text-[8px] bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 rounded font-black uppercase flex items-center gap-1">
-                      <ShieldCheck size={10} /> PAGO OK
-                    </span>
-                  )}
+                  <span className="text-[8px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded font-black uppercase">{activeRunner.categoria || 'SIN CAT'}</span>
+                  {activeRunner.pago_verificado && <span className="text-[8px] bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 rounded font-black uppercase flex items-center gap-1"><ShieldCheck size={10} /> PAGO OK</span>}
                 </div>
               </div>
               <div className="bg-white/[0.02] border border-white/5 p-5 rounded-xl flex flex-col items-center justify-center">
@@ -760,37 +578,19 @@ const ModuloChequeoKits = () => {
                 <p className="text-4xl font-black italic text-amber-400">{activeRunner.talla_camiseta || 'N/A'}</p>
               </div>
             </div>
-
             <div className="flex gap-3">
               {!activeRunner.kit_entregado ? (
-                <button
-                  onClick={confirmarEntrega}
-                  disabled={isLoading}
-                  className="flex-1 py-4 rounded-xl bg-green-500 hover:bg-green-400 text-black font-black uppercase text-sm tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-3"
-                >
-                  {isLoading ? <RefreshCw size={18} className="animate-spin" /> : <CheckCircle size={18} />}
-                  Confirmar Entrega de Kit
+                <button onClick={confirmarEntrega} disabled={isLoading}
+                  className="flex-1 py-4 rounded-xl bg-green-500 hover:bg-green-400 text-black font-black uppercase text-sm tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-3">
+                  {isLoading ? <RefreshCw size={18} className="animate-spin" /> : <CheckCircle size={18} />} Confirmar Entrega de Kit
                 </button>
               ) : (
                 <>
-                  <div className="flex-1 py-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3">
-                    <CheckCircle size={18} /> Kit Ya Entregado
-                  </div>
-                  <button
-                    onClick={deshacerEntrega}
-                    disabled={isLoading}
-                    className="px-6 py-4 rounded-xl bg-white/5 hover:bg-red-500/10 text-red-400 border border-red-500/20 font-black uppercase text-xs tracking-widest transition-all"
-                  >
-                    Revertir
-                  </button>
+                  <div className="flex-1 py-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 font-black uppercase text-sm tracking-widest flex items-center justify-center gap-3"><CheckCircle size={18} /> Kit Ya Entregado</div>
+                  <button onClick={deshacerEntrega} disabled={isLoading} className="px-6 py-4 rounded-xl bg-white/5 hover:bg-red-500/10 text-red-400 border border-red-500/20 font-black uppercase text-xs tracking-widest transition-all">Revertir</button>
                 </>
               )}
-              <button
-                onClick={() => { setActiveRunner(null); setBibInput(''); setStatusMsg(null); }}
-                className="px-6 py-4 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 font-black uppercase text-xs tracking-widest transition-all"
-              >
-                Cancelar
-              </button>
+              <button onClick={() => { setActiveRunner(null); setBibInput(''); setStatusMsg(null); }} className="px-6 py-4 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 font-black uppercase text-xs tracking-widest transition-all">Cancelar</button>
             </div>
           </div>
         )}
@@ -821,77 +621,53 @@ const TasaConfig = () => {
       const { data, error } = await supabase.from('system_config').select('*').eq('id', 1).single();
       if (error) throw error;
       if (data) {
-        setTasaActual(data.tasa_bcv);
-        setNuevaTasa(String(data.tasa_bcv));
-        setCostoUSDActual(data.costo_usd || 40);
-        setNuevoCostoUSD(String(data.costo_usd || 40));
+        setTasaActual(data.tasa_bcv); setNuevaTasa(String(data.tasa_bcv));
+        setCostoUSDActual(data.costo_usd || 40); setNuevoCostoUSD(String(data.costo_usd || 40));
         setUltimaActualizacion(new Date(data.ultima_actualizacion).toLocaleString('es-VE'));
       }
     } catch (err) { console.error(err); } finally { setIsLoading(false); }
   };
 
   const handleUpdateProtocol = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
+    e.preventDefault(); setIsSaving(true);
     try {
       const parsedTasa = parseFloat(nuevaTasa.replace(',', '.'));
       const parsedCosto = parseFloat(nuevoCostoUSD.replace(',', '.'));
-      const { error } = await supabase.from('system_config').update({
-        tasa_bcv: parsedTasa, costo_usd: parsedCosto, ultima_actualizacion: new Date().toISOString()
-      }).eq('id', 1);
+      const { error } = await supabase.from('system_config').update({ tasa_bcv: parsedTasa, costo_usd: parsedCosto, ultima_actualizacion: new Date().toISOString() }).eq('id', 1);
       if (error) throw error;
-      await fetchConfig();
-      setSuccessMsg(true);
-      setTimeout(() => setSuccessMsg(false), 3000);
+      await fetchConfig(); setSuccessMsg(true); setTimeout(() => setSuccessMsg(false), 3000);
     } catch (err: any) { alert(err.message); } finally { setIsSaving(false); }
   };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
       <div className="bg-black/40 border border-cyan-500/20 rounded-2xl p-8">
-        <h4 className="text-sm font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
-          <Settings size={18} className="text-cyan-400" /> Parámetros Financieros
-        </h4>
+        <h4 className="text-sm font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2"><Settings size={18} className="text-cyan-400" /> Parámetros Financieros</h4>
         <form onSubmit={handleUpdateProtocol} className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="tasa_bcv_input" className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-2 block">Tasa BCV</label>
-              <input id="tasa_bcv_input" name="tasa_bcv" type="text" value={nuevaTasa} onChange={e => setNuevaTasa(e.target.value)}
-                className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-cyan-500/50 transition-colors" />
+              <input id="tasa_bcv_input" name="tasa_bcv" type="text" value={nuevaTasa} onChange={e => setNuevaTasa(e.target.value)} className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-cyan-500/50 transition-colors" />
             </div>
             <div>
               <label htmlFor="costo_usd_input" className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-2 block">Inscripción USD</label>
-              <input id="costo_usd_input" name="costo_usd" type="text" value={nuevoCostoUSD} onChange={e => setNuevoCostoUSD(e.target.value)}
-                className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-cyan-500/50 transition-colors" />
+              <input id="costo_usd_input" name="costo_usd" type="text" value={nuevoCostoUSD} onChange={e => setNuevoCostoUSD(e.target.value)} className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-cyan-500/50 transition-colors" />
             </div>
           </div>
-          <button type="submit" disabled={isSaving || isLoading}
-            className="w-full flex items-center justify-center gap-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black px-6 py-4 text-xs font-black uppercase tracking-[0.2em] transition-all">
+          <button type="submit" disabled={isSaving || isLoading} className="w-full flex items-center justify-center gap-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black px-6 py-4 text-xs font-black uppercase tracking-[0.2em] transition-all">
             {isSaving ? <RefreshCw className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />}
             {isSaving ? 'ACTUALIZANDO...' : 'SINCRONIZAR'}
           </button>
-          {successMsg && (
-            <div className="flex items-center justify-center gap-2 text-green-400 animate-pulse">
-              <CheckCircle size={16} /> <span className="text-[10px] uppercase font-bold">Sincronización Exitosa</span>
-            </div>
-          )}
+          {successMsg && <div className="flex items-center justify-center gap-2 text-green-400 animate-pulse"><CheckCircle size={16} /> <span className="text-[10px] uppercase font-bold">Sincronización Exitosa</span></div>}
         </form>
       </div>
       <div className="bg-cyan-500/5 border border-cyan-500/20 rounded-2xl p-8 flex flex-col justify-center">
-        {isLoading ? (
-          <div className="flex justify-center"><Activity size={48} className="animate-pulse text-cyan-500" /></div>
-        ) : (
+        {isLoading ? <div className="flex justify-center"><Activity size={48} className="animate-pulse text-cyan-500" /></div> : (
           <div className="space-y-4">
             <div className="flex justify-around items-center">
-              <div>
-                <p className="text-[8px] text-gray-500 uppercase">Tasa</p>
-                <div className="text-4xl font-black italic text-white">{tasaActual?.toFixed(2)}</div>
-              </div>
+              <div><p className="text-[8px] text-gray-500 uppercase">Tasa</p><div className="text-4xl font-black italic text-white">{tasaActual?.toFixed(2)}</div></div>
               <div className="h-12 w-[1px] bg-white/10" />
-              <div>
-                <p className="text-[8px] text-gray-500 uppercase">Inscripción</p>
-                <div className="text-4xl font-black italic text-cyan-400">${costoUSDActual}</div>
-              </div>
+              <div><p className="text-[8px] text-gray-500 uppercase">Inscripción</p><div className="text-4xl font-black italic text-cyan-400">${costoUSDActual}</div></div>
             </div>
             <div className="text-[10px] text-cyan-400 font-mono text-center">{ultimaActualizacion}</div>
           </div>
@@ -956,9 +732,7 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
   const handleDeleteAthlete = async () => {
     if (!athleteToDelete || isDeleting) return;
     setIsDeleting(true);
-    const targetId = athleteToDelete.id;
-    const targetCedula = athleteToDelete.cedula;
-    const targetBib = athleteToDelete.bib_number;
+    const targetId = athleteToDelete.id; const targetCedula = athleteToDelete.cedula; const targetBib = athleteToDelete.bib_number;
     try {
       await Promise.all([
         supabase.from('race_results').delete().eq('cedula_runner', targetCedula),
@@ -980,10 +754,7 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
   };
 
   const inspectComprobante = async (atleta: Runner) => {
-    setSelectedAtleta(atleta);
-    setComprobanteUrl(null);
-    setImgLoading(true);
-    setStatusMsg('Escaneando Hangar...');
+    setSelectedAtleta(atleta); setComprobanteUrl(null); setImgLoading(true); setStatusMsg('Escaneando Hangar...');
     try {
       const url = await getComprobantePublicUrl(atleta.cedula, atleta.referencia_pago, atleta.comprobante_url || atleta.comprobante_path);
       if (!url) setStatusMsg(`Archivo no detectado — V-${atleta.cedula}`);
@@ -991,11 +762,9 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
     } catch { setStatusMsg('Error de enlace visual'); } finally { setImgLoading(false); }
   };
 
-  const filteredAtletas = useMemo(() => {
-    return atletas.filter(a =>
-      `${a.nombre} ${a.apellido} ${a.cedula} ${a.categoria || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [atletas, searchTerm]);
+  const filteredAtletas = useMemo(() => atletas.filter(a =>
+    `${a.nombre} ${a.apellido} ${a.cedula} ${a.categoria || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
+  ), [atletas, searchTerm]);
 
   const kitsEntregados = atletas.filter(a => a.kit_entregado).length;
 
@@ -1004,29 +773,18 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
       <div className="bg-black/40 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
         <div className="p-6 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowPDFModal(true)}
-              className="px-4 py-2 rounded-lg bg-white/5 text-cyan-400 border border-cyan-400/20 hover:bg-cyan-400 hover:text-black flex items-center gap-2 text-[10px] uppercase font-black transition-all"
-            >
+            <button onClick={() => setShowPDFModal(true)} className="px-4 py-2 rounded-lg bg-white/5 text-cyan-400 border border-cyan-400/20 hover:bg-cyan-400 hover:text-black flex items-center gap-2 text-[10px] uppercase font-black transition-all">
               <FileText size={14} /> Exportar PDF
             </button>
-            {/* ── Indicador kits ── */}
             <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
               <Gift size={14} className="text-amber-400" />
-              <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">
-                Kits: {kitsEntregados}/{atletas.length}
-              </span>
+              <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">Kits: {kitsEntregados}/{atletas.length}</span>
             </div>
           </div>
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-            <input
-              id="filter_atletas" name="filter_atletas" type="text"
-              placeholder="Filtrar base..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-10 pr-4 text-[10px] uppercase font-bold outline-none focus:border-cyan-500/30 transition-all"
-            />
+            <input id="filter_atletas" name="filter_atletas" type="text" placeholder="Filtrar base..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-10 pr-4 text-[10px] uppercase font-bold outline-none focus:border-cyan-500/30 transition-all" />
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -1053,21 +811,11 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-[9px] text-gray-500 font-mono">V-{a.cedula}</span>
-                      <span className="text-[8px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                        {a.categoria || 'SIN CAT'}
-                      </span>
+                      <span className="text-[8px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">{a.categoria || 'SIN CAT'}</span>
                     </div>
                   </td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2 text-cyan-400 text-[10px] font-mono">
-                      <Phone size={12} /> {a.telefono || 'SIN_TLF'}
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded border border-white/10 text-white">
-                      {a.talla_camiseta || 'N/A'}
-                    </span>
-                  </td>
+                  <td className="p-4"><div className="flex items-center gap-2 text-cyan-400 text-[10px] font-mono"><Phone size={12} /> {a.telefono || 'SIN_TLF'}</div></td>
+                  <td className="p-4"><span className="text-xs font-mono bg-white/5 px-2 py-1 rounded border border-white/10 text-white">{a.talla_camiseta || 'N/A'}</span></td>
                   <td className="p-4">
                     <div className="flex flex-col">
                       <span className="font-bold text-white">{a.bib_number ? `#${a.bib_number}` : <Clock size={14} className="text-yellow-500/50" />}</span>
@@ -1076,29 +824,17 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
                   </td>
                   <td className="p-4">
                     <div className="flex items-center justify-center gap-2">
-                      <button onClick={() => inspectComprobante(a)} className="p-2 rounded-lg bg-white/5 hover:bg-cyan-500 hover:text-black transition-all" title="Ver comprobante">
-                        <Eye size={16} />
-                      </button>
-                      <button
-                        onClick={() => toggleVerificacionPago(a.id, a.pago_verificado)}
-                        disabled={isTogglingPayment === a.id}
-                        className={`p-2 rounded-lg transition-all border ${a.pago_verificado ? 'bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500 hover:text-black' : 'bg-white/5 text-gray-500 border-transparent hover:bg-white/10 hover:text-white'}`}
-                        title="Verificar pago"
-                      >
+                      <button onClick={() => inspectComprobante(a)} className="p-2 rounded-lg bg-white/5 hover:bg-cyan-500 hover:text-black transition-all" title="Ver comprobante"><Eye size={16} /></button>
+                      <button onClick={() => toggleVerificacionPago(a.id, a.pago_verificado)} disabled={isTogglingPayment === a.id}
+                        className={`p-2 rounded-lg transition-all border ${a.pago_verificado ? 'bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500 hover:text-black' : 'bg-white/5 text-gray-500 border-transparent hover:bg-white/10 hover:text-white'}`} title="Verificar pago">
                         {isTogglingPayment === a.id ? <RefreshCw size={16} className="animate-spin" /> : <CheckSquare size={16} />}
                       </button>
-                      {/* ── Botón Kit ── */}
-                      <button
-                        onClick={() => toggleKitEntregado(a.id, a.kit_entregado)}
-                        disabled={isTogglingKit === a.id}
+                      <button onClick={() => toggleKitEntregado(a.id, a.kit_entregado)} disabled={isTogglingKit === a.id}
                         className={`p-2 rounded-lg transition-all border ${a.kit_entregado ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500 hover:text-black' : 'bg-white/5 text-gray-500 border-transparent hover:bg-amber-500/20 hover:text-amber-400'}`}
-                        title={a.kit_entregado ? 'Kit entregado — click para revertir' : 'Marcar kit entregado'}
-                      >
+                        title={a.kit_entregado ? 'Kit entregado — click para revertir' : 'Marcar kit entregado'}>
                         {isTogglingKit === a.id ? <RefreshCw size={16} className="animate-spin" /> : <Gift size={16} />}
                       </button>
-                      <button onClick={() => setAthleteToDelete(a)} className="p-2 rounded-lg bg-white/5 hover:bg-red-500 hover:text-black text-red-500 transition-all" title="Eliminar">
-                        <Trash2 size={16} />
-                      </button>
+                      <button onClick={() => setAthleteToDelete(a)} className="p-2 rounded-lg bg-white/5 hover:bg-red-500 hover:text-black text-red-500 transition-all" title="Eliminar"><Trash2 size={16} /></button>
                     </div>
                   </td>
                 </tr>
@@ -1114,13 +850,9 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
         <div onClick={() => setSelectedAtleta(null)} className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/95 p-4 backdrop-blur-sm">
           <div onClick={e => e.stopPropagation()} className="bg-[#0a0f14] border border-cyan-400/20 rounded-3xl w-full max-w-6xl overflow-hidden flex flex-col md:flex-row shadow-2xl animate-in zoom-in-95">
             <div className="flex-1 bg-black flex items-center justify-center p-4 min-h-[400px]">
-              {imgLoading ? (
-                <div className="text-center"><RefreshCw className="animate-spin text-cyan-400 mb-4" size={40} /><p className="text-cyan-400 text-xs uppercase">Enlazando Hangar...</p></div>
-              ) : comprobanteUrl ? (
-                <img src={comprobanteUrl} alt="comprobante" className="max-h-[80vh] object-contain shadow-2xl" />
-              ) : (
-                <div className="text-center"><ShieldAlert size={60} className="text-gray-700 mb-4" /><p className="text-gray-500 text-xs uppercase">{statusMsg}</p></div>
-              )}
+              {imgLoading ? <div className="text-center"><RefreshCw className="animate-spin text-cyan-400 mb-4" size={40} /><p className="text-cyan-400 text-xs uppercase">Enlazando Hangar...</p></div>
+                : comprobanteUrl ? <img src={comprobanteUrl} alt="comprobante" className="max-h-[80vh] object-contain shadow-2xl" />
+                : <div className="text-center"><ShieldAlert size={60} className="text-gray-700 mb-4" /><p className="text-gray-500 text-xs uppercase">{statusMsg}</p></div>}
             </div>
             <div className="w-full md:w-[350px] bg-[#0d1319] border-l border-white/5 p-8 flex flex-col">
               <div className="flex justify-between items-start mb-6">
@@ -1130,37 +862,22 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
               <div className="space-y-4">
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5">
                   <p className="text-gray-500 text-[9px] uppercase">Unidad</p>
-                  <p className="text-white font-black text-sm uppercase flex justify-between items-center">
-                    {selectedAtleta.nombre} {selectedAtleta.apellido}
-                    {selectedAtleta.pago_verificado && <ShieldCheck size={14} className="text-green-500" />}
-                  </p>
+                  <p className="text-white font-black text-sm uppercase flex justify-between items-center">{selectedAtleta.nombre} {selectedAtleta.apellido}{selectedAtleta.pago_verificado && <ShieldCheck size={14} className="text-green-500" />}</p>
                   <p className="text-cyan-400 font-mono text-xs">V-{selectedAtleta.cedula}</p>
                 </div>
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Categoría Asignada</p><p className="text-cyan-400 font-black uppercase tracking-wider">{selectedAtleta.categoria || 'SIN ASIGNAR'}</p></div>
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Teléfono</p><p className="text-white font-mono">{selectedAtleta.telefono || 'SIN REGISTRO'}</p></div>
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Talla Reservada</p><p className="text-white font-mono uppercase">{selectedAtleta.talla_camiseta || 'NO ESPECIFICADA'}</p></div>
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Referencia</p><p className="text-green-400 font-mono break-all">{selectedAtleta.referencia_pago || 'PENDIENTE'}</p></div>
-                {/* Kit status en modal */}
                 <div className={`p-4 rounded-xl border flex items-center justify-between ${selectedAtleta.kit_entregado ? 'bg-amber-500/10 border-amber-500/30' : 'bg-white/[0.03] border-white/5'}`}>
-                  <div>
-                    <p className="text-gray-500 text-[9px] uppercase">Kit</p>
-                    <p className={`font-black text-sm uppercase ${selectedAtleta.kit_entregado ? 'text-amber-400' : 'text-gray-500'}`}>
-                      {selectedAtleta.kit_entregado ? 'Entregado ✓' : 'Pendiente'}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => toggleKitEntregado(selectedAtleta.id, selectedAtleta.kit_entregado)}
-                    disabled={isTogglingKit === selectedAtleta.id}
-                    className={`p-2 rounded-lg transition-all ${selectedAtleta.kit_entregado ? 'bg-amber-500/20 text-amber-400' : 'bg-white/5 text-gray-500 hover:text-amber-400'}`}
-                  >
+                  <div><p className="text-gray-500 text-[9px] uppercase">Kit</p><p className={`font-black text-sm uppercase ${selectedAtleta.kit_entregado ? 'text-amber-400' : 'text-gray-500'}`}>{selectedAtleta.kit_entregado ? 'Entregado ✓' : 'Pendiente'}</p></div>
+                  <button onClick={() => toggleKitEntregado(selectedAtleta.id, selectedAtleta.kit_entregado)} disabled={isTogglingKit === selectedAtleta.id}
+                    className={`p-2 rounded-lg transition-all ${selectedAtleta.kit_entregado ? 'bg-amber-500/20 text-amber-400' : 'bg-white/5 text-gray-500 hover:text-amber-400'}`}>
                     {isTogglingKit === selectedAtleta.id ? <RefreshCw size={14} className="animate-spin" /> : <Gift size={14} />}
                   </button>
                 </div>
-                <button
-                  onClick={() => toggleVerificacionPago(selectedAtleta.id, selectedAtleta.pago_verificado)}
-                  disabled={isTogglingPayment === selectedAtleta.id}
-                  className={`w-full py-3 rounded-xl flex items-center justify-center gap-2 text-xs font-black uppercase transition-all ${selectedAtleta.pago_verificado ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-cyan-500 hover:bg-cyan-400 text-black'}`}
-                >
+                <button onClick={() => toggleVerificacionPago(selectedAtleta.id, selectedAtleta.pago_verificado)} disabled={isTogglingPayment === selectedAtleta.id}
+                  className={`w-full py-3 rounded-xl flex items-center justify-center gap-2 text-xs font-black uppercase transition-all ${selectedAtleta.pago_verificado ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-cyan-500 hover:bg-cyan-400 text-black'}`}>
                   {isTogglingPayment === selectedAtleta.id ? <RefreshCw size={14} className="animate-spin" /> : selectedAtleta.pago_verificado ? <><CheckCircle size={14} /> PAGO VALIDADO</> : <><ShieldCheck size={14} /> APROBAR PAGO</>}
                 </button>
               </div>
@@ -1207,16 +924,14 @@ const EscuadronesList = () => {
         if (teamsError) throw teamsError;
         if (!teamsData || teamsData.length === 0) { setEquipos([]); return; }
         const runnerIds = [...new Set(teamsData.flatMap(t => [t.runner_m1_id, t.runner_m2_id, t.runner_f1_id, t.runner_f2_id]).filter(Boolean))];
-        const { data: runnersData, error: runnersError } = await supabase
-          .from('runners')
+        const { data: runnersData, error: runnersError } = await supabase.from('runners')
           .select(`id, nombre, apellido, bib_number, telefono, talla_camiseta, categoria, race_results:race_results!race_results_bib_number_fkey ( tiempo_chip )`)
           .in('id', runnerIds);
         if (runnersError) throw runnersError;
         const runnersMap = new Map(runnersData?.map(r => [r.id, r]));
         const processedTeams = teamsData.map(team => {
           const membersIds = [team.runner_m1_id, team.runner_m2_id, team.runner_f1_id, team.runner_f2_id];
-          let totalSeconds = 0;
-          let allFinished = true;
+          let totalSeconds = 0; let allFinished = true;
           const detailedMembers = membersIds.map(id => {
             const memberData = runnersMap.get(id);
             if (!memberData) return null;
@@ -1279,298 +994,464 @@ const EscuadronesList = () => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* TELEMETRÍA RFID                                                */
+/* PRE-RACE OVERLAY — Countdown fullscreen 60s                   */
 /* ────────────────────────────────────────────────────────────── */
 
-interface SystemStatus {
-  llrp_connected: boolean;
-  reader_host: string;
-  antennas: number[];
-  runners_with_chip: number;
-  race_started: boolean;
-  race_start_time: string | null;
-  demo_mode: boolean;
-}
+const PreRaceOverlay: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const [seconds, setSeconds] = useState(60);
+  const [fired, setFired] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-interface CrossingEvent {
-  type: 'start' | 'finish' | 'race_start' | 'connected';
-  bib?: number;
-  nombre?: string;
-  categoria?: string;
-  time?: string;
-  elapsed_seconds?: number;
-  elapsed_str?: string;
-  epc?: string;
-}
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      setSeconds(prev => {
+        if (prev <= 1) {
+          clearInterval(intervalRef.current!);
+          setFired(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, []);
 
-interface RaceResult {
-  position: number;
-  bib_number: number;
-  nombre: string;
-  apellido: string;
-  categoria: string;
-  genero: string;
-  finish_time_seconds: number;
-  finish_time_str: string;
-}
+  // Color transition: green → yellow → red as countdown approaches 0
+  const pct = seconds / 60;
+  const r = pct > 0.5 ? Math.round((1 - pct) * 2 * 255) : 255;
+  const g = pct > 0.5 ? 255 : Math.round(pct * 2 * 255);
+  const color = `rgb(${r},${g},0)`;
+  const glowColor = `rgba(${r},${g},0,0.35)`;
+
+  // Arc progress
+  const radius = 140;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - seconds / 60);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[9999999] flex flex-col items-center justify-center"
+      style={{ background: fired ? 'rgba(0,255,80,0.08)' : 'rgba(0,0,0,0.96)', backdropFilter: 'blur(8px)', transition: 'background 0.4s' }}
+    >
+      {/* Ambient glow pulse */}
+      <div className="absolute inset-0 pointer-events-none" style={{
+        background: `radial-gradient(ellipse at center, ${glowColor} 0%, transparent 65%)`,
+        animation: seconds <= 10 && !fired ? 'prerace-pulse 0.5s ease infinite' : undefined,
+      }} />
+
+      <style>{`
+        @keyframes prerace-pulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
+        @keyframes gun-flash { 0%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(3)} }
+        @keyframes fired-bounce { 0%{transform:scale(0.7);opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1);opacity:1} }
+      `}</style>
+
+      {!fired ? (
+        <>
+          {/* Label */}
+          <p className="text-white/40 text-xs font-black uppercase tracking-[0.5em] mb-12 relative z-10">
+            PRE-CARRERA · ALERTA ATLETAS
+          </p>
+
+          {/* Circular countdown */}
+          <div className="relative flex items-center justify-center mb-12">
+            <svg width="320" height="320" style={{ transform: 'rotate(-90deg)' }}>
+              {/* Track */}
+              <circle cx="160" cy="160" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
+              {/* Progress arc */}
+              <circle
+                cx="160" cy="160" r={radius}
+                fill="none"
+                stroke={color}
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={dashOffset}
+                style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.5s ease', filter: `drop-shadow(0 0 12px ${color})` }}
+              />
+            </svg>
+            {/* Number */}
+            <div className="absolute flex flex-col items-center" style={{ transform: 'rotate(0deg)' }}>
+              <span
+                className="font-black tabular-nums leading-none"
+                style={{
+                  fontSize: '9rem',
+                  color,
+                  textShadow: `0 0 40px ${color}, 0 0 80px ${glowColor}`,
+                  fontFamily: 'Barlow Condensed, sans-serif',
+                  fontStyle: 'italic',
+                  transition: 'color 0.5s ease',
+                }}
+              >
+                {seconds}
+              </span>
+              <span className="text-white/30 text-xs font-black uppercase tracking-[0.4em] mt-1">SEGUNDOS</span>
+            </div>
+          </div>
+
+          {/* Urgency bars when ≤10s */}
+          {seconds <= 10 && (
+            <div className="flex gap-2 mb-8">
+              {Array.from({ length: seconds }).map((_, i) => (
+                <div key={i} className="w-3 h-8 rounded-sm" style={{ background: color, opacity: 0.8 + i * 0.02, boxShadow: `0 0 6px ${color}` }} />
+              ))}
+            </div>
+          )}
+
+          <p className="text-white/20 text-[10px] font-black uppercase tracking-[0.3em] relative z-10">
+            WE RUN 10K NIGHT FEST · 06 JUN 2026
+          </p>
+
+          {/* Manual close */}
+          <button
+            onClick={onClose}
+            className="absolute top-8 right-8 text-white/20 hover:text-white/60 transition-colors text-xs font-black uppercase tracking-widest flex items-center gap-2"
+          >
+            <X size={14} /> Cerrar
+          </button>
+        </>
+      ) : (
+        /* FIRED state */
+        <div className="flex flex-col items-center gap-6" style={{ animation: 'fired-bounce 0.6s cubic-bezier(0.16,1,0.3,1) forwards' }}>
+          <div style={{ fontSize: '8rem', lineHeight: 1 }}>🏁</div>
+          <p className="text-white font-black text-4xl uppercase italic tracking-widest" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>¡CARRERA INICIADA!</p>
+          <p className="text-white/40 text-xs uppercase tracking-[0.4em]">Pistola disparada · Corredores en pista</p>
+          <button onClick={onClose} className="mt-8 px-8 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white font-black uppercase text-xs tracking-widest transition-all">
+            Cerrar
+          </button>
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+};
+
+/* ────────────────────────────────────────────────────────────── */
+/* TELEMETRY MODULE — Cronómetro + Pistola Digital                */
+/* ────────────────────────────────────────────────────────────── */
+
+type RaceState = 'idle' | 'running' | 'paused' | 'finished';
 
 const TelemetryModule = () => {
-  const [status, setStatus] = useState<SystemStatus | null>(null);
-  const [apiOnline, setApiOnline] = useState(false);
-  const [sseConnected, setSseConnected] = useState(false);
-  const [events, setEvents] = useState<CrossingEvent[]>([]);
-  const [results, setResults] = useState<RaceResult[]>([]);
-  const [activeSubTab, setActiveSubTab] = useState<'live' | 'results'>('live');
-  const [raceStarting, setRaceStarting] = useState(false);
-  const [resetting, setResetting] = useState(false);
-  const eventsEndRef = useRef<HTMLDivElement>(null);
+  /* ── Cronómetro ── */
+  const [raceState, setRaceState] = useState<RaceState>('idle');
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [startTimestamp, setStartTimestamp] = useState<number | null>(null);
+  const [pausedMs, setPausedMs] = useState(0);
+  const [officialStartTime, setOfficialStartTime] = useState<string | null>(null);
+  const rafRef = useRef<number | null>(null);
 
+  /* ── Gun flash ── */
+  const [gunFlash, setGunFlash] = useState(false);
+  const [savingStart, setSavingStart] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  /* ── Pre-race overlay ── */
+  const [showPreRace, setShowPreRace] = useState(false);
+
+  /* ── Reset confirm ── */
+  const [confirmReset, setConfirmReset] = useState(false);
+
+  /* ── Cronómetro tick via rAF ── */
   useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const res = await fetch(`${TELEMETRY_API}/status`, { signal: AbortSignal.timeout(3000) });
-        if (res.ok) { setStatus(await res.json()); setApiOnline(true); }
-        else setApiOnline(false);
-      } catch { setApiOnline(false); setStatus(null); }
-    };
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (!apiOnline) return;
-    const es = new EventSource(`${TELEMETRY_API}/live`);
-    es.onopen = () => setSseConnected(true);
-    es.onerror = () => setSseConnected(false);
-    es.onmessage = (e) => {
-      try {
-        const event: CrossingEvent = JSON.parse(e.data);
-        if (event.type === 'connected') return;
-        setEvents(prev => [event, ...prev].slice(0, 100));
-        if (event.type === 'finish') fetchResults();
-      } catch {}
-    };
-    return () => { es.close(); setSseConnected(false); };
-  }, [apiOnline]);
-
-  const fetchResults = useCallback(async () => {
-    try {
-      const res = await fetch(`${TELEMETRY_API}/results`);
-      if (res.ok) setResults(await res.json());
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    if (apiOnline) {
-      fetchResults();
-      const interval = setInterval(fetchResults, 10000);
-      return () => clearInterval(interval);
+    if (raceState === 'running') {
+      const tick = () => {
+        setElapsedMs(Date.now() - startTimestamp! + pausedMs);
+        rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
     }
-  }, [apiOnline, fetchResults]);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [raceState, startTimestamp, pausedMs]);
 
-  const handleRaceStart = async () => {
-    if (!confirm('¿Disparar pistola de salida? Se registrará start_time para todos los corredores.')) return;
-    setRaceStarting(true);
-    try {
-      const res = await fetch(`${TELEMETRY_API}/race/start`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
-      const data = await res.json();
-      if (res.ok) alert(`✅ Carrera iniciada: ${data.start_time}`);
-      else alert(`❌ Error: ${data.detail}`);
-    } catch { alert('❌ No se pudo conectar con el servidor de telemetría'); }
-    finally { setRaceStarting(false); }
+  /* ── Format elapsed ── */
+  const formatElapsed = (ms: number) => {
+    const totalCs = Math.floor(ms / 10);
+    const cs = totalCs % 100;
+    const totalSec = Math.floor(ms / 1000);
+    const sec = totalSec % 60;
+    const min = Math.floor(totalSec / 60) % 60;
+    const hr = Math.floor(totalSec / 3600);
+    if (hr > 0) return `${hr}:${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    return `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
   };
 
-  const handleReset = async () => {
-    if (!confirm('¿BORRAR TODOS LOS TIEMPOS? Esta acción no se puede deshacer.')) return;
-    setResetting(true);
+  /* ── Disparar pistola ── */
+  const handleFireGun = async () => {
+    const now = Date.now();
+    const isoNow = new Date(now).toISOString();
+
+    // Animación flash
+    setGunFlash(true);
+    setTimeout(() => setGunFlash(false), 600);
+
+    // Iniciar cronómetro
+    setStartTimestamp(now);
+    setPausedMs(0);
+    setElapsedMs(0);
+    setRaceState('running');
+    setOfficialStartTime(isoNow);
+
+    // Guardar en Supabase — actualiza start_time en todos los runners sin start_time
+    setSavingStart(true);
+    setSaveMsg(null);
     try {
-      await fetch(`${TELEMETRY_API}/race/reset`, { method: 'POST' });
-      setResults([]); setEvents([]);
-    } catch { alert('❌ Error en reset'); }
-    finally { setResetting(false); }
+      const { error } = await supabase
+        .from('runners')
+        .update({ start_time: isoNow, race_status: 'in_progress' })
+        .is('start_time', null);
+      if (error) throw error;
+      setSaveMsg({ text: '✅ START TIME sincronizado en Supabase', ok: true });
+    } catch (err: any) {
+      setSaveMsg({ text: `⚠️ Cronómetro corriendo — error Supabase: ${err.message}`, ok: false });
+    } finally {
+      setSavingStart(false);
+      setTimeout(() => setSaveMsg(null), 5000);
+    }
   };
 
-  if (!apiOnline) {
-    return (
-      <div className="max-w-2xl mx-auto mt-12">
-        <div className="bg-black/40 border border-yellow-500/20 rounded-2xl p-12 text-center">
-          <Radio size={48} className="text-yellow-500/50 mx-auto mb-4" />
-          <h3 className="text-xl font-black text-white uppercase italic tracking-widest mb-2">Servidor Offline</h3>
-          <p className="text-gray-400 text-sm mb-6">El backend de telemetría no está accesible.</p>
-          <div className="bg-white/[0.03] border border-white/5 rounded-xl p-6 text-left space-y-2 mb-6">
-            <p className="text-[10px] text-yellow-400 font-black uppercase tracking-widest mb-3">Checklist de arranque:</p>
-            <p className="text-xs text-gray-300 font-mono">1. Ejecutar <span className="text-cyan-400">start_telemetry.bat</span> en la PC Windows</p>
-            <p className="text-xs text-gray-300 font-mono">2. Zebra IoT UI → Connection → <span className="text-cyan-400">Disconnect</span></p>
-            <p className="text-xs text-gray-300 font-mono">3. Confirmar en consola: <span className="text-green-400">✅ LLRP conectado</span></p>
-            <p className="text-xs text-gray-300 font-mono">4. URL actual: <span className="text-yellow-400">{TELEMETRY_API}</span></p>
-          </div>
-          <p className="text-[9px] text-gray-600 uppercase tracking-widest">
-            Si la IP cambió, editar la constante TELEMETRY_API en AdminDashboard.tsx
-          </p>
-        </div>
-        <div className="mt-8 bg-black/40 border border-red-500/20 rounded-2xl p-6">
-          <p className="text-[9px] text-red-400 font-black uppercase tracking-widest mb-4 flex items-center gap-2">
-            <Zap size={12} /> Señal pre-carrera — disponible sin servidor RFID
-          </p>
-          <PreRaceButton seconds={60} />
-        </div>
-      </div>
-    );
-  }
+  /* ── Pause / Resume ── */
+  const handlePauseResume = () => {
+    if (raceState === 'running') {
+      setPausedMs(elapsedMs);
+      setRaceState('paused');
+    } else if (raceState === 'paused') {
+      setStartTimestamp(Date.now());
+      setRaceState('running');
+    }
+  };
+
+  /* ── Reset ── */
+  const handleReset = () => {
+    setRaceState('idle');
+    setElapsedMs(0);
+    setStartTimestamp(null);
+    setPausedMs(0);
+    setOfficialStartTime(null);
+    setSaveMsg(null);
+    setConfirmReset(false);
+  };
+
+  /* ── Finish ── */
+  const handleFinish = () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    setRaceState('finished');
+  };
+
+  /* ── Colors by state ── */
+  const stateColor = {
+    idle: 'rgba(100,100,120,1)',
+    running: '#00f2ff',
+    paused: '#fbbf24',
+    finished: '#22c55e',
+  }[raceState];
+
+  const stateGlow = {
+    idle: 'transparent',
+    running: 'rgba(0,242,255,0.15)',
+    paused: 'rgba(251,191,36,0.15)',
+    finished: 'rgba(34,197,94,0.15)',
+  }[raceState];
 
   return (
-    <div className="space-y-6 animate-in fade-in">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: 'Lector RFID', value: status?.llrp_connected ? 'CONECTADO' : status?.demo_mode ? 'DEMO' : 'OFFLINE', color: status?.llrp_connected ? 'green' : status?.demo_mode ? 'yellow' : 'red' },
-          { label: 'Corredores con chip', value: String(status?.runners_with_chip ?? 0), color: 'cyan' },
-          { label: 'Carrera', value: status?.race_started ? 'EN CURSO' : 'EN ESPERA', color: status?.race_started ? 'green' : 'gray' },
-          { label: 'Antenas activas', value: status?.antennas?.join(', ') ?? '—', color: 'cyan' },
-        ].map(card => (
-          <div key={card.label} className={`bg-black/40 border rounded-2xl p-4 ${
-            card.color === 'green' ? 'border-green-500/20' :
-            card.color === 'yellow' ? 'border-yellow-500/20' :
-            card.color === 'red' ? 'border-red-500/20' :
-            card.color === 'cyan' ? 'border-cyan-500/20' :
-            'border-white/10'
-          }`}>
-            <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-1">{card.label}</p>
-            <p className={`font-black text-lg ${
-              card.color === 'green' ? 'text-green-400' :
-              card.color === 'yellow' ? 'text-yellow-400' :
-              card.color === 'red' ? 'text-red-400' :
-              card.color === 'cyan' ? 'text-cyan-400' :
-              'text-gray-400'
-            }`}>{card.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <span className={`w-2 h-2 rounded-full ${sseConnected ? 'bg-green-400 animate-pulse' : 'bg-red-500'}`} />
-        <span className="text-[10px] text-gray-500 uppercase font-black tracking-widest">
-          {sseConnected ? 'Stream en vivo activo' : 'Stream desconectado'}
-        </span>
-      </div>
-
-      <div className="bg-black/40 border border-white/5 rounded-2xl p-6 space-y-6">
-        <h4 className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-2">
-          <Radio size={12} className="text-cyan-400" /> Control de Carrera
-        </h4>
-        <div>
-          <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-3 flex items-center gap-2">
-            <span className="w-4 h-4 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 text-[8px] flex items-center justify-center font-black">1</span>
-            Alerta Pre-Carrera · Enviar 1 minuto antes
-          </p>
-          <PreRaceButton seconds={60} />
-        </div>
-        <div className="border-t border-white/5" />
-        <div>
-          <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-3 flex items-center gap-2">
-            <span className="w-4 h-4 rounded-full bg-green-500/20 border border-green-500/40 text-green-400 text-[8px] flex items-center justify-center font-black">2</span>
-            Pistola de Salida · Registra start_time en Supabase
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <button onClick={handleRaceStart} disabled={raceStarting}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-black uppercase text-xs tracking-widest transition-all disabled:opacity-50">
-              {raceStarting ? <RefreshCw size={14} className="animate-spin" /> : <Zap size={14} />}
-              Disparar Pistola
-            </button>
-            <button onClick={fetchResults}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-cyan-400 font-black uppercase text-xs tracking-widest transition-all border border-cyan-500/20">
-              <RefreshCw size={14} /> Actualizar
-            </button>
-            <button onClick={handleReset} disabled={resetting}
-              className="flex items-center gap-2 px-4 py-3 rounded-xl bg-red-900/30 hover:bg-red-900/50 text-red-400 font-black uppercase text-xs tracking-widest transition-all border border-red-500/20 ml-auto disabled:opacity-50">
-              {resetting ? <RefreshCw size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
-              Reset Tiempos
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex gap-1 border-b border-white/5">
-        {(['live', 'results'] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveSubTab(tab)}
-            className={`px-6 py-3 text-xs font-black uppercase tracking-widest transition-all rounded-t-xl ${
-              activeSubTab === tab ? 'bg-white/5 text-yellow-400 border-b-2 border-yellow-400' : 'text-gray-500 hover:text-white'
-            }`}>
-            {tab === 'live' ? '📡 Live' : '🏁 Resultados'}
-          </button>
-        ))}
-      </div>
-
-      {activeSubTab === 'live' && (
-        <div className="bg-black/40 border border-white/5 rounded-2xl p-4 max-h-[500px] overflow-y-auto">
-          {events.length === 0 ? (
-            <div className="py-16 text-center">
-              <Radio size={32} className="text-gray-700 mx-auto mb-3" />
-              <p className="text-gray-600 text-xs uppercase font-black tracking-widest">Esperando cruces de chips...</p>
-            </div>
-          ) : events.map((ev, i) => {
-            if (ev.type === 'race_start') return (
-              <div key={i} className="flex items-center gap-3 py-3 border-b border-white/5 text-green-400">
-                <Zap size={18} />
-                <div>
-                  <span className="font-black text-xs uppercase">Pistola Disparada</span>
-                  <span className="text-gray-600 text-[9px] ml-2 font-mono">{ev.time}</span>
-                </div>
-              </div>
-            );
-            const isFinish = ev.type === 'finish';
-            return (
-              <div key={i} className={`flex items-center gap-3 py-3 border-b border-white/5 ${isFinish ? 'text-yellow-400' : 'text-cyan-400'}`}>
-                <span className="text-lg">{isFinish ? '🏁' : '🚀'}</span>
-                <div className="flex-1 min-w-0">
-                  <span className="font-black text-xs">BIB #{ev.bib}</span>
-                  <span className="text-white text-xs ml-2">{ev.nombre}</span>
-                  <span className="text-gray-500 text-[9px] ml-2 uppercase">{ev.categoria}</span>
-                </div>
-                {isFinish && ev.elapsed_str && (
-                  <span className="text-yellow-400 font-black text-sm font-mono flex-shrink-0">{ev.elapsed_str}</span>
-                )}
-                {!isFinish && <span className="text-cyan-400 text-[9px] font-black uppercase flex-shrink-0">Salida</span>}
-              </div>
-            );
-          })}
-          <div ref={eventsEndRef} />
-        </div>
+    <>
+      {/* Gun flash overlay */}
+      {gunFlash && createPortal(
+        <div className="fixed inset-0 z-[9999998] pointer-events-none"
+          style={{ background: 'rgba(255,255,255,0.18)', animation: 'gun-flash-anim 0.55s ease-out forwards' }} />,
+        document.body
       )}
 
-      {activeSubTab === 'results' && (
-        <div className="bg-black/40 border border-white/5 rounded-2xl overflow-hidden">
-          {results.length === 0 ? (
-            <div className="py-16 text-center">
-              <p className="text-gray-600 text-xs uppercase font-black tracking-widest">Sin resultados aún</p>
-            </div>
-          ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="bg-white/5">
-                  <th className="p-4 text-left text-[9px] uppercase text-gray-400">#</th>
-                  <th className="p-4 text-left text-[9px] uppercase text-gray-400">Dorsal</th>
-                  <th className="p-4 text-left text-[9px] uppercase text-gray-400">Atleta</th>
-                  <th className="p-4 text-left text-[9px] uppercase text-gray-400">Categoría</th>
-                  <th className="p-4 text-right text-[9px] uppercase text-yellow-400">Tiempo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {results.map(r => (
-                  <tr key={r.bib_number} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="p-4 text-gray-500 font-black text-sm">{r.position}</td>
-                    <td className="p-4 text-cyan-400 font-black text-sm">#{r.bib_number}</td>
-                    <td className="p-4 text-white text-xs font-bold uppercase">{r.nombre} {r.apellido}</td>
-                    <td className="p-4 text-gray-500 text-[9px] uppercase">{r.categoria}</td>
-                    <td className="p-4 text-right text-yellow-400 font-black font-mono">{r.finish_time_str}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      <style>{`
+        @keyframes gun-flash-anim { 0%{opacity:1} 100%{opacity:0} }
+        @keyframes chrono-blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+      `}</style>
+
+      {/* Pre-race overlay */}
+      {showPreRace && <PreRaceOverlay onClose={() => setShowPreRace(false)} />}
+
+      <div className="space-y-6 animate-in fade-in max-w-4xl mx-auto">
+
+        {/* ── HEADER ── */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-black italic uppercase text-white tracking-widest" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
+              Control de Carrera
+            </h2>
+            <p className="text-[9px] text-gray-500 uppercase tracking-widest mt-1">WE RUN 10K · 06 JUN 2026 · Barquisimeto</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full" style={{
+              background: stateColor,
+              boxShadow: `0 0 8px ${stateColor}`,
+              animation: raceState === 'running' ? 'chrono-blink 1s ease infinite' : undefined,
+            }} />
+            <span className="text-xs font-black uppercase tracking-widest" style={{ color: stateColor }}>
+              {{ idle: 'EN ESPERA', running: 'EN CURSO', paused: 'PAUSADO', finished: 'FINALIZADO' }[raceState]}
+            </span>
+          </div>
+        </div>
+
+        {/* ── CRONÓMETRO HERO ── */}
+        <div className="relative rounded-3xl overflow-hidden border"
+          style={{ borderColor: `${stateColor}30`, background: `linear-gradient(135deg, rgba(0,0,0,0.6), rgba(0,0,0,0.4))`, boxShadow: `inset 0 0 80px ${stateGlow}` }}>
+
+          {/* Ambient glow when running */}
+          {raceState === 'running' && (
+            <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse at 50% 0%, ${stateGlow} 0%, transparent 60%)` }} />
           )}
+
+          <div className="relative z-10 p-10 flex flex-col items-center">
+            {/* Time display */}
+            <p className="text-[9px] text-gray-500 uppercase tracking-[0.4em] mb-4 font-black">CRONÓMETRO OFICIAL</p>
+            <div
+              className="font-black tabular-nums leading-none mb-2"
+              style={{
+                fontSize: 'clamp(5rem, 14vw, 9rem)',
+                color: stateColor,
+                textShadow: raceState === 'running' ? `0 0 30px ${stateColor}, 0 0 60px ${stateGlow}` : 'none',
+                fontFamily: 'Barlow Condensed, sans-serif',
+                fontStyle: 'italic',
+                letterSpacing: '-0.02em',
+                animation: raceState === 'paused' ? 'chrono-blink 0.8s ease infinite' : undefined,
+                transition: 'color 0.4s, text-shadow 0.4s',
+              }}
+            >
+              {formatElapsed(elapsedMs)}
+            </div>
+
+            {/* Official start time */}
+            {officialStartTime && (
+              <p className="text-[9px] font-mono uppercase tracking-widest mb-8" style={{ color: `${stateColor}80` }}>
+                PISTOLA: {new Date(officialStartTime).toLocaleTimeString('es-VE', { hour12: false })}
+              </p>
+            )}
+
+            {/* Save msg */}
+            {saveMsg && (
+              <div className={`mb-6 px-5 py-3 rounded-xl text-xs font-black uppercase tracking-wider border ${saveMsg.ok ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'}`}>
+                {savingStart ? <RefreshCw size={12} className="inline animate-spin mr-2" /> : null}
+                {saveMsg.text}
+              </div>
+            )}
+
+            {/* ── Controls ── */}
+            <div className="flex flex-wrap gap-3 justify-center">
+
+              {/* PISTOLA — solo cuando está idle */}
+              {raceState === 'idle' && (
+                <button
+                  onClick={handleFireGun}
+                  disabled={savingStart}
+                  className="relative px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-black transition-all flex items-center gap-3 text-sm overflow-hidden"
+                  style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 0 32px rgba(34,197,94,0.4), 0 4px 24px rgba(0,0,0,0.4)' }}
+                >
+                  {savingStart ? <RefreshCw size={20} className="animate-spin" /> : <Zap size={20} />}
+                  DISPARAR PISTOLA
+                  {/* shine */}
+                  <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.15) 50%, transparent 60%)' }} />
+                </button>
+              )}
+
+              {/* PAUSE / RESUME — cuando está running o paused */}
+              {(raceState === 'running' || raceState === 'paused') && (
+                <button onClick={handlePauseResume}
+                  className="px-8 py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center gap-3 text-sm border"
+                  style={{
+                    background: raceState === 'running' ? 'rgba(251,191,36,0.1)' : 'rgba(0,242,255,0.1)',
+                    borderColor: raceState === 'running' ? 'rgba(251,191,36,0.3)' : 'rgba(0,242,255,0.3)',
+                    color: raceState === 'running' ? '#fbbf24' : '#00f2ff',
+                  }}>
+                  {raceState === 'running' ? '⏸ PAUSAR' : '▶ REANUDAR'}
+                </button>
+              )}
+
+              {/* FINALIZAR — cuando está running o paused */}
+              {(raceState === 'running' || raceState === 'paused') && (
+                <button onClick={handleFinish}
+                  className="px-8 py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center gap-3 text-sm border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20">
+                  🏁 FINALIZAR
+                </button>
+              )}
+
+              {/* RESET — cuando no está idle */}
+              {raceState !== 'idle' && (
+                <button onClick={() => setConfirmReset(true)}
+                  className="px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center gap-2 border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/15">
+                  <RefreshCw size={14} /> RESET
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-      )}
-    </div>
+
+        {/* ── PASO 1 — PRE-CARRERA ── */}
+        <div className="bg-black/40 border border-white/8 rounded-2xl p-6">
+          <div className="flex items-start gap-4 mb-5">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm flex-shrink-0"
+              style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}>1</div>
+            <div>
+              <p className="text-white font-black uppercase tracking-widest text-sm">Alerta Pre-Carrera</p>
+              <p className="text-gray-500 text-[10px] uppercase tracking-widest mt-0.5">Activa el overlay de 60 segundos en pantalla — avisa a los atletas antes de la salida</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowPreRace(true)}
+            className="w-full py-4 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 transition-all border"
+            style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.25)', color: '#ef4444' }}
+          >
+            <Clock size={18} />
+            ACTIVAR CUENTA REGRESIVA 60s
+          </button>
+        </div>
+
+        {/* ── PASO 2 — PISTOLA (recordatorio) ── */}
+        <div className="bg-black/40 border border-white/8 rounded-2xl p-6">
+          <div className="flex items-start gap-4">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm flex-shrink-0"
+              style={{ background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e' }}>2</div>
+            <div className="flex-1">
+              <p className="text-white font-black uppercase tracking-widest text-sm">Pistola de Salida</p>
+              <p className="text-gray-500 text-[10px] uppercase tracking-widest mt-0.5">
+                {raceState === 'idle'
+                  ? 'Usa el botón DISPARAR PISTOLA en el cronómetro para iniciar la carrera y sincronizar start_time en Supabase'
+                  : raceState === 'running'
+                    ? `Carrera en curso — iniciada ${officialStartTime ? 'a las ' + new Date(officialStartTime).toLocaleTimeString('es-VE') : ''}`
+                    : raceState === 'paused'
+                      ? 'Cronómetro pausado — presiona REANUDAR para continuar'
+                      : `Carrera finalizada — tiempo total: ${formatElapsed(elapsedMs)}`
+                }
+              </p>
+              {raceState !== 'idle' && (
+                <div className="mt-3 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full" style={{ background: stateColor, boxShadow: `0 0 6px ${stateColor}`, animation: raceState === 'running' ? 'chrono-blink 1s ease infinite' : undefined }} />
+                  <span className="text-xs font-black uppercase tracking-widest" style={{ color: stateColor }}>
+                    {{ idle: '', running: 'CORRIENDO', paused: 'PAUSADO', finished: 'COMPLETADO' }[raceState]}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Confirm Reset Modal ── */}
+        {confirmReset && createPortal(
+          <div className="fixed inset-0 z-[9999999] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+            <div className="bg-[#0a0a0a] border border-red-500/30 rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95">
+              <div className="bg-red-500/15 p-3 rounded-2xl w-fit mb-5"><AlertTriangle className="text-red-500" size={24} /></div>
+              <h3 className="text-xl font-black text-white uppercase italic mb-2">Resetear Cronómetro</h3>
+              <p className="text-gray-400 text-sm mb-8">El cronómetro volverá a cero. <span className="text-red-400">No borrará los datos en Supabase.</span></p>
+              <div className="flex gap-3">
+                <button onClick={() => setConfirmReset(false)} className="flex-1 py-4 rounded-xl bg-white/5 font-bold hover:bg-white/10 transition-all text-sm">Cancelar</button>
+                <button onClick={handleReset} className="flex-1 py-4 rounded-xl bg-red-600 hover:bg-red-500 font-black uppercase text-xs tracking-widest transition-all flex items-center justify-center gap-2">
+                  <RefreshCw size={14} /> Confirmar Reset
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+      </div>
+    </>
   );
 };
 
@@ -1613,21 +1494,15 @@ export default function AdminDashboard() {
             { id: 'race_config',  label: 'Carrera',      icon: null },
             { id: 'results',      label: 'Resultados',   icon: null },
           ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
+            <button key={tab.id} onClick={() => setActiveTab(tab.id as typeof activeTab)}
               className={`px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all flex items-center gap-2 ${
                 activeTab === tab.id
-                  ? (tab as any).accent === 'amber'
-                    ? 'bg-amber-400 text-black shadow-lg shadow-amber-400/20'
-                    : (tab as any).accent === 'yellow'
-                      ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20'
-                      : 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20'
+                  ? (tab as any).accent === 'amber' ? 'bg-amber-400 text-black shadow-lg shadow-amber-400/20'
+                    : (tab as any).accent === 'yellow' ? 'bg-yellow-400 text-black shadow-lg shadow-yellow-400/20'
+                    : 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20'
                   : 'bg-white/5 hover:bg-white/10 text-gray-400'
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
+              }`}>
+              {tab.icon}{tab.label}
             </button>
           ))}
         </div>
@@ -1636,9 +1511,7 @@ export default function AdminDashboard() {
           <>
             <TasaConfig />
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2">
-                <AtletasList onUpdateCount={setTotalAtletas} />
-              </div>
+              <div className="lg:col-span-2"><AtletasList onUpdateCount={setTotalAtletas} /></div>
               <div>
                 <div className="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-3xl p-8 text-black shadow-2xl relative overflow-hidden group">
                   <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><Activity size={80} /></div>
@@ -1661,9 +1534,7 @@ export default function AdminDashboard() {
             <RaceForm /><RouteConfig />
           </div>
         )}
-        {activeTab === 'results' && (
-          <div className="animate-in fade-in"><ResultsTable /></div>
-        )}
+        {activeTab === 'results' && <div className="animate-in fade-in"><ResultsTable /></div>}
       </main>
     </div>
   );

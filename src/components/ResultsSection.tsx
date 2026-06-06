@@ -609,7 +609,7 @@ export default function ResultsSection() {
         <div className="rs-header">
           <div className="rs-eyebrow">
             <span className="rs-eyebrow-dot" />
-            <span className="rs-eyebrow-text">WE RUN 10K NIGHT FEST · 2026</span>
+            <span className="rs-eyebrow-text">WE RUN RAYOCERO · 10K NIGHT FEST · 2026</span>
           </div>
           <h1 className="rs-title">
             <span style={{ display: 'block' }}>MIS</span>
@@ -730,7 +730,7 @@ export default function ResultsSection() {
                 {/* Tiempo hero */}
                 <div className="rs-time-hero">
                   <div>
-                    <div className="rs-time-label">TIEMPO OFICIAL · WE RUN 10K</div>
+                    <div className="rs-time-label">TIEMPO OFICIAL · WE RUN RAYOCERO 10K</div>
                     <div className={`rs-time-value ${hasTime ? 'has-time' : ''}`}>
                       {hasTime ? formatTime(runner.finish_time_seconds!) : '--:--:--'}
                     </div>
@@ -800,7 +800,7 @@ export default function ResultsSection() {
                       <RouteMapStrava
                         points={gpsPoints}
                         athleteName={`${runner.nombre} ${runner.apellido}`}
-                        eventName="WE RUN 10K NIGHT FEST"
+                        eventName="WE RUN RAYOCERO 10K NIGHT FEST"
                         showShareCard={true}
                       />
                     </Suspense>
