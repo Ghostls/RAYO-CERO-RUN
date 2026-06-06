@@ -1,15 +1,15 @@
 /**
- * RAYO CERO — RACE TRACKER V3.0
+ * RAYO CERO — RACE TRACKER V3.1
  * Telemetría GPS en tiempo real con Filtro de Kalman + Supabase Realtime
- * Stack visual: #03070b fondo, cyan #00f2ff acento, tipografía militar italic
  *
- * EVOLUCIÓN V3.0:
- * — GPS en segundo plano via useGpsBackground (Wake Lock API)
- * — Mapa real Leaflet via RouteMapStrava V3 (prop live=true)
- * — Banner de aviso iOS/Android integrado
+ * CHANGELOG V3.1:
+ * — PreRaceOverlay integrado: se activa via Supabase Broadcast desde AdminDashboard
+ * — Canal 'race-control' escucha evento type:'prerace' con countdown_seconds
+ * — Overlay fullscreen con cuenta regresiva + glow + barra de urgencia
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
 import { GeoPoint } from './KalmanFilter';
 import RouteMapStrava from './RouteMapStrava';
@@ -50,6 +50,169 @@ const formatFinal = (seconds: number): string => {
   return `${String(m).padStart(2,'0')}:${String(parseFloat(s)).padStart(5,'0')}`;
 };
 
+/* ────────────────────────────────────────────────────────────── */
+/* PRE-RACE OVERLAY                                               */
+/* ────────────────────────────────────────────────────────────── */
+
+const PreRaceOverlay: React.FC<{ totalSeconds: number; onClose: () => void }> = ({ totalSeconds, onClose }) => {
+  const [seconds, setSeconds] = useState(totalSeconds);
+  const [fired, setFired] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      setSeconds(prev => {
+        if (prev <= 1) {
+          clearInterval(intervalRef.current!);
+          setFired(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, []);
+
+  // Color: verde → amarillo → rojo
+  const pct = seconds / totalSeconds;
+  const r = pct > 0.5 ? Math.round((1 - pct) * 2 * 255) : 255;
+  const g = pct > 0.5 ? 255 : Math.round(pct * 2 * 255);
+  const color = `rgb(${r},${g},0)`;
+  const glowColor = `rgba(${r},${g},0,0.3)`;
+
+  // Arco SVG
+  const radius = 120;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - seconds / totalSeconds);
+
+  return createPortal(
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 99999,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: fired ? 'rgba(0,40,10,0.97)' : 'rgba(3,7,11,0.97)',
+        backdropFilter: 'blur(6px)',
+        transition: 'background 0.5s',
+        fontFamily: "'Barlow Condensed', sans-serif",
+      }}
+    >
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@1,900&display=swap');
+        @keyframes prerace-glow-pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
+        @keyframes fired-in { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06)} 100%{transform:scale(1);opacity:1} }
+        @keyframes bar-flash { 0%,100%{opacity:0.7} 50%{opacity:1} }
+      `}</style>
+
+      {/* Glow ambiental */}
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: `radial-gradient(ellipse at center, ${glowColor} 0%, transparent 65%)`,
+        animation: seconds <= 10 && !fired ? 'prerace-glow-pulse 0.5s ease infinite' : undefined,
+      }} />
+
+      {!fired ? (
+        <>
+          <p style={{
+            color: 'rgba(255,255,255,0.3)', fontSize: 10,
+            fontWeight: 900, letterSpacing: '0.45em',
+            textTransform: 'uppercase', marginBottom: 40,
+            position: 'relative', zIndex: 1,
+          }}>
+            PRE-CARRERA · ALERTA
+          </p>
+
+          {/* Círculo countdown */}
+          <div style={{ position: 'relative', width: 280, height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="280" height="280" style={{ position: 'absolute', transform: 'rotate(-90deg)' }}>
+              <circle cx="140" cy="140" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="7" />
+              <circle
+                cx="140" cy="140" r={radius}
+                fill="none" stroke={color} strokeWidth="7"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={dashOffset}
+                style={{
+                  transition: 'stroke-dashoffset 0.9s linear, stroke 0.4s ease',
+                  filter: `drop-shadow(0 0 10px ${color})`,
+                }}
+              />
+            </svg>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
+              <span style={{
+                fontSize: 96, fontWeight: 900, fontStyle: 'italic',
+                lineHeight: 1, color,
+                textShadow: `0 0 40px ${color}, 0 0 80px ${glowColor}`,
+                transition: 'color 0.4s',
+              }}>
+                {seconds}
+              </span>
+              <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', letterSpacing: '0.4em', fontWeight: 900, textTransform: 'uppercase', marginTop: 4 }}>
+                SEGUNDOS
+              </span>
+            </div>
+          </div>
+
+          {/* Barras de urgencia ≤10s */}
+          {seconds <= 10 && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 32, position: 'relative', zIndex: 1 }}>
+              {Array.from({ length: seconds }).map((_, i) => (
+                <div key={i} style={{
+                  width: 10, height: 32, borderRadius: 3,
+                  background: color, opacity: 0.7 + i * 0.03,
+                  boxShadow: `0 0 8px ${color}`,
+                  animation: 'bar-flash 0.5s ease infinite',
+                }} />
+              ))}
+            </div>
+          )}
+
+          <p style={{
+            color: 'rgba(255,255,255,0.15)', fontSize: 9,
+            fontWeight: 900, letterSpacing: '0.3em',
+            textTransform: 'uppercase', marginTop: 40,
+            position: 'relative', zIndex: 1,
+          }}>
+            WE RUN 10K NIGHT FEST · 2026
+          </p>
+        </>
+      ) : (
+        /* Estado FIRED */
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20,
+          animation: 'fired-in 0.6s cubic-bezier(0.16,1,0.3,1) forwards',
+        }}>
+          <span style={{ fontSize: 80, lineHeight: 1 }}>🏁</span>
+          <p style={{
+            fontSize: 40, fontWeight: 900, fontStyle: 'italic',
+            color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.05em',
+            textShadow: '0 0 30px rgba(34,197,94,0.5)', margin: 0,
+          }}>
+            ¡A CORRER!
+          </p>
+          <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.4em', textTransform: 'uppercase' }}>
+            Pistola disparada
+          </p>
+          <button onClick={onClose} style={{
+            marginTop: 24, padding: '12px 32px', borderRadius: 12,
+            background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
+            color: 'white', fontFamily: "'Barlow Condensed', sans-serif",
+            fontSize: 13, fontWeight: 900, letterSpacing: '0.2em',
+            textTransform: 'uppercase', cursor: 'pointer',
+          }}>
+            Cerrar
+          </button>
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+};
+
+/* ────────────────────────────────────────────────────────────── */
+/* RACE TRACKER                                                   */
+/* ────────────────────────────────────────────────────────────── */
+
 export default function RaceTracker({ bibNumber }: Props) {
   const [bib, setBib] = useState<string>(bibNumber?.toString() ?? '');
   const [runner, setRunner] = useState<RunnerState | null>(null);
@@ -57,11 +220,15 @@ export default function RaceTracker({ bibNumber }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  /* ── Pre-race overlay state ── */
+  const [showPreRace, setShowPreRace] = useState(false);
+  const [preRaceSeconds, setPreRaceSeconds] = useState(60);
+
   const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const raceControlRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const runnerRef = useRef<RunnerState | null>(null);
 
-  // GPS en segundo plano con Wake Lock
   const {
     points: gpsPoints,
     gpsActive,
@@ -70,6 +237,26 @@ export default function RaceTracker({ bibNumber }: Props) {
     start: startGPS,
     stop: stopGPS,
   } = useGpsBackground({ bibNumber: runner?.bib_number ?? null });
+
+  /* ── Suscripción al canal race-control para recibir prerace ── */
+  useEffect(() => {
+    raceControlRef.current = supabase
+      .channel('race-control')
+      .on('broadcast', { event: 'prerace' }, (payload) => {
+        const seconds = payload?.payload?.countdown_seconds ?? 60;
+        setPreRaceSeconds(seconds);
+        setShowPreRace(true);
+      })
+      .on('broadcast', { event: 'race_start' }, () => {
+        // La pistola se disparó — cerrar overlay si sigue abierto
+        setShowPreRace(false);
+      })
+      .subscribe();
+
+    return () => {
+      if (raceControlRef.current) supabase.removeChannel(raceControlRef.current);
+    };
+  }, []);
 
   const subscribeToRunner = useCallback((bibNum: number) => {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
@@ -449,15 +636,21 @@ export default function RaceTracker({ bibNumber }: Props) {
         }
       `}</style>
 
+      {/* Pre-race overlay — se activa via broadcast desde admin */}
+      {showPreRace && (
+        <PreRaceOverlay
+          totalSeconds={preRaceSeconds}
+          onClose={() => setShowPreRace(false)}
+        />
+      )}
+
       <div className="rt-root">
-        {/* Header */}
         <div className="rt-header">
           <div className="rt-brand">RAYO<span>CERO</span></div>
           <div className="rt-badge">⚡ Telemetría Live</div>
         </div>
 
         <div className="rt-body">
-          {/* BIB input */}
           {!bibNumber && (
             <div className="rt-search">
               <input
@@ -482,7 +675,6 @@ export default function RaceTracker({ bibNumber }: Props) {
 
           {runner ? (
             <div className="rt-card">
-              {/* Runner info */}
               <div className="rt-runner-name">{runner.nombre} {runner.apellido}</div>
               <div className="rt-tags">
                 <span className="rt-tag">BIB #{runner.bib_number}</span>
@@ -495,7 +687,6 @@ export default function RaceTracker({ bibNumber }: Props) {
                 </span>
               </div>
 
-              {/* GPS bar */}
               {gpsActive && (
                 <div style={{ marginTop: 12 }}>
                   <GpsBackgroundBanner
@@ -506,7 +697,6 @@ export default function RaceTracker({ bibNumber }: Props) {
                 </div>
               )}
 
-              {/* Timer */}
               <div className="rt-timer-wrap">
                 <div className="rt-timer-label">
                   {runner.race_status === 'waiting' && 'Esperando salida'}
@@ -520,10 +710,8 @@ export default function RaceTracker({ bibNumber }: Props) {
                 </div>
               </div>
 
-              {/* Route map — RouteMapStrava unificado */}
               {gpsPoints.length >= 2 && <RouteMapStrava points={gpsPoints} live={true} />}
 
-              {/* Simulators */}
               <div className="rt-sim">
                 <div className="rt-sim-label">[ modo prueba ]</div>
                 <div className="rt-sim-btns">

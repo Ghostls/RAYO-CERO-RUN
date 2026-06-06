@@ -13,6 +13,7 @@ import { RaceForm } from '../components/admin/RaceForm';
 import { RouteConfig } from '../components/admin/RouteConfig';
 import { ResultsTable } from '../components/admin/ResultsTable';
 import logoPrincipal from '../assets/logo.png';
+import PreRaceButton from '../components/Preracebutton';
 import ModuloInscripcionAdmin from '../components/admin/ModuloInscripcionAdmin';
 
 /* ────────────────────────────────────────────────────────────── */
@@ -1126,32 +1127,23 @@ const PreRaceOverlay: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* TELEMETRY MODULE — Cronómetro + Pistola Digital                */
+/* TELEMETRY MODULE — Cronómetro + Pistola Digital + PreRaceButton*/
 /* ────────────────────────────────────────────────────────────── */
 
 type RaceState = 'idle' | 'running' | 'paused' | 'finished';
 
 const TelemetryModule = () => {
-  /* ── Cronómetro ── */
   const [raceState, setRaceState] = useState<RaceState>('idle');
   const [elapsedMs, setElapsedMs] = useState(0);
   const [startTimestamp, setStartTimestamp] = useState<number | null>(null);
   const [pausedMs, setPausedMs] = useState(0);
   const [officialStartTime, setOfficialStartTime] = useState<string | null>(null);
   const rafRef = useRef<number | null>(null);
-
-  /* ── Gun flash ── */
   const [gunFlash, setGunFlash] = useState(false);
   const [savingStart, setSavingStart] = useState(false);
   const [saveMsg, setSaveMsg] = useState<{ text: string; ok: boolean } | null>(null);
-
-  /* ── Pre-race overlay ── */
-  const [showPreRace, setShowPreRace] = useState(false);
-
-  /* ── Reset confirm ── */
   const [confirmReset, setConfirmReset] = useState(false);
 
-  /* ── Cronómetro tick via rAF ── */
   useEffect(() => {
     if (raceState === 'running') {
       const tick = () => {
@@ -1163,7 +1155,6 @@ const TelemetryModule = () => {
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [raceState, startTimestamp, pausedMs]);
 
-  /* ── Format elapsed ── */
   const formatElapsed = (ms: number) => {
     const totalCs = Math.floor(ms / 10);
     const cs = totalCs % 100;
@@ -1175,23 +1166,16 @@ const TelemetryModule = () => {
     return `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
   };
 
-  /* ── Disparar pistola ── */
   const handleFireGun = async () => {
     const now = Date.now();
     const isoNow = new Date(now).toISOString();
-
-    // Animación flash
     setGunFlash(true);
     setTimeout(() => setGunFlash(false), 600);
-
-    // Iniciar cronómetro
     setStartTimestamp(now);
     setPausedMs(0);
     setElapsedMs(0);
     setRaceState('running');
     setOfficialStartTime(isoNow);
-
-    // Guardar en Supabase — actualiza start_time en todos los runners sin start_time
     setSavingStart(true);
     setSaveMsg(null);
     try {
@@ -1200,159 +1184,121 @@ const TelemetryModule = () => {
         .update({ start_time: isoNow, race_status: 'in_progress' })
         .is('start_time', null);
       if (error) throw error;
-      setSaveMsg({ text: '✅ START TIME sincronizado en Supabase', ok: true });
+      // Señal race_start → RaceSignalProvider en clientes la recibe
+      await supabase.from('race_signals').insert({
+        type: 'race_start',
+        message: isoNow,
+        created_by: 'admin',
+      });
+      setSaveMsg({ text: '✅ Pistola disparada · Señal enviada a atletas', ok: true });
     } catch (err: any) {
-      setSaveMsg({ text: `⚠️ Cronómetro corriendo — error Supabase: ${err.message}`, ok: false });
+      setSaveMsg({ text: `⚠️ Cronómetro corriendo — error: ${err.message}`, ok: false });
     } finally {
       setSavingStart(false);
       setTimeout(() => setSaveMsg(null), 5000);
     }
   };
 
-  /* ── Pause / Resume ── */
   const handlePauseResume = () => {
-    if (raceState === 'running') {
-      setPausedMs(elapsedMs);
-      setRaceState('paused');
-    } else if (raceState === 'paused') {
-      setStartTimestamp(Date.now());
-      setRaceState('running');
-    }
+    if (raceState === 'running') { setPausedMs(elapsedMs); setRaceState('paused'); }
+    else if (raceState === 'paused') { setStartTimestamp(Date.now()); setRaceState('running'); }
   };
 
-  /* ── Reset ── */
   const handleReset = () => {
-    setRaceState('idle');
-    setElapsedMs(0);
-    setStartTimestamp(null);
-    setPausedMs(0);
-    setOfficialStartTime(null);
-    setSaveMsg(null);
-    setConfirmReset(false);
+    setRaceState('idle'); setElapsedMs(0); setStartTimestamp(null);
+    setPausedMs(0); setOfficialStartTime(null); setSaveMsg(null); setConfirmReset(false);
   };
 
-  /* ── Finish ── */
   const handleFinish = () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     setRaceState('finished');
   };
 
-  /* ── Colors by state ── */
-  const stateColor = {
-    idle: 'rgba(100,100,120,1)',
-    running: '#00f2ff',
-    paused: '#fbbf24',
-    finished: '#22c55e',
-  }[raceState];
-
-  const stateGlow = {
-    idle: 'transparent',
-    running: 'rgba(0,242,255,0.15)',
-    paused: 'rgba(251,191,36,0.15)',
-    finished: 'rgba(34,197,94,0.15)',
-  }[raceState];
+  const stateColor: Record<RaceState, string> = {
+    idle: 'rgba(100,100,120,1)', running: '#00f2ff', paused: '#fbbf24', finished: '#22c55e',
+  };
+  const stateGlow: Record<RaceState, string> = {
+    idle: 'transparent', running: 'rgba(0,242,255,0.15)',
+    paused: 'rgba(251,191,36,0.15)', finished: 'rgba(34,197,94,0.15)',
+  };
+  const stateLabel: Record<RaceState, string> = {
+    idle: 'EN ESPERA', running: 'EN CURSO', paused: 'PAUSADO', finished: 'FINALIZADO',
+  };
+  const color = stateColor[raceState];
+  const glow  = stateGlow[raceState];
 
   return (
     <>
-      {/* Gun flash overlay */}
       {gunFlash && createPortal(
         <div className="fixed inset-0 z-[9999998] pointer-events-none"
           style={{ background: 'rgba(255,255,255,0.18)', animation: 'gun-flash-anim 0.55s ease-out forwards' }} />,
         document.body
       )}
-
       <style>{`
         @keyframes gun-flash-anim { 0%{opacity:1} 100%{opacity:0} }
-        @keyframes chrono-blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        @keyframes chrono-blink   { 0%,100%{opacity:1} 50%{opacity:0.3} }
       `}</style>
-
-      {/* Pre-race overlay */}
-      {showPreRace && <PreRaceOverlay onClose={() => setShowPreRace(false)} />}
 
       <div className="space-y-6 animate-in fade-in max-w-4xl mx-auto">
 
-        {/* ── HEADER ── */}
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-black italic uppercase text-white tracking-widest" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>
-              Control de Carrera
-            </h2>
+            <h2 className="text-2xl font-black italic uppercase text-white tracking-widest"
+              style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>Control de Carrera</h2>
             <p className="text-[9px] text-gray-500 uppercase tracking-widest mt-1">WE RUN 10K · 06 JUN 2026 · Barquisimeto</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full" style={{
-              background: stateColor,
-              boxShadow: `0 0 8px ${stateColor}`,
+              background: color, boxShadow: `0 0 8px ${color}`,
               animation: raceState === 'running' ? 'chrono-blink 1s ease infinite' : undefined,
             }} />
-            <span className="text-xs font-black uppercase tracking-widest" style={{ color: stateColor }}>
-              {{ idle: 'EN ESPERA', running: 'EN CURSO', paused: 'PAUSADO', finished: 'FINALIZADO' }[raceState]}
+            <span className="text-xs font-black uppercase tracking-widest" style={{ color }}>
+              {stateLabel[raceState]}
             </span>
           </div>
         </div>
 
-        {/* ── CRONÓMETRO HERO ── */}
+        {/* Cronómetro */}
         <div className="relative rounded-3xl overflow-hidden border"
-          style={{ borderColor: `${stateColor}30`, background: `linear-gradient(135deg, rgba(0,0,0,0.6), rgba(0,0,0,0.4))`, boxShadow: `inset 0 0 80px ${stateGlow}` }}>
-
-          {/* Ambient glow when running */}
+          style={{ borderColor: `${color}30`, background: 'linear-gradient(135deg,rgba(0,0,0,0.6),rgba(0,0,0,0.4))', boxShadow: `inset 0 0 80px ${glow}` }}>
           {raceState === 'running' && (
-            <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse at 50% 0%, ${stateGlow} 0%, transparent 60%)` }} />
+            <div className="absolute inset-0 pointer-events-none"
+              style={{ background: `radial-gradient(ellipse at 50% 0%,${glow} 0%,transparent 60%)` }} />
           )}
-
           <div className="relative z-10 p-10 flex flex-col items-center">
-            {/* Time display */}
             <p className="text-[9px] text-gray-500 uppercase tracking-[0.4em] mb-4 font-black">CRONÓMETRO OFICIAL</p>
-            <div
-              className="font-black tabular-nums leading-none mb-2"
-              style={{
-                fontSize: 'clamp(5rem, 14vw, 9rem)',
-                color: stateColor,
-                textShadow: raceState === 'running' ? `0 0 30px ${stateColor}, 0 0 60px ${stateGlow}` : 'none',
-                fontFamily: 'Barlow Condensed, sans-serif',
-                fontStyle: 'italic',
-                letterSpacing: '-0.02em',
-                animation: raceState === 'paused' ? 'chrono-blink 0.8s ease infinite' : undefined,
-                transition: 'color 0.4s, text-shadow 0.4s',
-              }}
-            >
+            <div className="font-black tabular-nums leading-none mb-2" style={{
+              fontSize: 'clamp(5rem,14vw,9rem)', color,
+              textShadow: raceState === 'running' ? `0 0 30px ${color},0 0 60px ${glow}` : 'none',
+              fontFamily: 'Barlow Condensed,sans-serif', fontStyle: 'italic', letterSpacing: '-0.02em',
+              animation: raceState === 'paused' ? 'chrono-blink 0.8s ease infinite' : undefined,
+              transition: 'color 0.4s,text-shadow 0.4s',
+            }}>
               {formatElapsed(elapsedMs)}
             </div>
-
-            {/* Official start time */}
             {officialStartTime && (
-              <p className="text-[9px] font-mono uppercase tracking-widest mb-8" style={{ color: `${stateColor}80` }}>
+              <p className="text-[9px] font-mono uppercase tracking-widest mb-8" style={{ color: `${color}80` }}>
                 PISTOLA: {new Date(officialStartTime).toLocaleTimeString('es-VE', { hour12: false })}
               </p>
             )}
-
-            {/* Save msg */}
             {saveMsg && (
-              <div className={`mb-6 px-5 py-3 rounded-xl text-xs font-black uppercase tracking-wider border ${saveMsg.ok ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'}`}>
-                {savingStart ? <RefreshCw size={12} className="inline animate-spin mr-2" /> : null}
+              <div className={`mb-6 px-5 py-3 rounded-xl text-xs font-black uppercase tracking-wider border ${
+                saveMsg.ok ? 'bg-green-500/10 border-green-500/30 text-green-400' : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+              }`}>
+                {savingStart && <RefreshCw size={12} className="inline animate-spin mr-2" />}
                 {saveMsg.text}
               </div>
             )}
-
-            {/* ── Controls ── */}
             <div className="flex flex-wrap gap-3 justify-center">
-
-              {/* PISTOLA — solo cuando está idle */}
               {raceState === 'idle' && (
-                <button
-                  onClick={handleFireGun}
-                  disabled={savingStart}
-                  className="relative px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-black transition-all flex items-center gap-3 text-sm overflow-hidden"
-                  style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)', boxShadow: '0 0 32px rgba(34,197,94,0.4), 0 4px 24px rgba(0,0,0,0.4)' }}
-                >
+                <button onClick={handleFireGun} disabled={savingStart}
+                  className="relative px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-black transition-all flex items-center gap-3 text-sm overflow-hidden disabled:opacity-50"
+                  style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', boxShadow: '0 0 32px rgba(34,197,94,0.4)' }}>
                   {savingStart ? <RefreshCw size={20} className="animate-spin" /> : <Zap size={20} />}
                   DISPARAR PISTOLA
-                  {/* shine */}
-                  <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.15) 50%, transparent 60%)' }} />
                 </button>
               )}
-
-              {/* PAUSE / RESUME — cuando está running o paused */}
               {(raceState === 'running' || raceState === 'paused') && (
                 <button onClick={handlePauseResume}
                   className="px-8 py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center gap-3 text-sm border"
@@ -1364,16 +1310,12 @@ const TelemetryModule = () => {
                   {raceState === 'running' ? '⏸ PAUSAR' : '▶ REANUDAR'}
                 </button>
               )}
-
-              {/* FINALIZAR — cuando está running o paused */}
               {(raceState === 'running' || raceState === 'paused') && (
                 <button onClick={handleFinish}
                   className="px-8 py-4 rounded-2xl font-black uppercase tracking-widest transition-all flex items-center gap-3 text-sm border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20">
                   🏁 FINALIZAR
                 </button>
               )}
-
-              {/* RESET — cuando no está idle */}
               {raceState !== 'idle' && (
                 <button onClick={() => setConfirmReset(true)}
                   className="px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center gap-2 border border-red-500/20 bg-red-500/5 text-red-400 hover:bg-red-500/15">
@@ -1384,28 +1326,24 @@ const TelemetryModule = () => {
           </div>
         </div>
 
-        {/* ── PASO 1 — PRE-CARRERA ── */}
-        <div className="bg-black/40 border border-white/8 rounded-2xl p-6">
+        {/* Paso 1 — Pre-Carrera */}
+        <div className="bg-black/40 border border-white/[0.08] rounded-2xl p-6">
           <div className="flex items-start gap-4 mb-5">
             <div className="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm flex-shrink-0"
               style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444' }}>1</div>
             <div>
               <p className="text-white font-black uppercase tracking-widest text-sm">Alerta Pre-Carrera</p>
-              <p className="text-gray-500 text-[10px] uppercase tracking-widest mt-0.5">Activa el overlay de 60 segundos en pantalla — avisa a los atletas antes de la salida</p>
+              <p className="text-gray-500 text-[10px] uppercase tracking-widest mt-0.5">
+                Inserta señal en <span className="text-cyan-400 font-mono">race_signals</span> →
+                todos los atletas con la app abierta ven el countdown de 60s en su pantalla
+              </p>
             </div>
           </div>
-          <button
-            onClick={() => setShowPreRace(true)}
-            className="w-full py-4 rounded-xl font-black uppercase tracking-widest text-sm flex items-center justify-center gap-3 transition-all border"
-            style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.25)', color: '#ef4444' }}
-          >
-            <Clock size={18} />
-            ACTIVAR CUENTA REGRESIVA 60s
-          </button>
+          <PreRaceButton seconds={60} />
         </div>
 
-        {/* ── PASO 2 — PISTOLA (recordatorio) ── */}
-        <div className="bg-black/40 border border-white/8 rounded-2xl p-6">
+        {/* Paso 2 — Estado pistola */}
+        <div className="bg-black/40 border border-white/[0.08] rounded-2xl p-6">
           <div className="flex items-start gap-4">
             <div className="w-8 h-8 rounded-full flex items-center justify-center font-black text-sm flex-shrink-0"
               style={{ background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e' }}>2</div>
@@ -1413,19 +1351,20 @@ const TelemetryModule = () => {
               <p className="text-white font-black uppercase tracking-widest text-sm">Pistola de Salida</p>
               <p className="text-gray-500 text-[10px] uppercase tracking-widest mt-0.5">
                 {raceState === 'idle'
-                  ? 'Usa el botón DISPARAR PISTOLA en el cronómetro para iniciar la carrera y sincronizar start_time en Supabase'
+                  ? 'Usa DISPARAR PISTOLA — inicia cronómetro + escribe start_time en Supabase + señal race_start a atletas'
                   : raceState === 'running'
-                    ? `Carrera en curso — iniciada ${officialStartTime ? 'a las ' + new Date(officialStartTime).toLocaleTimeString('es-VE') : ''}`
-                    : raceState === 'paused'
-                      ? 'Cronómetro pausado — presiona REANUDAR para continuar'
-                      : `Carrera finalizada — tiempo total: ${formatElapsed(elapsedMs)}`
-                }
+                    ? `En curso desde ${officialStartTime ? new Date(officialStartTime).toLocaleTimeString('es-VE') : '—'}`
+                    : raceState === 'paused' ? 'Pausado — presiona REANUDAR'
+                    : `Finalizado — ${formatElapsed(elapsedMs)}`}
               </p>
               {raceState !== 'idle' && (
                 <div className="mt-3 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ background: stateColor, boxShadow: `0 0 6px ${stateColor}`, animation: raceState === 'running' ? 'chrono-blink 1s ease infinite' : undefined }} />
-                  <span className="text-xs font-black uppercase tracking-widest" style={{ color: stateColor }}>
-                    {{ idle: '', running: 'CORRIENDO', paused: 'PAUSADO', finished: 'COMPLETADO' }[raceState]}
+                  <div className="w-2 h-2 rounded-full" style={{
+                    background: color, boxShadow: `0 0 6px ${color}`,
+                    animation: raceState === 'running' ? 'chrono-blink 1s ease infinite' : undefined,
+                  }} />
+                  <span className="text-xs font-black uppercase tracking-widest" style={{ color }}>
+                    {stateLabel[raceState]}
                   </span>
                 </div>
               )}
@@ -1433,13 +1372,13 @@ const TelemetryModule = () => {
           </div>
         </div>
 
-        {/* ── Confirm Reset Modal ── */}
+        {/* Confirm Reset */}
         {confirmReset && createPortal(
           <div className="fixed inset-0 z-[9999999] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
             <div className="bg-[#0a0a0a] border border-red-500/30 rounded-3xl p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95">
               <div className="bg-red-500/15 p-3 rounded-2xl w-fit mb-5"><AlertTriangle className="text-red-500" size={24} /></div>
               <h3 className="text-xl font-black text-white uppercase italic mb-2">Resetear Cronómetro</h3>
-              <p className="text-gray-400 text-sm mb-8">El cronómetro volverá a cero. <span className="text-red-400">No borrará los datos en Supabase.</span></p>
+              <p className="text-gray-400 text-sm mb-8">Vuelve a cero. <span className="text-red-400">No borra Supabase.</span></p>
               <div className="flex gap-3">
                 <button onClick={() => setConfirmReset(false)} className="flex-1 py-4 rounded-xl bg-white/5 font-bold hover:bg-white/10 transition-all text-sm">Cancelar</button>
                 <button onClick={handleReset} className="flex-1 py-4 rounded-xl bg-red-600 hover:bg-red-500 font-black uppercase text-xs tracking-widest transition-all flex items-center justify-center gap-2">

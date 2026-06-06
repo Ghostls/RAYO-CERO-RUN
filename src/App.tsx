@@ -1,8 +1,8 @@
 /**
- * RAYO CERO — CORE ROUTER V7.4 (STABLE EVOLUTION - VALKYRON SHIELD)
+ * RAYO CERO — CORE ROUTER V7.5 (STABLE EVOLUTION - VALKYRON SHIELD)
  * Senior Dev: MIA / Gemini (Valkyron Group)
  * CEO: Lualdo Sciscioli
- * EVOLUCIÓN V7.4: Rutas del Portal del Atleta (/acceso, /perfil)
+ * EVOLUCIÓN V7.5: RaceSignalProvider integrado — countdown pre-carrera en todos los dispositivos
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -16,6 +16,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 // IMPORTACIONES DE COMPONENTES GLOBALES
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+
+// ✅ V7.5 — Provider global de señales de carrera
+import RaceSignalProvider from "./components/Racesignalprovider";
 
 import { lazy, Suspense } from "react";
 
@@ -42,22 +45,22 @@ const wrap = (Component: React.ComponentType) => (
   <Suspense fallback={<PageLoader />}><Component /></Suspense>
 );
 
-// PÁGINAS — lazy load (no bloquean el bundle inicial)
-const Index = lazy(() => import("./pages/Index"));
-const RaceDetail = lazy(() => import("./pages/RaceDetail"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const AdminLogin = lazy(() => import("./pages/AdminLogin"));
+// PÁGINAS — lazy load
+const Index          = lazy(() => import("./pages/Index"));
+const RaceDetail     = lazy(() => import("./pages/RaceDetail"));
+const NotFound       = lazy(() => import("./pages/NotFound"));
+const AdminLogin     = lazy(() => import("./pages/AdminLogin"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 
 // MÓDULOS ESPECÍFICOS — lazy load
 const RegistrationForm = lazy(() => import("./components/RegistrationForm"));
-const ResultsSection = lazy(() => import("./components/ResultsSection"));
-const RacesSection = lazy(() => import("./components/RacesSection"));
-const RaceTracker = lazy(() => import("./components/RaceTracker"));
-const TrackerLanding = lazy(() => import("./components/TrackerLanding"));
+const ResultsSection   = lazy(() => import("./components/ResultsSection"));
+const RacesSection     = lazy(() => import("./components/RacesSection"));
+const RaceTracker      = lazy(() => import("./components/RaceTracker"));
+const TrackerLanding   = lazy(() => import("./components/TrackerLanding"));
 
 // PORTAL DEL ATLETA — lazy load
-const AthleteAuth = lazy(() => import("./components/AthleteAuth"));
+const AthleteAuth    = lazy(() => import("./components/AthleteAuth"));
 const AthleteProfile = lazy(() => import("./components/Athleteprofile"));
 
 const queryClient = new QueryClient();
@@ -87,17 +90,17 @@ const AppContent = ({ session, loading }: { session: any; loading: boolean }) =>
       <main className="flex-grow">
         <Routes>
           {/* RUTAS PÚBLICAS */}
-          <Route path="/" element={wrap(Index)} />
-          <Route path="/carreras" element={wrap(RacesSection)} />
+          <Route path="/"           element={wrap(Index)} />
+          <Route path="/carreras"   element={wrap(RacesSection)} />
           <Route path="/carrera/:id" element={wrap(RaceDetail)} />
-          <Route path="/registro" element={wrap(RegistrationForm)} />
+          <Route path="/registro"   element={wrap(RegistrationForm)} />
           <Route path="/resultados" element={wrap(ResultsSection)} />
 
-          {/* TELEMETRÍA GPS — Mini PWA para corredores */}
-          <Route path="/tracker" element={wrap(TrackerLanding)} />
+          {/* TELEMETRÍA GPS */}
+          <Route path="/tracker"      element={wrap(TrackerLanding)} />
           <Route path="/tracker/:bib" element={<TrackerPage />} />
 
-          {/* PORTAL DEL ATLETA — Login sin contraseña + Perfil */}
+          {/* PORTAL DEL ATLETA */}
           <Route path="/acceso" element={wrap(AthleteAuth)} />
           <Route path="/perfil" element={wrap(AthleteProfile)} />
 
@@ -171,7 +174,16 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <AppContent session={session} loading={loading} />
+          {/*
+           * ✅ RaceSignalProvider — envuelve AppContent completo
+           * Escucha INSERT en race_signals (Supabase Realtime)
+           * Muestra RaceCountdown en CUALQUIER pantalla donde el atleta esté
+           * Admin → /admin-dashboard queda dentro pero el overlay
+           * no molesta porque el admin no tiene la app abierta como atleta
+           */}
+          <RaceSignalProvider eventName="WE RUN 10K NIGHT FEST">
+            <AppContent session={session} loading={loading} />
+          </RaceSignalProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>
