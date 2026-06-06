@@ -12,7 +12,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import RaceCountdown, { useRaceSignal, type RaceSignal } from './Racecountdown';
+import RaceCountdown, { useRaceSignal, type RaceSignal } from './RaceCountdown';
 
 interface Props {
   children: React.ReactNode;
