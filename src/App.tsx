@@ -18,7 +18,7 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
 // ✅ V7.5 — Provider global de señales de carrera
-import RaceSignalProvider from "./components/Racesignalprovider";
+import RaceSignalProvider from "./components/RaceSignalProvider";
 
 import { lazy, Suspense } from "react";
 
