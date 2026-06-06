@@ -18,6 +18,8 @@ import { useState, useCallback, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import type { GeoPoint } from '@/components/RouteMapStrava';
+import sponsor15 from '@/assets/15.png';
+import sponsor22 from '@/assets/22.png';
 
 const RouteMapStrava = lazy(() => import('@/components/RouteMapStrava'));
 
@@ -79,8 +81,8 @@ const parseGpsTrack = (raw: string | null): GeoPoint[] => {
 
 /* ─── Sponsors ──────────────────────────────────────────────── */
 const SPONSORS = [
-  { src: 'src/assets/15.png', alt: 'Sponsor 15' },
-  { src: 'src/assets/22.png', alt: 'Sponsor 22' },
+  { src: sponsor15, alt: 'Sponsor 15' },
+  { src: sponsor22, alt: 'Sponsor 22' },
 ];
 
 /* ─── CSS ───────────────────────────────────────────────────── */
@@ -607,7 +609,7 @@ export default function ResultsSection() {
         <div className="rs-header">
           <div className="rs-eyebrow">
             <span className="rs-eyebrow-dot" />
-            <span className="rs-eyebrow-text">WE RUN RAYOCERO 10K NIGHT FEST · 2026</span>
+            <span className="rs-eyebrow-text">WE RUN 10K NIGHT FEST · 2026</span>
           </div>
           <h1 className="rs-title">
             <span style={{ display: 'block' }}>MIS</span>
@@ -728,7 +730,7 @@ export default function ResultsSection() {
                 {/* Tiempo hero */}
                 <div className="rs-time-hero">
                   <div>
-                    <div className="rs-time-label">TIEMPO OFICIAL · WE RUN RAYOCERO 10K</div>
+                    <div className="rs-time-label">TIEMPO OFICIAL · WE RUN 10K</div>
                     <div className={`rs-time-value ${hasTime ? 'has-time' : ''}`}>
                       {hasTime ? formatTime(runner.finish_time_seconds!) : '--:--:--'}
                     </div>
@@ -798,7 +800,7 @@ export default function ResultsSection() {
                       <RouteMapStrava
                         points={gpsPoints}
                         athleteName={`${runner.nombre} ${runner.apellido}`}
-                        eventName="WE RUN RAYOCERO 10K NIGHT FEST"
+                        eventName="WE RUN 10K NIGHT FEST"
                         showShareCard={true}
                       />
                     </Suspense>
