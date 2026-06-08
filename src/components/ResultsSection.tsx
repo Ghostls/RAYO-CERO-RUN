@@ -54,6 +54,8 @@ interface JsonAtleta {
   nombre_completo: string;
   categoria: string;
   genero: string;
+  tiempo_oficial: string;   // tiempo pistola
+  tiempo_chip: string;      // tiempo chip (neto)
   tiempo_bruto: string;
   tiempo_neto: string;
   posicion_general: number;
@@ -90,7 +92,18 @@ const formatPace = (secs: number, distKm = 10): string => {
   const paceSecPerKm = secs / distKm;
   const m = Math.floor(paceSecPerKm / 60);
   const s = Math.floor(paceSecPerKm % 60);
-  return `${m}:${String(s).padStart(2,'0')}`;
+  return `${m}'${String(s).padStart(2,'0')}"`;
+};
+
+// Normaliza el pace del JSON ("3'13"" o "3:13") a formato uniforme min'ss"
+const normalizePace = (p: string | null): string | null => {
+  if (!p) return null;
+  // Ya tiene formato correcto min'ss"
+  if (/^\d+'\d{2}"$/.test(p)) return p;
+  // Formato MM:SS → convertir
+  const m = p.match(/^(\d+):(\d{2})$/);
+  if (m) return `${m[1]}'${m[2]}"`;
+  return p;
 };
 
 const statusLabel = (status: string) => {
@@ -943,8 +956,10 @@ export default function ResultsSection() {
           const apellido = parts.slice(1).join(' ');
           // Convertir tiempo "HH:MM:SS" → segundos
           let finish_time_seconds: number | null = null;
-          if (jsonData.tiempo_neto && !jsonData.sin_tiempo) {
-            const tp = jsonData.tiempo_neto.split(':');
+          // Preferir tiempo_chip para finish_time_seconds, fallback a tiempo_neto/oficial
+          const tRef = jsonData.tiempo_chip || jsonData.tiempo_neto || jsonData.tiempo_oficial;
+          if (tRef && !jsonData.sin_tiempo) {
+            const tp = tRef.split(':');
             if (tp.length === 3) {
               finish_time_seconds = parseInt(tp[0])*3600 + parseInt(tp[1])*60 + parseFloat(tp[2]);
             } else if (tp.length === 2) {
@@ -1018,8 +1033,8 @@ export default function ResultsSection() {
   const pace      = hasTime ? formatPace(runner!.finish_time_seconds!) : null;
   const gpsPoints = runner ? parseGpsTrack(runner.gps_track) : [];
 
-  // Pace del JSON si Supabase no tiene datos de tiempo
-  const paceDisplay = pace ?? jsonAtleta?.pace ?? null;
+  // Pace — siempre en formato min'ss" (min/km)
+  const paceDisplay = pace ? normalizePace(pace) : normalizePace(jsonAtleta?.pace ?? null);
 
   return (
     <>
@@ -1177,32 +1192,39 @@ export default function ResultsSection() {
                         </div>
                       </div>
 
-                      {/* Tiempo hero */}
+                      {/* Tiempo hero — pistola + chip */}
                       <div className="rs-time-hero">
                         <div>
-                          <div className="rs-time-label">TIEMPO OFICIAL · WE RUN RAYOCERO 10K</div>
-                          <div className={`rs-time-value ${hasTime ? 'has-time' : ''}`}>
-                            {hasTime
-                              ? formatTime(runner.finish_time_seconds!)
-                              : jsonAtleta?.tiempo_neto && !jsonAtleta.sin_tiempo
-                                ? jsonAtleta.tiempo_neto
+                          <div className="rs-time-label">TIEMPO PISTOLA · WE RUN RAYOCERO 10K</div>
+                          <div className={`rs-time-value ${(jsonAtleta?.tiempo_oficial || hasTime) ? 'has-time' : ''}`}>
+                            {jsonAtleta?.tiempo_oficial && !jsonAtleta.sin_tiempo
+                              ? jsonAtleta.tiempo_oficial
+                              : hasTime
+                                ? formatTime(runner.finish_time_seconds!)
                                 : '--:--:--'
                             }
                           </div>
                         </div>
-                        {runner.split_time_seconds != null && (
-                          <div style={{ textAlign: 'right' }}>
-                            <div className="rs-time-label">CONTROL 5K</div>
-                            <div style={{
-                              fontFamily: "'Barlow Condensed', sans-serif",
-                              fontStyle: 'italic', fontWeight: 900,
-                              fontSize: 'clamp(2rem, 5vw, 3.5rem)',
-                              color: 'rgba(255,255,255,0.5)', lineHeight: 1,
-                            }}>
-                              {formatTime(runner.split_time_seconds)}
-                            </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div className="rs-time-label">TIEMPO CHIP</div>
+                          <div style={{
+                            fontFamily: "'Barlow Condensed', sans-serif",
+                            fontStyle: 'italic', fontWeight: 900,
+                            fontSize: 'clamp(2rem, 5vw, 3.5rem)',
+                            color: '#00f2ff', lineHeight: 1,
+                            textShadow: '0 0 20px rgba(0,242,255,0.3)',
+                          }}>
+                            {jsonAtleta?.tiempo_chip && !jsonAtleta.sin_tiempo
+                              ? jsonAtleta.tiempo_chip
+                              : runner.split_time_seconds != null
+                                ? formatTime(runner.split_time_seconds)
+                                : '--:--:--'
+                            }
                           </div>
-                        )}
+                          <div style={{ fontSize: '7px', color: 'rgba(255,255,255,0.2)', letterSpacing: '0.3em', textTransform: 'uppercase', marginTop: '4px' }}>
+                            tiempo neto oficial
+                          </div>
+                        </div>
                       </div>
 
                       {/* Stats */}
