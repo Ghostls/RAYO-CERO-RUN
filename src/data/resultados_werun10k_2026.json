@@ -13,7 +13,8 @@
     "posicion_categoria": 1,
     "pace": "3'13\"",
     "velocidad_kmh": 18.6,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 3
   },
   {
     "dorsal": 864,
@@ -29,7 +30,8 @@
     "posicion_categoria": 2,
     "pace": "3'14\"",
     "velocidad_kmh": 18.5,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 3
   },
   {
     "dorsal": 749,
@@ -45,7 +47,8 @@
     "posicion_categoria": 3,
     "pace": "2'59\"",
     "velocidad_kmh": 20.11,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 3
   },
   {
     "dorsal": 1081,
@@ -61,7 +64,8 @@
     "posicion_categoria": 1,
     "pace": "3'14\"",
     "velocidad_kmh": 18.53,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 732,
@@ -77,7 +81,8 @@
     "posicion_categoria": 1,
     "pace": "3'20\"",
     "velocidad_kmh": 17.93,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 340,
@@ -93,7 +98,8 @@
     "posicion_categoria": 1,
     "pace": "3'26\"",
     "velocidad_kmh": 17.48,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 373,
@@ -109,7 +115,8 @@
     "posicion_categoria": 2,
     "pace": "3'24\"",
     "velocidad_kmh": 17.62,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 330,
@@ -125,7 +132,8 @@
     "posicion_categoria": 2,
     "pace": "3'27\"",
     "velocidad_kmh": 17.38,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 921,
@@ -141,7 +149,8 @@
     "posicion_categoria": 1,
     "pace": "3'25\"",
     "velocidad_kmh": 17.5,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 859,
@@ -157,7 +166,8 @@
     "posicion_categoria": 3,
     "pace": "3'14\"",
     "velocidad_kmh": 18.49,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 860,
@@ -173,7 +183,8 @@
     "posicion_categoria": 2,
     "pace": "3'28\"",
     "velocidad_kmh": 17.28,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 988,
@@ -189,7 +200,8 @@
     "posicion_categoria": 4,
     "pace": "3'32\"",
     "velocidad_kmh": 16.98,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 900,
@@ -205,7 +217,8 @@
     "posicion_categoria": 3,
     "pace": "3'20\"",
     "velocidad_kmh": 17.98,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 315,
@@ -221,7 +234,8 @@
     "posicion_categoria": 3,
     "pace": "3'39\"",
     "velocidad_kmh": 16.44,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 292,
@@ -237,7 +251,8 @@
     "posicion_categoria": 1,
     "pace": "3'42\"",
     "velocidad_kmh": 16.22,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 967,
@@ -253,7 +268,8 @@
     "posicion_categoria": 1,
     "pace": "3'40\"",
     "velocidad_kmh": 16.33,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 1033,
@@ -269,7 +285,8 @@
     "posicion_categoria": 1,
     "pace": "3'52\"",
     "velocidad_kmh": 15.49,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 3
   },
   {
     "dorsal": 946,
@@ -285,7 +302,8 @@
     "posicion_categoria": 2,
     "pace": "3'48\"",
     "velocidad_kmh": 15.73,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 3
   },
   {
     "dorsal": 920,
@@ -301,7 +319,8 @@
     "posicion_categoria": 1,
     "pace": "3'53\"",
     "velocidad_kmh": 15.4,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 1056,
@@ -317,7 +336,8 @@
     "posicion_categoria": 5,
     "pace": "3'53\"",
     "velocidad_kmh": 15.41,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 142,
@@ -333,7 +353,8 @@
     "posicion_categoria": 6,
     "pace": "3'42\"",
     "velocidad_kmh": 16.19,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 378,
@@ -349,7 +370,8 @@
     "posicion_categoria": 2,
     "pace": "3'54\"",
     "velocidad_kmh": 15.35,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 1064,
@@ -365,7 +387,8 @@
     "posicion_categoria": 2,
     "pace": "3'54\"",
     "velocidad_kmh": 15.36,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 282,
@@ -381,7 +404,8 @@
     "posicion_categoria": 3,
     "pace": "4'02\"",
     "velocidad_kmh": 14.82,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 3
   },
   {
     "dorsal": 965,
@@ -397,7 +421,8 @@
     "posicion_categoria": 1,
     "pace": "4'03\"",
     "velocidad_kmh": 14.81,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 87,
@@ -413,7 +438,8 @@
     "posicion_categoria": 4,
     "pace": "4'02\"",
     "velocidad_kmh": 14.87,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 277,
@@ -429,7 +455,8 @@
     "posicion_categoria": 2,
     "pace": "3'46\"",
     "velocidad_kmh": 15.89,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 180,
@@ -445,7 +472,8 @@
     "posicion_categoria": 2,
     "pace": "3'56\"",
     "velocidad_kmh": 15.22,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 919,
@@ -461,7 +489,8 @@
     "posicion_categoria": 1,
     "pace": "4'03\"",
     "velocidad_kmh": 14.76,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 710,
@@ -477,7 +506,8 @@
     "posicion_categoria": 1,
     "pace": "3'59\"",
     "velocidad_kmh": 15.04,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 110,
@@ -493,7 +523,8 @@
     "posicion_categoria": 3,
     "pace": "4'10\"",
     "velocidad_kmh": 14.39,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 947,
@@ -509,7 +540,8 @@
     "posicion_categoria": 4,
     "pace": "4'08\"",
     "velocidad_kmh": 14.46,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 112,
@@ -525,7 +557,8 @@
     "posicion_categoria": 2,
     "pace": "3'56\"",
     "velocidad_kmh": 15.21,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 826,
@@ -541,7 +574,8 @@
     "posicion_categoria": 5,
     "pace": "3'59\"",
     "velocidad_kmh": 15.01,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 1057,
@@ -557,7 +591,8 @@
     "posicion_categoria": 1,
     "pace": "4'09\"",
     "velocidad_kmh": 14.46,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 875,
@@ -573,7 +608,8 @@
     "posicion_categoria": 3,
     "pace": "4'02\"",
     "velocidad_kmh": 14.86,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 169,
@@ -589,7 +625,8 @@
     "posicion_categoria": 7,
     "pace": "4'06\"",
     "velocidad_kmh": 14.62,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 337,
@@ -605,7 +642,8 @@
     "posicion_categoria": 4,
     "pace": "4'15\"",
     "velocidad_kmh": 14.1,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 867,
@@ -621,7 +659,8 @@
     "posicion_categoria": 5,
     "pace": "4'17\"",
     "velocidad_kmh": 13.96,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 1078,
@@ -637,7 +676,8 @@
     "posicion_categoria": 6,
     "pace": "4'11\"",
     "velocidad_kmh": 14.29,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 111,
@@ -653,7 +693,8 @@
     "posicion_categoria": 2,
     "pace": "4'11\"",
     "velocidad_kmh": 14.33,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 796,
@@ -669,7 +710,8 @@
     "posicion_categoria": 3,
     "pace": "4'20\"",
     "velocidad_kmh": 13.8,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 724,
@@ -685,7 +727,8 @@
     "posicion_categoria": 8,
     "pace": "4'19\"",
     "velocidad_kmh": 13.87,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 291,
@@ -701,7 +744,8 @@
     "posicion_categoria": 1,
     "pace": "4'21\"",
     "velocidad_kmh": 13.79,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 1079,
@@ -717,7 +761,8 @@
     "posicion_categoria": 6,
     "pace": "4'10\"",
     "velocidad_kmh": 14.39,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 94,
@@ -733,7 +778,8 @@
     "posicion_categoria": 5,
     "pace": "4'20\"",
     "velocidad_kmh": 13.82,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 776,
@@ -749,7 +795,8 @@
     "posicion_categoria": 7,
     "pace": "4'22\"",
     "velocidad_kmh": 13.73,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 1016,
@@ -765,7 +812,8 @@
     "posicion_categoria": 9,
     "pace": "4'23\"",
     "velocidad_kmh": 13.68,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 1091,
@@ -781,7 +829,8 @@
     "posicion_categoria": 3,
     "pace": "4'22\"",
     "velocidad_kmh": 13.7,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 174,
@@ -797,7 +846,8 @@
     "posicion_categoria": 8,
     "pace": "4'24\"",
     "velocidad_kmh": 13.63,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 279,
@@ -813,7 +863,8 @@
     "posicion_categoria": 2,
     "pace": "4'17\"",
     "velocidad_kmh": 13.99,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 816,
@@ -829,7 +880,8 @@
     "posicion_categoria": 7,
     "pace": "4'26\"",
     "velocidad_kmh": 13.49,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 108,
@@ -845,7 +897,8 @@
     "posicion_categoria": 10,
     "pace": "4'27\"",
     "velocidad_kmh": 13.47,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 716,
@@ -861,7 +914,8 @@
     "posicion_categoria": 11,
     "pace": "4'29\"",
     "velocidad_kmh": 13.37,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 918,
@@ -877,7 +931,8 @@
     "posicion_categoria": 3,
     "pace": "4'30\"",
     "velocidad_kmh": 13.32,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 367,
@@ -893,7 +948,8 @@
     "posicion_categoria": 12,
     "pace": "4'27\"",
     "velocidad_kmh": 13.48,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 376,
@@ -909,7 +965,8 @@
     "posicion_categoria": 6,
     "pace": "4'31\"",
     "velocidad_kmh": 13.26,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 813,
@@ -925,7 +982,8 @@
     "posicion_categoria": 13,
     "pace": "4'16\"",
     "velocidad_kmh": 14.02,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 113,
@@ -941,7 +999,8 @@
     "posicion_categoria": 1,
     "pace": "4'33\"",
     "velocidad_kmh": 13.15,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 853,
@@ -957,7 +1016,8 @@
     "posicion_categoria": 7,
     "pace": "4'34\"",
     "velocidad_kmh": 13.12,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 1061,
@@ -973,7 +1033,8 @@
     "posicion_categoria": 14,
     "pace": "4'35\"",
     "velocidad_kmh": 13.07,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 714,
@@ -989,7 +1050,8 @@
     "posicion_categoria": 15,
     "pace": "4'35\"",
     "velocidad_kmh": 13.06,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 821,
@@ -1005,7 +1067,8 @@
     "posicion_categoria": 4,
     "pace": "4'25\"",
     "velocidad_kmh": 13.55,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 258,
@@ -1021,7 +1084,8 @@
     "posicion_categoria": 3,
     "pace": "4'37\"",
     "velocidad_kmh": 12.98,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 356,
@@ -1037,7 +1101,8 @@
     "posicion_categoria": 5,
     "pace": "4'25\"",
     "velocidad_kmh": 13.56,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 369,
@@ -1053,7 +1118,8 @@
     "posicion_categoria": 4,
     "pace": "4'25\"",
     "velocidad_kmh": 13.56,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 855,
@@ -1069,7 +1135,8 @@
     "posicion_categoria": 16,
     "pace": "4'39\"",
     "velocidad_kmh": 12.88,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 1006,
@@ -1085,7 +1152,8 @@
     "posicion_categoria": 6,
     "pace": "4'41\"",
     "velocidad_kmh": 12.78,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 1027,
@@ -1101,7 +1169,8 @@
     "posicion_categoria": 4,
     "pace": "4'39\"",
     "velocidad_kmh": 12.88,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 229,
@@ -1117,7 +1186,8 @@
     "posicion_categoria": 8,
     "pace": "4'44\"",
     "velocidad_kmh": 12.65,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 773,
@@ -1133,7 +1203,8 @@
     "posicion_categoria": 17,
     "pace": "4'44\"",
     "velocidad_kmh": 12.67,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 166,
@@ -1149,7 +1220,8 @@
     "posicion_categoria": 9,
     "pace": "4'42\"",
     "velocidad_kmh": 12.75,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 284,
@@ -1165,7 +1237,8 @@
     "posicion_categoria": 18,
     "pace": "4'47\"",
     "velocidad_kmh": 12.54,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 705,
@@ -1181,7 +1254,8 @@
     "posicion_categoria": 5,
     "pace": "4'34\"",
     "velocidad_kmh": 13.12,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 263,
@@ -1197,7 +1271,8 @@
     "posicion_categoria": 3,
     "pace": "4'49\"",
     "velocidad_kmh": 12.42,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 341,
@@ -1213,7 +1288,8 @@
     "posicion_categoria": 2,
     "pace": "4'38\"",
     "velocidad_kmh": 12.93,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 305,
@@ -1229,7 +1305,8 @@
     "posicion_categoria": 4,
     "pace": "4'49\"",
     "velocidad_kmh": 12.42,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 217,
@@ -1245,7 +1322,8 @@
     "posicion_categoria": 9,
     "pace": "4'42\"",
     "velocidad_kmh": 12.73,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 355,
@@ -1261,7 +1339,8 @@
     "posicion_categoria": 19,
     "pace": "4'45\"",
     "velocidad_kmh": 12.61,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 708,
@@ -1277,7 +1356,8 @@
     "posicion_categoria": 20,
     "pace": "4'46\"",
     "velocidad_kmh": 12.57,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 306,
@@ -1293,7 +1373,8 @@
     "posicion_categoria": 10,
     "pace": "4'42\"",
     "velocidad_kmh": 12.74,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 231,
@@ -1309,7 +1390,8 @@
     "posicion_categoria": 10,
     "pace": "4'37\"",
     "velocidad_kmh": 12.95,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 372,
@@ -1325,7 +1407,8 @@
     "posicion_categoria": 5,
     "pace": "4'49\"",
     "velocidad_kmh": 12.44,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 331,
@@ -1341,7 +1424,8 @@
     "posicion_categoria": 11,
     "pace": "4'57\"",
     "velocidad_kmh": 12.12,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 173,
@@ -1357,7 +1441,8 @@
     "posicion_categoria": 8,
     "pace": "4'54\"",
     "velocidad_kmh": 12.21,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 1080,
@@ -1373,7 +1458,8 @@
     "posicion_categoria": 11,
     "pace": "4'42\"",
     "velocidad_kmh": 12.75,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 294,
@@ -1389,7 +1475,8 @@
     "posicion_categoria": 12,
     "pace": "4'55\"",
     "velocidad_kmh": 12.18,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 768,
@@ -1405,7 +1492,8 @@
     "posicion_categoria": 6,
     "pace": "4'56\"",
     "velocidad_kmh": 12.15,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 728,
@@ -1421,7 +1509,8 @@
     "posicion_categoria": 3,
     "pace": "4'42\"",
     "velocidad_kmh": 12.73,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 928,
@@ -1437,7 +1526,8 @@
     "posicion_categoria": 7,
     "pace": "4'57\"",
     "velocidad_kmh": 12.09,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 326,
@@ -1453,7 +1543,8 @@
     "posicion_categoria": 21,
     "pace": "4'54\"",
     "velocidad_kmh": 12.21,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 1008,
@@ -1469,7 +1560,8 @@
     "posicion_categoria": 5,
     "pace": "5'01\"",
     "velocidad_kmh": 11.93,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 783,
@@ -1485,7 +1577,8 @@
     "posicion_categoria": 6,
     "pace": "5'02\"",
     "velocidad_kmh": 11.92,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 255,
@@ -1501,7 +1594,8 @@
     "posicion_categoria": 12,
     "pace": "5'02\"",
     "velocidad_kmh": 11.92,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 935,
@@ -1517,7 +1611,8 @@
     "posicion_categoria": 13,
     "pace": "5'04\"",
     "velocidad_kmh": 11.83,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 168,
@@ -1533,7 +1628,8 @@
     "posicion_categoria": 7,
     "pace": "5'03\"",
     "velocidad_kmh": 11.85,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 727,
@@ -1549,7 +1645,8 @@
     "posicion_categoria": 14,
     "pace": "4'50\"",
     "velocidad_kmh": 12.41,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 922,
@@ -1565,7 +1662,8 @@
     "posicion_categoria": 9,
     "pace": "5'04\"",
     "velocidad_kmh": 11.82,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 1024,
@@ -1581,7 +1679,8 @@
     "posicion_categoria": 7,
     "pace": "4'51\"",
     "velocidad_kmh": 12.34,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 755,
@@ -1597,7 +1696,8 @@
     "posicion_categoria": 8,
     "pace": "4'51\"",
     "velocidad_kmh": 12.36,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 1055,
@@ -1613,7 +1713,8 @@
     "posicion_categoria": 4,
     "pace": "5'01\"",
     "velocidad_kmh": 11.92,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 115,
@@ -1629,7 +1730,8 @@
     "posicion_categoria": 13,
     "pace": "5'05\"",
     "velocidad_kmh": 11.78,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 338,
@@ -1645,7 +1747,8 @@
     "posicion_categoria": 10,
     "pace": "5'06\"",
     "velocidad_kmh": 11.74,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 940,
@@ -1661,7 +1764,8 @@
     "posicion_categoria": 2,
     "pace": "5'00\"",
     "velocidad_kmh": 12.0,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 366,
@@ -1677,7 +1781,8 @@
     "posicion_categoria": 14,
     "pace": "5'07\"",
     "velocidad_kmh": 11.7,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 48,
@@ -1693,7 +1798,8 @@
     "posicion_categoria": 9,
     "pace": "4'58\"",
     "velocidad_kmh": 12.08,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 211,
@@ -1709,7 +1815,8 @@
     "posicion_categoria": 8,
     "pace": "5'08\"",
     "velocidad_kmh": 11.66,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 285,
@@ -1725,7 +1832,8 @@
     "posicion_categoria": 15,
     "pace": "5'09\"",
     "velocidad_kmh": 11.62,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 944,
@@ -1741,7 +1849,8 @@
     "posicion_categoria": 22,
     "pace": "5'09\"",
     "velocidad_kmh": 11.64,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 770,
@@ -1757,7 +1866,8 @@
     "posicion_categoria": 23,
     "pace": "5'02\"",
     "velocidad_kmh": 11.9,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 371,
@@ -1773,7 +1883,8 @@
     "posicion_categoria": 4,
     "pace": "5'03\"",
     "velocidad_kmh": 11.87,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 324,
@@ -1789,7 +1900,8 @@
     "posicion_categoria": 15,
     "pace": "5'00\"",
     "velocidad_kmh": 11.99,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 852,
@@ -1805,7 +1917,8 @@
     "posicion_categoria": 5,
     "pace": "5'11\"",
     "velocidad_kmh": 11.55,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 195,
@@ -1821,7 +1934,8 @@
     "posicion_categoria": 24,
     "pace": "5'09\"",
     "velocidad_kmh": 11.62,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 973,
@@ -1837,7 +1951,8 @@
     "posicion_categoria": 16,
     "pace": "5'08\"",
     "velocidad_kmh": 11.66,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 119,
@@ -1853,7 +1968,8 @@
     "posicion_categoria": 17,
     "pace": "5'12\"",
     "velocidad_kmh": 11.53,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 861,
@@ -1869,7 +1985,8 @@
     "posicion_categoria": 6,
     "pace": "5'11\"",
     "velocidad_kmh": 11.57,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 267,
@@ -1885,7 +2002,8 @@
     "posicion_categoria": 18,
     "pace": "5'06\"",
     "velocidad_kmh": 11.73,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 316,
@@ -1901,7 +2019,8 @@
     "posicion_categoria": 25,
     "pace": "5'13\"",
     "velocidad_kmh": 11.49,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 851,
@@ -1917,7 +2036,8 @@
     "posicion_categoria": 26,
     "pace": "5'14\"",
     "velocidad_kmh": 11.46,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 902,
@@ -1933,7 +2053,8 @@
     "posicion_categoria": 27,
     "pace": "5'10\"",
     "velocidad_kmh": 11.59,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 1036,
@@ -1949,7 +2070,8 @@
     "posicion_categoria": 10,
     "pace": "5'15\"",
     "velocidad_kmh": 11.42,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 179,
@@ -1965,7 +2087,8 @@
     "posicion_categoria": 28,
     "pace": "5'13\"",
     "velocidad_kmh": 11.5,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 314,
@@ -1981,7 +2104,8 @@
     "posicion_categoria": 29,
     "pace": "5'13\"",
     "velocidad_kmh": 11.47,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 299,
@@ -1997,7 +2121,8 @@
     "posicion_categoria": 16,
     "pace": "5'09\"",
     "velocidad_kmh": 11.62,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 747,
@@ -2013,7 +2138,8 @@
     "posicion_categoria": 30,
     "pace": "5'11\"",
     "velocidad_kmh": 11.58,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 250,
@@ -2029,7 +2155,8 @@
     "posicion_categoria": 31,
     "pace": "5'18\"",
     "velocidad_kmh": 11.32,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 886,
@@ -2045,7 +2172,8 @@
     "posicion_categoria": 11,
     "pace": "5'15\"",
     "velocidad_kmh": 11.42,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 345,
@@ -2061,7 +2189,8 @@
     "posicion_categoria": 19,
     "pace": "5'16\"",
     "velocidad_kmh": 11.39,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 344,
@@ -2077,7 +2206,8 @@
     "posicion_categoria": 32,
     "pace": "5'16\"",
     "velocidad_kmh": 11.39,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 133,
@@ -2093,7 +2223,8 @@
     "posicion_categoria": 20,
     "pace": "5'17\"",
     "velocidad_kmh": 11.36,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 290,
@@ -2109,7 +2240,8 @@
     "posicion_categoria": 17,
     "pace": "5'19\"",
     "velocidad_kmh": 11.28,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 95,
@@ -2125,7 +2257,8 @@
     "posicion_categoria": 5,
     "pace": "5'20\"",
     "velocidad_kmh": 11.23,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 301,
@@ -2141,7 +2274,8 @@
     "posicion_categoria": 21,
     "pace": "5'13\"",
     "velocidad_kmh": 11.49,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 843,
@@ -2157,7 +2291,8 @@
     "posicion_categoria": 6,
     "pace": "5'22\"",
     "velocidad_kmh": 11.16,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 863,
@@ -2173,7 +2308,8 @@
     "posicion_categoria": 12,
     "pace": "5'23\"",
     "velocidad_kmh": 11.14,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 106,
@@ -2189,7 +2325,8 @@
     "posicion_categoria": 11,
     "pace": "5'22\"",
     "velocidad_kmh": 11.15,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 128,
@@ -2205,7 +2342,8 @@
     "posicion_categoria": 13,
     "pace": "5'07\"",
     "velocidad_kmh": 11.7,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 50,
@@ -2221,7 +2359,8 @@
     "posicion_categoria": 18,
     "pace": "5'19\"",
     "velocidad_kmh": 11.27,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 270,
@@ -2237,7 +2376,8 @@
     "posicion_categoria": 33,
     "pace": "5'19\"",
     "velocidad_kmh": 11.28,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 734,
@@ -2253,7 +2393,8 @@
     "posicion_categoria": 19,
     "pace": "5'21\"",
     "velocidad_kmh": 11.18,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 911,
@@ -2269,7 +2410,8 @@
     "posicion_categoria": 6,
     "pace": "5'24\"",
     "velocidad_kmh": 11.1,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 980,
@@ -2285,7 +2427,8 @@
     "posicion_categoria": 14,
     "pace": "5'22\"",
     "velocidad_kmh": 11.16,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 223,
@@ -2301,7 +2444,8 @@
     "posicion_categoria": 34,
     "pace": "5'22\"",
     "velocidad_kmh": 11.17,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 765,
@@ -2317,7 +2461,8 @@
     "posicion_categoria": 4,
     "pace": "5'24\"",
     "velocidad_kmh": 11.08,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 1075,
@@ -2333,7 +2478,8 @@
     "posicion_categoria": 5,
     "pace": "5'26\"",
     "velocidad_kmh": 11.04,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 991,
@@ -2349,7 +2495,8 @@
     "posicion_categoria": 6,
     "pace": "5'26\"",
     "velocidad_kmh": 11.04,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 83,
@@ -2365,7 +2512,8 @@
     "posicion_categoria": 20,
     "pace": "5'16\"",
     "velocidad_kmh": 11.39,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 848,
@@ -2381,7 +2529,8 @@
     "posicion_categoria": 21,
     "pace": "5'24\"",
     "velocidad_kmh": 11.09,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 720,
@@ -2397,7 +2546,8 @@
     "posicion_categoria": 9,
     "pace": "5'27\"",
     "velocidad_kmh": 11.01,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 707,
@@ -2413,7 +2563,8 @@
     "posicion_categoria": 2,
     "pace": "5'27\"",
     "velocidad_kmh": 11.01,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 718,
@@ -2429,7 +2580,8 @@
     "posicion_categoria": 35,
     "pace": "5'28\"",
     "velocidad_kmh": 10.97,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 84,
@@ -2445,7 +2597,8 @@
     "posicion_categoria": 7,
     "pace": "5'27\"",
     "velocidad_kmh": 11.01,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 808,
@@ -2461,7 +2614,8 @@
     "posicion_categoria": 15,
     "pace": "5'19\"",
     "velocidad_kmh": 11.25,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 332,
@@ -2477,7 +2631,8 @@
     "posicion_categoria": 22,
     "pace": "5'21\"",
     "velocidad_kmh": 11.18,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 1047,
@@ -2493,7 +2648,8 @@
     "posicion_categoria": 7,
     "pace": "5'29\"",
     "velocidad_kmh": 10.93,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 989,
@@ -2509,7 +2665,8 @@
     "posicion_categoria": 16,
     "pace": "5'15\"",
     "velocidad_kmh": 11.42,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 877,
@@ -2525,7 +2682,8 @@
     "posicion_categoria": 36,
     "pace": "5'24\"",
     "velocidad_kmh": 11.09,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 269,
@@ -2541,7 +2699,8 @@
     "posicion_categoria": 10,
     "pace": "5'29\"",
     "velocidad_kmh": 10.91,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 225,
@@ -2557,7 +2716,8 @@
     "posicion_categoria": 23,
     "pace": "5'28\"",
     "velocidad_kmh": 10.95,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 339,
@@ -2573,7 +2733,8 @@
     "posicion_categoria": 24,
     "pace": "5'29\"",
     "velocidad_kmh": 10.92,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 41,
@@ -2589,7 +2750,8 @@
     "posicion_categoria": 25,
     "pace": "5'30\"",
     "velocidad_kmh": 10.91,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 814,
@@ -2605,7 +2767,8 @@
     "posicion_categoria": 37,
     "pace": "5'32\"",
     "velocidad_kmh": 10.83,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 949,
@@ -2621,7 +2784,8 @@
     "posicion_categoria": 22,
     "pace": "5'34\"",
     "velocidad_kmh": 10.77,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 1063,
@@ -2637,7 +2801,8 @@
     "posicion_categoria": 38,
     "pace": "5'30\"",
     "velocidad_kmh": 10.9,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 985,
@@ -2653,7 +2818,8 @@
     "posicion_categoria": 17,
     "pace": "5'26\"",
     "velocidad_kmh": 11.02,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 37,
@@ -2669,7 +2835,8 @@
     "posicion_categoria": 18,
     "pace": "5'31\"",
     "velocidad_kmh": 10.85,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 782,
@@ -2685,7 +2852,8 @@
     "posicion_categoria": 39,
     "pace": "5'22\"",
     "velocidad_kmh": 11.15,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 841,
@@ -2701,7 +2869,8 @@
     "posicion_categoria": 7,
     "pace": "5'34\"",
     "velocidad_kmh": 10.77,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 329,
@@ -2717,7 +2886,8 @@
     "posicion_categoria": 40,
     "pace": "5'32\"",
     "velocidad_kmh": 10.84,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 834,
@@ -2733,7 +2903,8 @@
     "posicion_categoria": 8,
     "pace": "5'34\"",
     "velocidad_kmh": 10.76,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 28,
@@ -2749,7 +2920,8 @@
     "posicion_categoria": 8,
     "pace": "5'36\"",
     "velocidad_kmh": 10.7,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 856,
@@ -2765,7 +2937,8 @@
     "posicion_categoria": 23,
     "pace": "5'30\"",
     "velocidad_kmh": 10.89,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 961,
@@ -2781,7 +2954,8 @@
     "posicion_categoria": 9,
     "pace": "5'25\"",
     "velocidad_kmh": 11.07,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 738,
@@ -2797,7 +2971,8 @@
     "posicion_categoria": 41,
     "pace": "5'34\"",
     "velocidad_kmh": 10.78,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 893,
@@ -2813,7 +2988,8 @@
     "posicion_categoria": 12,
     "pace": "5'37\"",
     "velocidad_kmh": 10.67,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 926,
@@ -2829,7 +3005,8 @@
     "posicion_categoria": 26,
     "pace": "5'37\"",
     "velocidad_kmh": 10.67,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 857,
@@ -2845,7 +3022,8 @@
     "posicion_categoria": 24,
     "pace": "5'31\"",
     "velocidad_kmh": 10.87,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 273,
@@ -2861,7 +3039,8 @@
     "posicion_categoria": 42,
     "pace": "5'40\"",
     "velocidad_kmh": 10.58,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 943,
@@ -2877,7 +3056,8 @@
     "posicion_categoria": 13,
     "pace": "5'40\"",
     "velocidad_kmh": 10.58,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 219,
@@ -2893,7 +3073,8 @@
     "posicion_categoria": 8,
     "pace": "5'42\"",
     "velocidad_kmh": 10.52,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 218,
@@ -2909,7 +3090,8 @@
     "posicion_categoria": 3,
     "pace": "5'42\"",
     "velocidad_kmh": 10.52,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 309,
@@ -2925,7 +3107,8 @@
     "posicion_categoria": 19,
     "pace": "5'38\"",
     "velocidad_kmh": 10.62,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 122,
@@ -2941,7 +3124,8 @@
     "posicion_categoria": 43,
     "pace": "5'33\"",
     "velocidad_kmh": 10.78,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 845,
@@ -2957,7 +3141,8 @@
     "posicion_categoria": 10,
     "pace": "5'43\"",
     "velocidad_kmh": 10.48,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 107,
@@ -2973,7 +3158,8 @@
     "posicion_categoria": 14,
     "pace": "5'41\"",
     "velocidad_kmh": 10.55,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 36,
@@ -2989,7 +3175,8 @@
     "posicion_categoria": 44,
     "pace": "5'38\"",
     "velocidad_kmh": 10.65,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 1,
@@ -3005,7 +3192,8 @@
     "posicion_categoria": 9,
     "pace": "5'42\"",
     "velocidad_kmh": 10.5,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 319,
@@ -3021,7 +3209,8 @@
     "posicion_categoria": 45,
     "pace": "5'43\"",
     "velocidad_kmh": 10.48,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 933,
@@ -3037,7 +3226,8 @@
     "posicion_categoria": 4,
     "pace": "5'48\"",
     "velocidad_kmh": 10.32,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 51,
@@ -3053,7 +3243,8 @@
     "posicion_categoria": 10,
     "pace": "5'46\"",
     "velocidad_kmh": 10.4,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 377,
@@ -3069,7 +3260,8 @@
     "posicion_categoria": 7,
     "pace": "5'40\"",
     "velocidad_kmh": 10.58,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 910,
@@ -3085,7 +3277,8 @@
     "posicion_categoria": 11,
     "pace": "5'45\"",
     "velocidad_kmh": 10.42,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 289,
@@ -3101,7 +3294,8 @@
     "posicion_categoria": 15,
     "pace": "5'33\"",
     "velocidad_kmh": 10.81,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 261,
@@ -3117,7 +3311,8 @@
     "posicion_categoria": 20,
     "pace": "5'48\"",
     "velocidad_kmh": 10.34,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 736,
@@ -3133,7 +3328,8 @@
     "posicion_categoria": 25,
     "pace": "5'42\"",
     "velocidad_kmh": 10.53,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 733,
@@ -3149,7 +3345,8 @@
     "posicion_categoria": 46,
     "pace": "5'46\"",
     "velocidad_kmh": 10.38,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 71,
@@ -3165,7 +3362,8 @@
     "posicion_categoria": 27,
     "pace": "5'44\"",
     "velocidad_kmh": 10.45,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 750,
@@ -3181,7 +3379,8 @@
     "posicion_categoria": 11,
     "pace": "5'49\"",
     "velocidad_kmh": 10.3,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 958,
@@ -3197,7 +3396,8 @@
     "posicion_categoria": 26,
     "pace": "5'42\"",
     "velocidad_kmh": 10.53,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 992,
@@ -3213,7 +3413,8 @@
     "posicion_categoria": 12,
     "pace": "5'49\"",
     "velocidad_kmh": 10.3,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 899,
@@ -3229,7 +3430,8 @@
     "posicion_categoria": 47,
     "pace": "5'47\"",
     "velocidad_kmh": 10.35,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 288,
@@ -3245,7 +3447,8 @@
     "posicion_categoria": 48,
     "pace": "5'49\"",
     "velocidad_kmh": 10.29,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 990,
@@ -3261,7 +3464,8 @@
     "posicion_categoria": 5,
     "pace": "5'49\"",
     "velocidad_kmh": 10.32,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 132,
@@ -3277,7 +3481,8 @@
     "posicion_categoria": 49,
     "pace": "5'42\"",
     "velocidad_kmh": 10.5,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 780,
@@ -3293,7 +3498,8 @@
     "posicion_categoria": 28,
     "pace": "5'46\"",
     "velocidad_kmh": 10.39,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 957,
@@ -3309,7 +3515,8 @@
     "posicion_categoria": 13,
     "pace": "5'51\"",
     "velocidad_kmh": 10.24,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 929,
@@ -3325,7 +3532,8 @@
     "posicion_categoria": 16,
     "pace": "5'51\"",
     "velocidad_kmh": 10.24,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 65,
@@ -3341,7 +3549,8 @@
     "posicion_categoria": 27,
     "pace": "5'43\"",
     "velocidad_kmh": 10.48,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 175,
@@ -3357,7 +3566,8 @@
     "posicion_categoria": 17,
     "pace": "5'52\"",
     "velocidad_kmh": 10.22,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 38,
@@ -3373,7 +3583,8 @@
     "posicion_categoria": 50,
     "pace": "5'52\"",
     "velocidad_kmh": 10.2,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 266,
@@ -3389,7 +3600,8 @@
     "posicion_categoria": 28,
     "pace": "5'52\"",
     "velocidad_kmh": 10.21,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 328,
@@ -3405,7 +3617,8 @@
     "posicion_categoria": 51,
     "pace": "5'51\"",
     "velocidad_kmh": 10.24,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 721,
@@ -3421,7 +3634,8 @@
     "posicion_categoria": 6,
     "pace": "5'47\"",
     "velocidad_kmh": 10.37,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 46,
@@ -3437,7 +3651,8 @@
     "posicion_categoria": 29,
     "pace": "5'53\"",
     "velocidad_kmh": 10.19,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 8,
@@ -3453,7 +3668,8 @@
     "posicion_categoria": 29,
     "pace": "5'46\"",
     "velocidad_kmh": 10.39,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 1077,
@@ -3469,7 +3685,8 @@
     "posicion_categoria": 12,
     "pace": "5'53\"",
     "velocidad_kmh": 10.2,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 769,
@@ -3485,7 +3702,8 @@
     "posicion_categoria": 21,
     "pace": "5'52\"",
     "velocidad_kmh": 10.22,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 304,
@@ -3501,7 +3719,8 @@
     "posicion_categoria": 9,
     "pace": "5'49\"",
     "velocidad_kmh": 10.31,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 963,
@@ -3517,7 +3736,8 @@
     "posicion_categoria": 11,
     "pace": "5'54\"",
     "velocidad_kmh": 10.16,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 897,
@@ -3533,7 +3753,8 @@
     "posicion_categoria": 13,
     "pace": "5'53\"",
     "velocidad_kmh": 10.19,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 1065,
@@ -3549,7 +3770,8 @@
     "posicion_categoria": 52,
     "pace": "5'50\"",
     "velocidad_kmh": 10.26,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 740,
@@ -3565,7 +3787,8 @@
     "posicion_categoria": 8,
     "pace": "5'45\"",
     "velocidad_kmh": 10.43,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 896,
@@ -3581,7 +3804,8 @@
     "posicion_categoria": 53,
     "pace": "5'53\"",
     "velocidad_kmh": 10.18,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 1034,
@@ -3597,7 +3821,8 @@
     "posicion_categoria": 14,
     "pace": "5'42\"",
     "velocidad_kmh": 10.51,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 1018,
@@ -3613,7 +3838,8 @@
     "posicion_categoria": 14,
     "pace": "5'55\"",
     "velocidad_kmh": 10.14,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 760,
@@ -3629,7 +3855,8 @@
     "posicion_categoria": 30,
     "pace": "5'52\"",
     "velocidad_kmh": 10.22,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 30,
@@ -3645,7 +3872,8 @@
     "posicion_categoria": 15,
     "pace": "5'57\"",
     "velocidad_kmh": 10.08,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 784,
@@ -3661,7 +3889,8 @@
     "posicion_categoria": 54,
     "pace": "5'48\"",
     "velocidad_kmh": 10.33,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 785,
@@ -3677,7 +3906,8 @@
     "posicion_categoria": 31,
     "pace": "5'57\"",
     "velocidad_kmh": 10.06,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 701,
@@ -3693,7 +3923,8 @@
     "posicion_categoria": 55,
     "pace": "5'58\"",
     "velocidad_kmh": 10.04,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 275,
@@ -3709,7 +3940,8 @@
     "posicion_categoria": 22,
     "pace": "5'46\"",
     "velocidad_kmh": 10.4,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 236,
@@ -3725,7 +3957,8 @@
     "posicion_categoria": 9,
     "pace": "5'58\"",
     "velocidad_kmh": 10.04,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 839,
@@ -3741,7 +3974,8 @@
     "posicion_categoria": 23,
     "pace": "5'48\"",
     "velocidad_kmh": 10.34,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 49,
@@ -3757,7 +3991,8 @@
     "posicion_categoria": 32,
     "pace": "5'56\"",
     "velocidad_kmh": 10.09,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 870,
@@ -3773,7 +4008,8 @@
     "posicion_categoria": 12,
     "pace": "6'00\"",
     "velocidad_kmh": 9.99,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 196,
@@ -3789,7 +4025,8 @@
     "posicion_categoria": 10,
     "pace": "5'57\"",
     "velocidad_kmh": 10.08,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 937,
@@ -3805,7 +4042,8 @@
     "posicion_categoria": 11,
     "pace": "6'00\"",
     "velocidad_kmh": 9.99,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 370,
@@ -3821,7 +4059,8 @@
     "posicion_categoria": 7,
     "pace": "6'01\"",
     "velocidad_kmh": 9.96,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 215,
@@ -3837,7 +4076,8 @@
     "posicion_categoria": 13,
     "pace": "5'59\"",
     "velocidad_kmh": 10.01,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 249,
@@ -3853,7 +4093,8 @@
     "posicion_categoria": 24,
     "pace": "6'01\"",
     "velocidad_kmh": 9.97,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 27,
@@ -3869,7 +4110,8 @@
     "posicion_categoria": 30,
     "pace": "5'51\"",
     "velocidad_kmh": 10.25,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 29,
@@ -3885,7 +4127,8 @@
     "posicion_categoria": 12,
     "pace": "6'02\"",
     "velocidad_kmh": 9.92,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 40,
@@ -3901,7 +4144,8 @@
     "posicion_categoria": 14,
     "pace": "5'54\"",
     "velocidad_kmh": 10.16,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 178,
@@ -3917,7 +4161,8 @@
     "posicion_categoria": 25,
     "pace": "6'00\"",
     "velocidad_kmh": 9.98,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 1021,
@@ -3933,7 +4178,8 @@
     "posicion_categoria": 10,
     "pace": "6'02\"",
     "velocidad_kmh": 9.92,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 1070,
@@ -3949,7 +4195,8 @@
     "posicion_categoria": 31,
     "pace": "6'01\"",
     "velocidad_kmh": 9.96,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 221,
@@ -3965,7 +4212,8 @@
     "posicion_categoria": 13,
     "pace": "5'58\"",
     "velocidad_kmh": 10.06,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 868,
@@ -3981,7 +4229,8 @@
     "posicion_categoria": 32,
     "pace": "6'01\"",
     "velocidad_kmh": 9.96,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 789,
@@ -3997,7 +4246,8 @@
     "posicion_categoria": 33,
     "pace": "5'56\"",
     "velocidad_kmh": 10.1,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 64,
@@ -4013,7 +4263,8 @@
     "posicion_categoria": 11,
     "pace": "6'02\"",
     "velocidad_kmh": 9.94,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 100,
@@ -4029,7 +4280,8 @@
     "posicion_categoria": 56,
     "pace": "6'10\"",
     "velocidad_kmh": 9.73,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 361,
@@ -4045,7 +4297,8 @@
     "posicion_categoria": 8,
     "pace": "5'52\"",
     "velocidad_kmh": 10.22,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 879,
@@ -4061,7 +4314,8 @@
     "posicion_categoria": 12,
     "pace": "6'03\"",
     "velocidad_kmh": 9.9,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 99,
@@ -4077,7 +4331,8 @@
     "posicion_categoria": 57,
     "pace": "6'03\"",
     "velocidad_kmh": 9.89,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 374,
@@ -4093,7 +4348,8 @@
     "posicion_categoria": 26,
     "pace": "6'03\"",
     "velocidad_kmh": 9.89,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 737,
@@ -4109,7 +4365,8 @@
     "posicion_categoria": 15,
     "pace": "6'07\"",
     "velocidad_kmh": 9.79,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 32,
@@ -4125,7 +4382,8 @@
     "posicion_categoria": 14,
     "pace": "6'04\"",
     "velocidad_kmh": 9.88,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 748,
@@ -4141,7 +4399,8 @@
     "posicion_categoria": 58,
     "pace": "6'04\"",
     "velocidad_kmh": 9.89,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 960,
@@ -4157,7 +4416,8 @@
     "posicion_categoria": 27,
     "pace": "6'09\"",
     "velocidad_kmh": 9.74,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 109,
@@ -4173,7 +4433,8 @@
     "posicion_categoria": 59,
     "pace": "6'07\"",
     "velocidad_kmh": 9.8,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 131,
@@ -4189,7 +4450,8 @@
     "posicion_categoria": 16,
     "pace": "6'03\"",
     "velocidad_kmh": 9.91,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 787,
@@ -4205,7 +4467,8 @@
     "posicion_categoria": 60,
     "pace": "6'09\"",
     "velocidad_kmh": 9.73,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 300,
@@ -4221,7 +4484,8 @@
     "posicion_categoria": 16,
     "pace": "6'00\"",
     "velocidad_kmh": 9.99,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 817,
@@ -4237,7 +4501,8 @@
     "posicion_categoria": 15,
     "pace": "6'10\"",
     "velocidad_kmh": 9.71,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 828,
@@ -4253,7 +4518,8 @@
     "posicion_categoria": 33,
     "pace": "6'05\"",
     "velocidad_kmh": 9.85,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 955,
@@ -4269,7 +4535,8 @@
     "posicion_categoria": 1,
     "pace": "6'11\"",
     "velocidad_kmh": 9.68,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 2
   },
   {
     "dorsal": 357,
@@ -4285,7 +4552,8 @@
     "posicion_categoria": 18,
     "pace": "6'12\"",
     "velocidad_kmh": 9.67,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 764,
@@ -4301,7 +4569,8 @@
     "posicion_categoria": 17,
     "pace": "6'09\"",
     "velocidad_kmh": 9.74,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 61,
@@ -4317,7 +4586,8 @@
     "posicion_categoria": 34,
     "pace": "6'03\"",
     "velocidad_kmh": 9.92,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 197,
@@ -4333,7 +4603,8 @@
     "posicion_categoria": 19,
     "pace": "6'10\"",
     "velocidad_kmh": 9.73,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 336,
@@ -4349,7 +4620,8 @@
     "posicion_categoria": 35,
     "pace": "6'10\"",
     "velocidad_kmh": 9.71,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 938,
@@ -4365,7 +4637,8 @@
     "posicion_categoria": 36,
     "pace": "6'05\"",
     "velocidad_kmh": 9.86,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 334,
@@ -4381,7 +4654,8 @@
     "posicion_categoria": 13,
     "pace": "5'59\"",
     "velocidad_kmh": 10.03,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 6,
@@ -4397,7 +4671,8 @@
     "posicion_categoria": 20,
     "pace": "6'11\"",
     "velocidad_kmh": 9.7,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 885,
@@ -4413,7 +4688,8 @@
     "posicion_categoria": 18,
     "pace": "6'14\"",
     "velocidad_kmh": 9.62,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 904,
@@ -4429,7 +4705,8 @@
     "posicion_categoria": 61,
     "pace": "6'13\"",
     "velocidad_kmh": 9.65,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 752,
@@ -4445,7 +4722,8 @@
     "posicion_categoria": 15,
     "pace": "6'12\"",
     "velocidad_kmh": 9.67,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 75,
@@ -4461,7 +4739,8 @@
     "posicion_categoria": 19,
     "pace": "6'11\"",
     "velocidad_kmh": 9.69,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 1085,
@@ -4477,7 +4756,8 @@
     "posicion_categoria": 34,
     "pace": "6'15\"",
     "velocidad_kmh": 9.58,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 908,
@@ -4493,7 +4773,8 @@
     "posicion_categoria": 62,
     "pace": "6'12\"",
     "velocidad_kmh": 9.67,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 323,
@@ -4509,7 +4790,8 @@
     "posicion_categoria": 20,
     "pace": "6'17\"",
     "velocidad_kmh": 9.54,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 763,
@@ -4525,7 +4807,8 @@
     "posicion_categoria": 21,
     "pace": "6'14\"",
     "velocidad_kmh": 9.62,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 364,
@@ -4541,7 +4824,8 @@
     "posicion_categoria": 63,
     "pace": "6'18\"",
     "velocidad_kmh": 9.52,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 962,
@@ -4557,7 +4841,8 @@
     "posicion_categoria": 37,
     "pace": "6'11\"",
     "velocidad_kmh": 9.68,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 127,
@@ -4573,7 +4858,8 @@
     "posicion_categoria": 22,
     "pace": "6'15\"",
     "velocidad_kmh": 9.6,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 335,
@@ -4589,7 +4875,8 @@
     "posicion_categoria": 64,
     "pace": "6'13\"",
     "velocidad_kmh": 9.64,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 835,
@@ -4605,7 +4892,8 @@
     "posicion_categoria": 14,
     "pace": "6'16\"",
     "velocidad_kmh": 9.55,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 317,
@@ -4621,7 +4909,8 @@
     "posicion_categoria": 65,
     "pace": "6'15\"",
     "velocidad_kmh": 9.58,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 1072,
@@ -4637,7 +4926,8 @@
     "posicion_categoria": 66,
     "pace": "6'07\"",
     "velocidad_kmh": 9.79,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 786,
@@ -4653,7 +4943,8 @@
     "posicion_categoria": 35,
     "pace": "6'07\"",
     "velocidad_kmh": 9.79,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 216,
@@ -4669,7 +4960,8 @@
     "posicion_categoria": 36,
     "pace": "6'19\"",
     "velocidad_kmh": 9.5,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 746,
@@ -4685,7 +4977,8 @@
     "posicion_categoria": 38,
     "pace": "6'14\"",
     "velocidad_kmh": 9.63,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 167,
@@ -4701,7 +4994,8 @@
     "posicion_categoria": 39,
     "pace": "6'17\"",
     "velocidad_kmh": 9.55,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 296,
@@ -4717,7 +5011,8 @@
     "posicion_categoria": 40,
     "pace": "6'22\"",
     "velocidad_kmh": 9.41,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 818,
@@ -4733,7 +5028,8 @@
     "posicion_categoria": 41,
     "pace": "6'22\"",
     "velocidad_kmh": 9.4,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 67,
@@ -4749,7 +5045,8 @@
     "posicion_categoria": 23,
     "pace": "6'22\"",
     "velocidad_kmh": 9.42,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 268,
@@ -4765,7 +5062,8 @@
     "posicion_categoria": 37,
     "pace": "6'24\"",
     "velocidad_kmh": 9.36,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 798,
@@ -4781,7 +5079,8 @@
     "posicion_categoria": 67,
     "pace": "6'24\"",
     "velocidad_kmh": 9.37,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 310,
@@ -4797,7 +5096,8 @@
     "posicion_categoria": 16,
     "pace": "6'14\"",
     "velocidad_kmh": 9.61,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 201,
@@ -4813,7 +5113,8 @@
     "posicion_categoria": 38,
     "pace": "6'21\"",
     "velocidad_kmh": 9.43,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 295,
@@ -4829,7 +5130,8 @@
     "posicion_categoria": 9,
     "pace": "6'24\"",
     "velocidad_kmh": 9.37,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 333,
@@ -4845,7 +5147,8 @@
     "posicion_categoria": 15,
     "pace": "6'15\"",
     "velocidad_kmh": 9.59,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 1015,
@@ -4861,7 +5164,8 @@
     "posicion_categoria": 68,
     "pace": "6'22\"",
     "velocidad_kmh": 9.41,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 359,
@@ -4877,7 +5181,8 @@
     "posicion_categoria": 69,
     "pace": "6'22\"",
     "velocidad_kmh": 9.41,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 975,
@@ -4893,7 +5198,8 @@
     "posicion_categoria": 28,
     "pace": "6'24\"",
     "velocidad_kmh": 9.35,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 795,
@@ -4909,7 +5215,8 @@
     "posicion_categoria": 17,
     "pace": "6'27\"",
     "velocidad_kmh": 9.29,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 719,
@@ -4925,7 +5232,8 @@
     "posicion_categoria": 10,
     "pace": "6'29\"",
     "velocidad_kmh": 9.24,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 102,
@@ -4941,7 +5249,8 @@
     "posicion_categoria": 70,
     "pace": "6'24\"",
     "velocidad_kmh": 9.36,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 996,
@@ -4957,7 +5266,8 @@
     "posicion_categoria": 16,
     "pace": "6'28\"",
     "velocidad_kmh": 9.27,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 12,
@@ -4973,7 +5283,8 @@
     "posicion_categoria": 39,
     "pace": "6'20\"",
     "velocidad_kmh": 9.46,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 825,
@@ -4989,7 +5300,8 @@
     "posicion_categoria": 18,
     "pace": "6'23\"",
     "velocidad_kmh": 9.39,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 103,
@@ -5005,7 +5317,8 @@
     "posicion_categoria": 71,
     "pace": "6'29\"",
     "velocidad_kmh": 9.25,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 126,
@@ -5021,7 +5334,8 @@
     "posicion_categoria": 29,
     "pace": "6'19\"",
     "velocidad_kmh": 9.48,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 901,
@@ -5037,7 +5351,8 @@
     "posicion_categoria": 24,
     "pace": "6'21\"",
     "velocidad_kmh": 9.43,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 797,
@@ -5053,7 +5368,8 @@
     "posicion_categoria": 16,
     "pace": "6'31\"",
     "velocidad_kmh": 9.2,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 972,
@@ -5069,7 +5385,8 @@
     "posicion_categoria": 25,
     "pace": "6'18\"",
     "velocidad_kmh": 9.52,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 812,
@@ -5085,7 +5402,8 @@
     "posicion_categoria": 17,
     "pace": "6'29\"",
     "velocidad_kmh": 9.24,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 19,
@@ -5101,7 +5419,8 @@
     "posicion_categoria": 18,
     "pace": "6'19\"",
     "velocidad_kmh": 9.49,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 756,
@@ -5117,7 +5436,8 @@
     "posicion_categoria": 72,
     "pace": "6'29\"",
     "velocidad_kmh": 9.25,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 286,
@@ -5133,7 +5453,8 @@
     "posicion_categoria": 40,
     "pace": "6'32\"",
     "velocidad_kmh": 9.17,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 959,
@@ -5149,7 +5470,8 @@
     "posicion_categoria": 17,
     "pace": "6'31\"",
     "velocidad_kmh": 9.19,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 205,
@@ -5165,7 +5487,8 @@
     "posicion_categoria": 26,
     "pace": "6'31\"",
     "velocidad_kmh": 9.2,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 775,
@@ -5181,7 +5504,8 @@
     "posicion_categoria": 73,
     "pace": "6'23\"",
     "velocidad_kmh": 9.38,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 823,
@@ -5197,7 +5521,8 @@
     "posicion_categoria": 19,
     "pace": "6'30\"",
     "velocidad_kmh": 9.21,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 1053,
@@ -5213,7 +5538,8 @@
     "posicion_categoria": 41,
     "pace": "6'32\"",
     "velocidad_kmh": 9.18,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 894,
@@ -5229,7 +5555,8 @@
     "posicion_categoria": 21,
     "pace": "6'32\"",
     "velocidad_kmh": 9.18,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 703,
@@ -5245,7 +5572,8 @@
     "posicion_categoria": 19,
     "pace": "6'31\"",
     "velocidad_kmh": 9.2,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 1046,
@@ -5261,7 +5589,8 @@
     "posicion_categoria": 18,
     "pace": "6'34\"",
     "velocidad_kmh": 9.13,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 966,
@@ -5277,7 +5606,8 @@
     "posicion_categoria": 27,
     "pace": "6'31\"",
     "velocidad_kmh": 9.19,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 162,
@@ -5293,7 +5623,8 @@
     "posicion_categoria": 74,
     "pace": "6'35\"",
     "velocidad_kmh": 9.1,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 774,
@@ -5309,7 +5640,8 @@
     "posicion_categoria": 42,
     "pace": "6'28\"",
     "velocidad_kmh": 9.27,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 144,
@@ -5325,7 +5657,8 @@
     "posicion_categoria": 75,
     "pace": "6'31\"",
     "velocidad_kmh": 9.2,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 862,
@@ -5341,7 +5674,8 @@
     "posicion_categoria": 28,
     "pace": "6'35\"",
     "velocidad_kmh": 9.11,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 1060,
@@ -5357,7 +5691,8 @@
     "posicion_categoria": 8,
     "pace": "6'37\"",
     "velocidad_kmh": 9.07,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 837,
@@ -5373,7 +5708,8 @@
     "posicion_categoria": 22,
     "pace": "6'26\"",
     "velocidad_kmh": 9.32,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 311,
@@ -5389,7 +5725,8 @@
     "posicion_categoria": 11,
     "pace": "6'23\"",
     "velocidad_kmh": 9.4,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 979,
@@ -5405,7 +5742,8 @@
     "posicion_categoria": 42,
     "pace": "6'28\"",
     "velocidad_kmh": 9.27,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 827,
@@ -5421,7 +5759,8 @@
     "posicion_categoria": 19,
     "pace": "6'35\"",
     "velocidad_kmh": 9.11,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 1000,
@@ -5437,7 +5776,8 @@
     "posicion_categoria": 76,
     "pace": "6'35\"",
     "velocidad_kmh": 9.11,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 895,
@@ -5453,7 +5793,8 @@
     "posicion_categoria": 43,
     "pace": "6'38\"",
     "velocidad_kmh": 9.02,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 890,
@@ -5469,7 +5810,8 @@
     "posicion_categoria": 20,
     "pace": "6'34\"",
     "velocidad_kmh": 9.12,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 297,
@@ -5485,7 +5827,8 @@
     "posicion_categoria": 77,
     "pace": "6'38\"",
     "velocidad_kmh": 9.04,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 121,
@@ -5501,7 +5844,8 @@
     "posicion_categoria": 29,
     "pace": "6'39\"",
     "velocidad_kmh": 9.02,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 81,
@@ -5517,7 +5861,8 @@
     "posicion_categoria": 78,
     "pace": "6'36\"",
     "velocidad_kmh": 9.08,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 1028,
@@ -5533,7 +5878,8 @@
     "posicion_categoria": 21,
     "pace": "6'40\"",
     "velocidad_kmh": 8.98,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 751,
@@ -5549,7 +5895,8 @@
     "posicion_categoria": 43,
     "pace": "6'29\"",
     "velocidad_kmh": 9.25,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 262,
@@ -5565,7 +5912,8 @@
     "posicion_categoria": 44,
     "pace": "6'42\"",
     "velocidad_kmh": 8.94,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 43,
@@ -5581,7 +5929,8 @@
     "posicion_categoria": 45,
     "pace": "6'39\"",
     "velocidad_kmh": 9.01,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 147,
@@ -5597,7 +5946,8 @@
     "posicion_categoria": 30,
     "pace": "6'31\"",
     "velocidad_kmh": 9.19,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 53,
@@ -5613,7 +5963,8 @@
     "posicion_categoria": 44,
     "pace": "6'39\"",
     "velocidad_kmh": 9.01,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 1035,
@@ -5629,7 +5980,8 @@
     "posicion_categoria": 20,
     "pace": "6'30\"",
     "velocidad_kmh": 9.21,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 325,
@@ -5645,7 +5997,8 @@
     "posicion_categoria": 12,
     "pace": "6'44\"",
     "velocidad_kmh": 8.91,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 114,
@@ -5661,7 +6014,8 @@
     "posicion_categoria": 79,
     "pace": "6'38\"",
     "velocidad_kmh": 9.04,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 307,
@@ -5677,7 +6031,8 @@
     "posicion_categoria": 21,
     "pace": "6'34\"",
     "velocidad_kmh": 9.12,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 881,
@@ -5693,7 +6048,8 @@
     "posicion_categoria": 46,
     "pace": "6'41\"",
     "velocidad_kmh": 8.96,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 788,
@@ -5709,7 +6065,8 @@
     "posicion_categoria": 22,
     "pace": "6'40\"",
     "velocidad_kmh": 8.98,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 1083,
@@ -5725,7 +6082,8 @@
     "posicion_categoria": 31,
     "pace": "6'48\"",
     "velocidad_kmh": 8.82,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 1069,
@@ -5741,7 +6099,8 @@
     "posicion_categoria": 9,
     "pace": "6'40\"",
     "velocidad_kmh": 8.99,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 993,
@@ -5757,7 +6116,8 @@
     "posicion_categoria": 32,
     "pace": "6'47\"",
     "velocidad_kmh": 8.84,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 1068,
@@ -5773,7 +6133,8 @@
     "posicion_categoria": 33,
     "pace": "6'47\"",
     "velocidad_kmh": 8.84,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 723,
@@ -5789,7 +6150,8 @@
     "posicion_categoria": 13,
     "pace": "6'50\"",
     "velocidad_kmh": 8.76,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 830,
@@ -5805,7 +6167,8 @@
     "posicion_categoria": 34,
     "pace": "6'46\"",
     "velocidad_kmh": 8.85,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 280,
@@ -5821,7 +6184,8 @@
     "posicion_categoria": 3,
     "pace": "6'48\"",
     "velocidad_kmh": 8.82,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 363,
@@ -5837,7 +6201,8 @@
     "posicion_categoria": 14,
     "pace": "6'38\"",
     "velocidad_kmh": 9.03,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 17,
@@ -5853,7 +6218,8 @@
     "posicion_categoria": 23,
     "pace": "6'42\"",
     "velocidad_kmh": 8.96,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 89,
@@ -5869,7 +6235,8 @@
     "posicion_categoria": 80,
     "pace": "6'47\"",
     "velocidad_kmh": 8.83,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 759,
@@ -5885,7 +6252,8 @@
     "posicion_categoria": 47,
     "pace": "6'48\"",
     "velocidad_kmh": 8.82,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 293,
@@ -5901,7 +6269,8 @@
     "posicion_categoria": 23,
     "pace": "6'50\"",
     "velocidad_kmh": 8.78,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 47,
@@ -5917,7 +6286,8 @@
     "posicion_categoria": 48,
     "pace": "6'53\"",
     "velocidad_kmh": 8.72,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 13,
@@ -5933,7 +6303,8 @@
     "posicion_categoria": 81,
     "pace": "6'53\"",
     "velocidad_kmh": 8.7,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 62,
@@ -5949,7 +6320,8 @@
     "posicion_categoria": 22,
     "pace": "6'50\"",
     "velocidad_kmh": 8.78,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 1071,
@@ -5965,7 +6337,8 @@
     "posicion_categoria": 4,
     "pace": "6'48\"",
     "velocidad_kmh": 8.8,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 762,
@@ -5981,7 +6354,8 @@
     "posicion_categoria": 5,
     "pace": "6'54\"",
     "velocidad_kmh": 8.69,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 878,
@@ -5997,7 +6371,8 @@
     "posicion_categoria": 6,
     "pace": "6'49\"",
     "velocidad_kmh": 8.79,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 913,
@@ -6013,7 +6388,8 @@
     "posicion_categoria": 45,
     "pace": "6'50\"",
     "velocidad_kmh": 8.77,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 1011,
@@ -6029,7 +6405,8 @@
     "posicion_categoria": 23,
     "pace": "6'53\"",
     "velocidad_kmh": 8.71,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 948,
@@ -6045,7 +6422,8 @@
     "posicion_categoria": 35,
     "pace": "6'54\"",
     "velocidad_kmh": 8.68,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 210,
@@ -6061,7 +6439,8 @@
     "posicion_categoria": 82,
     "pace": "6'47\"",
     "velocidad_kmh": 8.83,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 171,
@@ -6077,7 +6456,8 @@
     "posicion_categoria": 83,
     "pace": "6'43\"",
     "velocidad_kmh": 8.93,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 80,
@@ -6093,7 +6473,8 @@
     "posicion_categoria": 36,
     "pace": "6'49\"",
     "velocidad_kmh": 8.78,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 792,
@@ -6109,7 +6490,8 @@
     "posicion_categoria": 84,
     "pace": "6'54\"",
     "velocidad_kmh": 8.7,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 997,
@@ -6125,7 +6507,8 @@
     "posicion_categoria": 85,
     "pace": "6'54\"",
     "velocidad_kmh": 8.7,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 208,
@@ -6141,7 +6524,8 @@
     "posicion_categoria": 37,
     "pace": "6'53\"",
     "velocidad_kmh": 8.71,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 1042,
@@ -6157,7 +6541,8 @@
     "posicion_categoria": 20,
     "pace": "6'58\"",
     "velocidad_kmh": 8.61,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 137,
@@ -6173,7 +6558,8 @@
     "posicion_categoria": 49,
     "pace": "6'56\"",
     "velocidad_kmh": 8.64,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 883,
@@ -6189,7 +6575,8 @@
     "posicion_categoria": 86,
     "pace": "6'56\"",
     "velocidad_kmh": 8.64,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 1041,
@@ -6205,7 +6592,8 @@
     "posicion_categoria": 24,
     "pace": "6'53\"",
     "velocidad_kmh": 8.71,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 283,
@@ -6221,7 +6609,8 @@
     "posicion_categoria": 38,
     "pace": "7'00\"",
     "velocidad_kmh": 8.56,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 1067,
@@ -6237,7 +6626,8 @@
     "posicion_categoria": 24,
     "pace": "7'00\"",
     "velocidad_kmh": 8.57,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 887,
@@ -6253,7 +6643,8 @@
     "posicion_categoria": 39,
     "pace": "7'02\"",
     "velocidad_kmh": 8.52,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 77,
@@ -6269,7 +6660,8 @@
     "posicion_categoria": 40,
     "pace": "7'01\"",
     "velocidad_kmh": 8.54,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 876,
@@ -6285,7 +6677,8 @@
     "posicion_categoria": 41,
     "pace": "7'03\"",
     "velocidad_kmh": 8.51,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 72,
@@ -6301,7 +6694,8 @@
     "posicion_categoria": 42,
     "pace": "7'02\"",
     "velocidad_kmh": 8.52,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 884,
@@ -6317,7 +6711,8 @@
     "posicion_categoria": 87,
     "pace": "7'00\"",
     "velocidad_kmh": 8.56,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 193,
@@ -6333,7 +6728,8 @@
     "posicion_categoria": 50,
     "pace": "7'03\"",
     "velocidad_kmh": 8.49,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 88,
@@ -6349,7 +6745,8 @@
     "posicion_categoria": 43,
     "pace": "7'04\"",
     "velocidad_kmh": 8.48,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 936,
@@ -6365,7 +6762,8 @@
     "posicion_categoria": 25,
     "pace": "7'03\"",
     "velocidad_kmh": 8.49,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 882,
@@ -6381,7 +6779,8 @@
     "posicion_categoria": 88,
     "pace": "7'02\"",
     "velocidad_kmh": 8.53,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 822,
@@ -6397,7 +6796,8 @@
     "posicion_categoria": 44,
     "pace": "6'52\"",
     "velocidad_kmh": 8.72,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 272,
@@ -6413,7 +6813,8 @@
     "posicion_categoria": 45,
     "pace": "7'07\"",
     "velocidad_kmh": 8.42,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 815,
@@ -6429,7 +6830,8 @@
     "posicion_categoria": 25,
     "pace": "7'07\"",
     "velocidad_kmh": 8.42,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 942,
@@ -6445,7 +6847,8 @@
     "posicion_categoria": 17,
     "pace": "7'06\"",
     "velocidad_kmh": 8.45,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 172,
@@ -6461,7 +6864,8 @@
     "posicion_categoria": 7,
     "pace": "7'08\"",
     "velocidad_kmh": 8.41,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 194,
@@ -6477,7 +6881,8 @@
     "posicion_categoria": 46,
     "pace": "7'06\"",
     "velocidad_kmh": 8.43,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 1084,
@@ -6493,7 +6898,8 @@
     "posicion_categoria": 18,
     "pace": "7'06\"",
     "velocidad_kmh": 8.44,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 9,
@@ -6509,7 +6915,8 @@
     "posicion_categoria": 46,
     "pace": "7'02\"",
     "velocidad_kmh": 8.53,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 974,
@@ -6525,7 +6932,8 @@
     "posicion_categoria": 26,
     "pace": "7'08\"",
     "velocidad_kmh": 8.4,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 31,
@@ -6541,7 +6949,8 @@
     "posicion_categoria": 26,
     "pace": "7'08\"",
     "velocidad_kmh": 8.41,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 117,
@@ -6557,7 +6966,8 @@
     "posicion_categoria": 51,
     "pace": "7'06\"",
     "velocidad_kmh": 8.44,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 986,
@@ -6573,7 +6983,8 @@
     "posicion_categoria": 30,
     "pace": "7'06\"",
     "velocidad_kmh": 8.43,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 995,
@@ -6589,7 +7000,8 @@
     "posicion_categoria": 89,
     "pace": "7'06\"",
     "velocidad_kmh": 8.43,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 971,
@@ -6605,7 +7017,8 @@
     "posicion_categoria": 27,
     "pace": "7'09\"",
     "velocidad_kmh": 8.39,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 800,
@@ -6621,7 +7034,8 @@
     "posicion_categoria": 28,
     "pace": "7'07\"",
     "velocidad_kmh": 8.42,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 23,
@@ -6637,7 +7051,8 @@
     "posicion_categoria": 15,
     "pace": "7'07\"",
     "velocidad_kmh": 8.41,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 186,
@@ -6653,7 +7068,8 @@
     "posicion_categoria": 47,
     "pace": "7'05\"",
     "velocidad_kmh": 8.47,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 42,
@@ -6669,7 +7085,8 @@
     "posicion_categoria": 16,
     "pace": "7'09\"",
     "velocidad_kmh": 8.37,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 39,
@@ -6685,7 +7102,8 @@
     "posicion_categoria": 17,
     "pace": "7'11\"",
     "velocidad_kmh": 8.34,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 847,
@@ -6701,7 +7119,8 @@
     "posicion_categoria": 47,
     "pace": "7'11\"",
     "velocidad_kmh": 8.34,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 739,
@@ -6717,7 +7136,8 @@
     "posicion_categoria": 29,
     "pace": "7'11\"",
     "velocidad_kmh": 8.35,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 199,
@@ -6733,7 +7153,8 @@
     "posicion_categoria": 48,
     "pace": "7'13\"",
     "velocidad_kmh": 8.31,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 726,
@@ -6749,7 +7170,8 @@
     "posicion_categoria": 49,
     "pace": "7'11\"",
     "velocidad_kmh": 8.34,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 725,
@@ -6765,7 +7187,8 @@
     "posicion_categoria": 90,
     "pace": "7'09\"",
     "velocidad_kmh": 8.37,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 722,
@@ -6781,7 +7204,8 @@
     "posicion_categoria": 50,
     "pace": "7'09\"",
     "velocidad_kmh": 8.39,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 969,
@@ -6797,7 +7221,8 @@
     "posicion_categoria": 31,
     "pace": "7'12\"",
     "velocidad_kmh": 8.32,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 254,
@@ -6813,7 +7238,8 @@
     "posicion_categoria": 19,
     "pace": "7'15\"",
     "velocidad_kmh": 8.26,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 354,
@@ -6829,7 +7255,8 @@
     "posicion_categoria": 27,
     "pace": "7'11\"",
     "velocidad_kmh": 8.34,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 1076,
@@ -6845,7 +7272,8 @@
     "posicion_categoria": 28,
     "pace": "7'12\"",
     "velocidad_kmh": 8.33,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 743,
@@ -6861,7 +7289,8 @@
     "posicion_categoria": 48,
     "pace": "7'04\"",
     "velocidad_kmh": 8.48,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 977,
@@ -6877,7 +7306,8 @@
     "posicion_categoria": 91,
     "pace": "7'06\"",
     "velocidad_kmh": 8.44,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 1029,
@@ -6893,7 +7323,8 @@
     "posicion_categoria": 92,
     "pace": "7'17\"",
     "velocidad_kmh": 8.22,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 235,
@@ -6909,7 +7340,8 @@
     "posicion_categoria": 51,
     "pace": "7'16\"",
     "velocidad_kmh": 8.26,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 346,
@@ -6925,7 +7357,8 @@
     "posicion_categoria": 18,
     "pace": "7'14\"",
     "velocidad_kmh": 8.28,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 129,
@@ -6941,7 +7374,8 @@
     "posicion_categoria": 29,
     "pace": "7'07\"",
     "velocidad_kmh": 8.42,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 203,
@@ -6957,7 +7391,8 @@
     "posicion_categoria": 32,
     "pace": "7'15\"",
     "velocidad_kmh": 8.27,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 810,
@@ -6973,7 +7408,8 @@
     "posicion_categoria": 52,
     "pace": "7'06\"",
     "velocidad_kmh": 8.45,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 1012,
@@ -6989,7 +7425,8 @@
     "posicion_categoria": 30,
     "pace": "7'11\"",
     "velocidad_kmh": 8.35,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 85,
@@ -7005,7 +7442,8 @@
     "posicion_categoria": 52,
     "pace": "7'13\"",
     "velocidad_kmh": 8.31,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 930,
@@ -7021,7 +7459,8 @@
     "posicion_categoria": 93,
     "pace": "7'16\"",
     "velocidad_kmh": 8.25,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 252,
@@ -7037,7 +7476,8 @@
     "posicion_categoria": 53,
     "pace": "7'06\"",
     "velocidad_kmh": 8.44,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 1025,
@@ -7053,7 +7493,8 @@
     "posicion_categoria": 54,
     "pace": "7'15\"",
     "velocidad_kmh": 8.28,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 134,
@@ -7069,7 +7510,8 @@
     "posicion_categoria": 20,
     "pace": "7'16\"",
     "velocidad_kmh": 8.24,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 1019,
@@ -7085,7 +7527,8 @@
     "posicion_categoria": 49,
     "pace": "7'15\"",
     "velocidad_kmh": 8.27,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 842,
@@ -7101,7 +7544,8 @@
     "posicion_categoria": 24,
     "pace": "7'19\"",
     "velocidad_kmh": 8.18,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 34,
@@ -7117,7 +7561,8 @@
     "posicion_categoria": 53,
     "pace": "7'16\"",
     "velocidad_kmh": 8.24,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 189,
@@ -7133,7 +7578,8 @@
     "posicion_categoria": 55,
     "pace": "7'19\"",
     "velocidad_kmh": 8.19,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 14,
@@ -7149,7 +7595,8 @@
     "posicion_categoria": 54,
     "pace": "7'22\"",
     "velocidad_kmh": 8.14,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 976,
@@ -7165,7 +7612,8 @@
     "posicion_categoria": 55,
     "pace": "7'08\"",
     "velocidad_kmh": 8.4,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 44,
@@ -7181,7 +7629,8 @@
     "posicion_categoria": 31,
     "pace": "7'19\"",
     "velocidad_kmh": 8.2,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 308,
@@ -7197,7 +7646,8 @@
     "posicion_categoria": 56,
     "pace": "7'19\"",
     "velocidad_kmh": 8.2,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 21,
@@ -7213,7 +7663,8 @@
     "posicion_categoria": 56,
     "pace": "7'23\"",
     "velocidad_kmh": 8.12,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 950,
@@ -7229,7 +7680,8 @@
     "posicion_categoria": 30,
     "pace": "7'17\"",
     "velocidad_kmh": 8.22,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 925,
@@ -7245,7 +7697,8 @@
     "posicion_categoria": 25,
     "pace": "7'09\"",
     "velocidad_kmh": 8.39,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 802,
@@ -7261,7 +7714,8 @@
     "posicion_categoria": 57,
     "pace": "7'24\"",
     "velocidad_kmh": 8.1,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 793,
@@ -7277,7 +7731,8 @@
     "posicion_categoria": 21,
     "pace": "7'11\"",
     "velocidad_kmh": 8.34,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 298,
@@ -7293,7 +7748,8 @@
     "posicion_categoria": 57,
     "pace": "7'24\"",
     "velocidad_kmh": 8.1,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 209,
@@ -7309,7 +7765,8 @@
     "posicion_categoria": 50,
     "pace": "7'23\"",
     "velocidad_kmh": 8.11,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 66,
@@ -7325,7 +7782,8 @@
     "posicion_categoria": 58,
     "pace": "7'28\"",
     "velocidad_kmh": 8.03,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 801,
@@ -7341,7 +7799,8 @@
     "posicion_categoria": 59,
     "pace": "7'26\"",
     "velocidad_kmh": 8.07,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 353,
@@ -7357,7 +7816,8 @@
     "posicion_categoria": 60,
     "pace": "7'21\"",
     "velocidad_kmh": 8.15,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 259,
@@ -7373,7 +7833,8 @@
     "posicion_categoria": 58,
     "pace": "7'22\"",
     "velocidad_kmh": 8.13,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 1086,
@@ -7389,7 +7850,8 @@
     "posicion_categoria": 59,
     "pace": "7'12\"",
     "velocidad_kmh": 8.32,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 742,
@@ -7405,7 +7867,8 @@
     "posicion_categoria": 21,
     "pace": "7'25\"",
     "velocidad_kmh": 8.09,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 22
   },
   {
     "dorsal": 713,
@@ -7421,7 +7884,8 @@
     "posicion_categoria": 32,
     "pace": "7'23\"",
     "velocidad_kmh": 8.12,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 854,
@@ -7437,7 +7901,8 @@
     "posicion_categoria": 26,
     "pace": "7'29\"",
     "velocidad_kmh": 8.01,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 91,
@@ -7453,7 +7918,8 @@
     "posicion_categoria": 61,
     "pace": "7'28\"",
     "velocidad_kmh": 8.03,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 351,
@@ -7469,7 +7935,8 @@
     "posicion_categoria": 19,
     "pace": "7'17\"",
     "velocidad_kmh": 8.24,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 1043,
@@ -7485,7 +7952,8 @@
     "posicion_categoria": 1,
     "pace": "7'21\"",
     "velocidad_kmh": 8.16,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 2
   },
   {
     "dorsal": 903,
@@ -7501,7 +7969,8 @@
     "posicion_categoria": 33,
     "pace": "7'28\"",
     "velocidad_kmh": 8.03,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 791,
@@ -7517,7 +7986,8 @@
     "posicion_categoria": 34,
     "pace": "7'28\"",
     "velocidad_kmh": 8.03,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 148,
@@ -7533,7 +8003,8 @@
     "posicion_categoria": 94,
     "pace": "7'29\"",
     "velocidad_kmh": 8.02,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 322,
@@ -7549,7 +8020,8 @@
     "posicion_categoria": 8,
     "pace": "7'33\"",
     "velocidad_kmh": 7.94,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 1049,
@@ -7565,7 +8037,8 @@
     "posicion_categoria": 95,
     "pace": "7'33\"",
     "velocidad_kmh": 7.94,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 165,
@@ -7581,7 +8054,8 @@
     "posicion_categoria": 33,
     "pace": "7'30\"",
     "velocidad_kmh": 8.0,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 347,
@@ -7597,7 +8071,8 @@
     "posicion_categoria": 51,
     "pace": "7'28\"",
     "velocidad_kmh": 8.04,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 964,
@@ -7613,7 +8088,8 @@
     "posicion_categoria": 10,
     "pace": "7'35\"",
     "velocidad_kmh": 7.91,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 916,
@@ -7629,7 +8105,8 @@
     "posicion_categoria": 62,
     "pace": "7'34\"",
     "velocidad_kmh": 7.92,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 987,
@@ -7645,7 +8122,8 @@
     "posicion_categoria": 60,
     "pace": "7'34\"",
     "velocidad_kmh": 7.92,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 226,
@@ -7661,7 +8139,8 @@
     "posicion_categoria": 20,
     "pace": "7'35\"",
     "velocidad_kmh": 7.91,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 907,
@@ -7677,7 +8156,8 @@
     "posicion_categoria": 96,
     "pace": "7'24\"",
     "velocidad_kmh": 8.1,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 754,
@@ -7693,7 +8173,8 @@
     "posicion_categoria": 61,
     "pace": "7'35\"",
     "velocidad_kmh": 7.91,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 794,
@@ -7709,7 +8190,8 @@
     "posicion_categoria": 52,
     "pace": "7'36\"",
     "velocidad_kmh": 7.89,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 18,
@@ -7725,7 +8207,8 @@
     "posicion_categoria": 22,
     "pace": "7'32\"",
     "velocidad_kmh": 7.96,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 192,
@@ -7741,7 +8224,8 @@
     "posicion_categoria": 97,
     "pace": "7'33\"",
     "velocidad_kmh": 7.94,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 123,
@@ -7757,7 +8241,8 @@
     "posicion_categoria": 62,
     "pace": "7'34\"",
     "velocidad_kmh": 7.91,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 78,
@@ -7773,7 +8258,8 @@
     "posicion_categoria": 53,
     "pace": "7'39\"",
     "velocidad_kmh": 7.84,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 1051,
@@ -7789,7 +8275,8 @@
     "posicion_categoria": 63,
     "pace": "7'36\"",
     "velocidad_kmh": 7.88,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 753,
@@ -7805,7 +8292,8 @@
     "posicion_categoria": 23,
     "pace": "7'39\"",
     "velocidad_kmh": 7.83,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 281,
@@ -7821,7 +8309,8 @@
     "posicion_categoria": 64,
     "pace": "7'36\"",
     "velocidad_kmh": 7.88,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 1087,
@@ -7837,7 +8326,8 @@
     "posicion_categoria": 65,
     "pace": "7'36\"",
     "velocidad_kmh": 7.89,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 63,
@@ -7853,7 +8343,8 @@
     "posicion_categoria": 66,
     "pace": "7'37\"",
     "velocidad_kmh": 7.87,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 352,
@@ -7869,7 +8360,8 @@
     "posicion_categoria": 21,
     "pace": "7'37\"",
     "velocidad_kmh": 7.87,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 104,
@@ -7885,7 +8377,8 @@
     "posicion_categoria": 31,
     "pace": "7'38\"",
     "velocidad_kmh": 7.84,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 256,
@@ -7901,7 +8394,8 @@
     "posicion_categoria": 54,
     "pace": "7'41\"",
     "velocidad_kmh": 7.8,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 257,
@@ -7917,7 +8411,8 @@
     "posicion_categoria": 98,
     "pace": "7'34\"",
     "velocidad_kmh": 7.92,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 56,
@@ -7933,7 +8428,8 @@
     "posicion_categoria": 34,
     "pace": "7'42\"",
     "velocidad_kmh": 7.79,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 978,
@@ -7949,7 +8445,8 @@
     "posicion_categoria": 99,
     "pace": "7'32\"",
     "velocidad_kmh": 7.96,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 840,
@@ -7965,7 +8462,8 @@
     "posicion_categoria": 22,
     "pace": "7'46\"",
     "velocidad_kmh": 7.71,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 343,
@@ -7981,7 +8479,8 @@
     "posicion_categoria": 67,
     "pace": "7'39\"",
     "velocidad_kmh": 7.83,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 92,
@@ -7997,7 +8496,8 @@
     "posicion_categoria": 23,
     "pace": "7'40\"",
     "velocidad_kmh": 7.82,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 790,
@@ -8013,7 +8513,8 @@
     "posicion_categoria": 55,
     "pace": "7'38\"",
     "velocidad_kmh": 7.85,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 858,
@@ -8029,7 +8530,8 @@
     "posicion_categoria": 24,
     "pace": "7'40\"",
     "velocidad_kmh": 7.82,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 1014,
@@ -8045,7 +8547,8 @@
     "posicion_categoria": 68,
     "pace": "7'41\"",
     "velocidad_kmh": 7.81,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 1045,
@@ -8061,7 +8564,8 @@
     "posicion_categoria": 32,
     "pace": "7'30\"",
     "velocidad_kmh": 7.99,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 924,
@@ -8077,7 +8581,8 @@
     "posicion_categoria": 24,
     "pace": "7'35\"",
     "velocidad_kmh": 7.9,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 994,
@@ -8093,7 +8598,8 @@
     "posicion_categoria": 69,
     "pace": "7'41\"",
     "velocidad_kmh": 7.8,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 202,
@@ -8109,7 +8615,8 @@
     "posicion_categoria": 100,
     "pace": "7'42\"",
     "velocidad_kmh": 7.78,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 871,
@@ -8125,7 +8632,8 @@
     "posicion_categoria": 56,
     "pace": "7'42\"",
     "velocidad_kmh": 7.78,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 888,
@@ -8141,7 +8649,8 @@
     "posicion_categoria": 25,
     "pace": "7'45\"",
     "velocidad_kmh": 7.73,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 118,
@@ -8157,7 +8666,8 @@
     "posicion_categoria": 27,
     "pace": "7'42\"",
     "velocidad_kmh": 7.78,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 1007,
@@ -8173,7 +8683,8 @@
     "posicion_categoria": 63,
     "pace": "7'33\"",
     "velocidad_kmh": 7.93,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 811,
@@ -8189,7 +8700,8 @@
     "posicion_categoria": 35,
     "pace": "7'45\"",
     "velocidad_kmh": 7.74,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 779,
@@ -8205,7 +8717,8 @@
     "posicion_categoria": 33,
     "pace": "7'38\"",
     "velocidad_kmh": 7.86,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 5,
@@ -8221,7 +8734,8 @@
     "posicion_categoria": 25,
     "pace": "7'45\"",
     "velocidad_kmh": 7.73,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 934,
@@ -8237,7 +8751,8 @@
     "posicion_categoria": 70,
     "pace": "7'48\"",
     "velocidad_kmh": 7.69,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 846,
@@ -8253,7 +8768,8 @@
     "posicion_categoria": 71,
     "pace": "7'44\"",
     "velocidad_kmh": 7.75,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 712,
@@ -8269,7 +8785,8 @@
     "posicion_categoria": 101,
     "pace": "7'43\"",
     "velocidad_kmh": 7.76,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 154,
@@ -8285,7 +8802,8 @@
     "posicion_categoria": 102,
     "pace": "7'45\"",
     "velocidad_kmh": 7.74,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 153,
@@ -8301,7 +8819,8 @@
     "posicion_categoria": 9,
     "pace": "7'41\"",
     "velocidad_kmh": 7.8,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 120,
@@ -8317,7 +8836,8 @@
     "posicion_categoria": 72,
     "pace": "7'51\"",
     "velocidad_kmh": 7.64,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 709,
@@ -8333,7 +8853,8 @@
     "posicion_categoria": 73,
     "pace": "7'42\"",
     "velocidad_kmh": 7.79,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 865,
@@ -8349,7 +8870,8 @@
     "posicion_categoria": 74,
     "pace": "7'44\"",
     "velocidad_kmh": 7.76,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 170,
@@ -8365,7 +8887,8 @@
     "posicion_categoria": 57,
     "pace": "7'40\"",
     "velocidad_kmh": 7.82,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 35,
@@ -8381,7 +8904,8 @@
     "posicion_categoria": 103,
     "pace": "7'51\"",
     "velocidad_kmh": 7.64,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 850,
@@ -8397,7 +8921,8 @@
     "posicion_categoria": 26,
     "pace": "7'40\"",
     "velocidad_kmh": 7.82,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 116,
@@ -8413,7 +8938,8 @@
     "posicion_categoria": 75,
     "pace": "7'51\"",
     "velocidad_kmh": 7.64,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 799,
@@ -8429,7 +8955,8 @@
     "posicion_categoria": 26,
     "pace": "7'55\"",
     "velocidad_kmh": 7.58,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 358,
@@ -8445,7 +8972,8 @@
     "posicion_categoria": 76,
     "pace": "7'54\"",
     "velocidad_kmh": 7.59,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 838,
@@ -8461,7 +8989,8 @@
     "posicion_categoria": 77,
     "pace": "7'57\"",
     "velocidad_kmh": 7.55,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 1052,
@@ -8477,7 +9006,8 @@
     "posicion_categoria": 58,
     "pace": "7'55\"",
     "velocidad_kmh": 7.58,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 866,
@@ -8493,7 +9023,8 @@
     "posicion_categoria": 78,
     "pace": "7'58\"",
     "velocidad_kmh": 7.53,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 953,
@@ -8509,7 +9040,8 @@
     "posicion_categoria": 34,
     "pace": "7'58\"",
     "velocidad_kmh": 7.53,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 1066,
@@ -8525,7 +9057,8 @@
     "posicion_categoria": 36,
     "pace": "7'57\"",
     "velocidad_kmh": 7.54,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 998,
@@ -8541,7 +9074,8 @@
     "posicion_categoria": 27,
     "pace": "7'58\"",
     "velocidad_kmh": 7.53,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 224,
@@ -8557,7 +9091,8 @@
     "posicion_categoria": 59,
     "pace": "8'01\"",
     "velocidad_kmh": 7.48,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 941,
@@ -8573,7 +9108,8 @@
     "posicion_categoria": 37,
     "pace": "8'00\"",
     "velocidad_kmh": 7.5,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 771,
@@ -8589,7 +9125,8 @@
     "posicion_categoria": 28,
     "pace": "8'00\"",
     "velocidad_kmh": 7.5,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 74,
@@ -8605,7 +9142,8 @@
     "posicion_categoria": 79,
     "pace": "8'02\"",
     "velocidad_kmh": 7.47,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 778,
@@ -8621,7 +9159,8 @@
     "posicion_categoria": 29,
     "pace": "8'04\"",
     "velocidad_kmh": 7.43,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 318,
@@ -8637,7 +9176,8 @@
     "posicion_categoria": 27,
     "pace": "8'04\"",
     "velocidad_kmh": 7.43,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 360,
@@ -8653,7 +9193,8 @@
     "posicion_categoria": 80,
     "pace": "7'46\"",
     "velocidad_kmh": 7.72,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 97,
@@ -8669,7 +9210,8 @@
     "posicion_categoria": 81,
     "pace": "8'02\"",
     "velocidad_kmh": 7.47,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 717,
@@ -8685,7 +9227,8 @@
     "posicion_categoria": 82,
     "pace": "8'03\"",
     "velocidad_kmh": 7.44,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 98,
@@ -8701,7 +9244,8 @@
     "posicion_categoria": 30,
     "pace": "8'03\"",
     "velocidad_kmh": 7.45,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 7,
@@ -8717,7 +9261,8 @@
     "posicion_categoria": 60,
     "pace": "7'59\"",
     "velocidad_kmh": 7.5,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 24,
@@ -8733,7 +9278,8 @@
     "posicion_categoria": 35,
     "pace": "8'04\"",
     "velocidad_kmh": 7.43,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 809,
@@ -8749,7 +9295,8 @@
     "posicion_categoria": 83,
     "pace": "8'07\"",
     "velocidad_kmh": 7.38,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 191,
@@ -8765,7 +9312,8 @@
     "posicion_categoria": 84,
     "pace": "8'06\"",
     "velocidad_kmh": 7.4,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 198,
@@ -8781,7 +9329,8 @@
     "posicion_categoria": 104,
     "pace": "8'06\"",
     "velocidad_kmh": 7.4,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 836,
@@ -8797,7 +9346,8 @@
     "posicion_categoria": 28,
     "pace": "8'00\"",
     "velocidad_kmh": 7.5,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 744,
@@ -8813,7 +9363,8 @@
     "posicion_categoria": 36,
     "pace": "8'05\"",
     "velocidad_kmh": 7.42,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 831,
@@ -8829,7 +9380,8 @@
     "posicion_categoria": 35,
     "pace": "8'06\"",
     "velocidad_kmh": 7.41,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 1062,
@@ -8845,7 +9397,8 @@
     "posicion_categoria": 64,
     "pace": "8'11\"",
     "velocidad_kmh": 7.33,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 176,
@@ -8861,7 +9414,8 @@
     "posicion_categoria": 105,
     "pace": "7'57\"",
     "velocidad_kmh": 7.55,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 177,
@@ -8877,7 +9431,8 @@
     "posicion_categoria": 106,
     "pace": "7'57\"",
     "velocidad_kmh": 7.54,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 274,
@@ -8893,7 +9448,8 @@
     "posicion_categoria": 85,
     "pace": "8'07\"",
     "velocidad_kmh": 7.38,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 745,
@@ -8909,7 +9465,8 @@
     "posicion_categoria": 28,
     "pace": "7'54\"",
     "velocidad_kmh": 7.59,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 96,
@@ -8925,7 +9482,8 @@
     "posicion_categoria": 65,
     "pace": "8'05\"",
     "velocidad_kmh": 7.42,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 807,
@@ -8941,7 +9499,8 @@
     "posicion_categoria": 38,
     "pace": "8'10\"",
     "velocidad_kmh": 7.34,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 898,
@@ -8957,7 +9516,8 @@
     "posicion_categoria": 31,
     "pace": "8'11\"",
     "velocidad_kmh": 7.32,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 22,
@@ -8973,7 +9533,8 @@
     "posicion_categoria": 61,
     "pace": "8'08\"",
     "velocidad_kmh": 7.36,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 271,
@@ -8989,7 +9550,8 @@
     "posicion_categoria": 32,
     "pace": "8'09\"",
     "velocidad_kmh": 7.36,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 758,
@@ -9005,7 +9567,8 @@
     "posicion_categoria": 86,
     "pace": "8'14\"",
     "velocidad_kmh": 7.28,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 342,
@@ -9021,7 +9584,8 @@
     "posicion_categoria": 29,
     "pace": "8'13\"",
     "velocidad_kmh": 7.29,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 29
   },
   {
     "dorsal": 287,
@@ -9037,7 +9601,8 @@
     "posicion_categoria": 33,
     "pace": "8'14\"",
     "velocidad_kmh": 7.27,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 829,
@@ -9053,7 +9618,8 @@
     "posicion_categoria": 87,
     "pace": "8'10\"",
     "velocidad_kmh": 7.34,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 915,
@@ -9069,7 +9635,8 @@
     "posicion_categoria": 66,
     "pace": "8'10\"",
     "velocidad_kmh": 7.34,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 970,
@@ -9085,7 +9652,8 @@
     "posicion_categoria": 88,
     "pace": "8'13\"",
     "velocidad_kmh": 7.29,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 999,
@@ -9101,7 +9669,8 @@
     "posicion_categoria": 89,
     "pace": "8'03\"",
     "velocidad_kmh": 7.45,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 16,
@@ -9117,7 +9686,8 @@
     "posicion_categoria": 10,
     "pace": "8'09\"",
     "velocidad_kmh": 7.36,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 54,
@@ -9133,7 +9703,8 @@
     "posicion_categoria": 34,
     "pace": "8'03\"",
     "velocidad_kmh": 7.44,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 1044,
@@ -9149,7 +9720,8 @@
     "posicion_categoria": 90,
     "pace": "8'16\"",
     "velocidad_kmh": 7.24,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 757,
@@ -9165,7 +9737,8 @@
     "posicion_categoria": 107,
     "pace": "8'15\"",
     "velocidad_kmh": 7.26,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 251,
@@ -9181,7 +9754,8 @@
     "posicion_categoria": 108,
     "pace": "8'17\"",
     "velocidad_kmh": 7.23,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 1010,
@@ -9197,7 +9771,8 @@
     "posicion_categoria": 109,
     "pace": "8'09\"",
     "velocidad_kmh": 7.36,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 302,
@@ -9213,7 +9788,8 @@
     "posicion_categoria": 110,
     "pace": "8'18\"",
     "velocidad_kmh": 7.22,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 86,
@@ -9229,7 +9805,8 @@
     "posicion_categoria": 36,
     "pace": "8'20\"",
     "velocidad_kmh": 7.2,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 278,
@@ -9245,7 +9822,8 @@
     "posicion_categoria": 91,
     "pace": "8'24\"",
     "velocidad_kmh": 7.14,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 715,
@@ -9261,7 +9839,8 @@
     "posicion_categoria": 35,
     "pace": "8'27\"",
     "velocidad_kmh": 7.1,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 1054,
@@ -9277,7 +9856,8 @@
     "posicion_categoria": 37,
     "pace": "8'25\"",
     "velocidad_kmh": 7.12,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 37
   },
   {
     "dorsal": 350,
@@ -9293,7 +9873,8 @@
     "posicion_categoria": 111,
     "pace": "8'14\"",
     "velocidad_kmh": 7.27,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 111
   },
   {
     "dorsal": 806,
@@ -9309,7 +9890,8 @@
     "posicion_categoria": 67,
     "pace": "8'29\"",
     "velocidad_kmh": 7.06,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 68
   },
   {
     "dorsal": 20,
@@ -9325,7 +9907,8 @@
     "posicion_categoria": 92,
     "pace": "8'30\"",
     "velocidad_kmh": 7.05,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 130,
@@ -9341,7 +9924,8 @@
     "posicion_categoria": 36,
     "pace": "8'27\"",
     "velocidad_kmh": 7.09,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 912,
@@ -9357,7 +9941,8 @@
     "posicion_categoria": 11,
     "pace": "8'21\"",
     "velocidad_kmh": 7.18,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 1048,
@@ -9373,7 +9958,8 @@
     "posicion_categoria": 37,
     "pace": "8'31\"",
     "velocidad_kmh": 7.04,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 105,
@@ -9389,7 +9975,8 @@
     "posicion_categoria": 93,
     "pace": "8'29\"",
     "velocidad_kmh": 7.07,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 82,
@@ -9405,7 +9992,8 @@
     "posicion_categoria": 94,
     "pace": "8'30\"",
     "velocidad_kmh": 7.06,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 73,
@@ -9421,7 +10009,8 @@
     "posicion_categoria": 95,
     "pace": "8'39\"",
     "velocidad_kmh": 6.92,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 368,
@@ -9437,7 +10026,8 @@
     "posicion_categoria": 96,
     "pace": "8'27\"",
     "velocidad_kmh": 7.09,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 956,
@@ -9453,7 +10043,8 @@
     "posicion_categoria": 97,
     "pace": "8'44\"",
     "velocidad_kmh": 6.86,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 874,
@@ -9469,7 +10060,8 @@
     "posicion_categoria": 37,
     "pace": "8'37\"",
     "velocidad_kmh": 6.95,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 136,
@@ -9485,7 +10077,8 @@
     "posicion_categoria": 29,
     "pace": "8'44\"",
     "velocidad_kmh": 6.86,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 76,
@@ -9501,7 +10094,8 @@
     "posicion_categoria": 30,
     "pace": "8'45\"",
     "velocidad_kmh": 6.85,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 30
   },
   {
     "dorsal": 880,
@@ -9517,7 +10111,8 @@
     "posicion_categoria": 62,
     "pace": "8'49\"",
     "velocidad_kmh": 6.8,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 63
   },
   {
     "dorsal": 832,
@@ -9533,7 +10128,8 @@
     "posicion_categoria": 38,
     "pace": "8'54\"",
     "velocidad_kmh": 6.74,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 124,
@@ -9549,7 +10145,8 @@
     "posicion_categoria": 39,
     "pace": "9'00\"",
     "velocidad_kmh": 6.66,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 731,
@@ -9565,7 +10162,8 @@
     "posicion_categoria": 40,
     "pace": "8'56\"",
     "velocidad_kmh": 6.71,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 1058,
@@ -9581,7 +10179,8 @@
     "posicion_categoria": 98,
     "pace": "9'22\"",
     "velocidad_kmh": 6.41,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 100
   },
   {
     "dorsal": 135,
@@ -9597,7 +10196,8 @@
     "posicion_categoria": 11,
     "pace": "9'29\"",
     "velocidad_kmh": 6.32,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 11
   },
   {
     "dorsal": 931,
@@ -9613,7 +10213,8 @@
     "posicion_categoria": 2,
     "pace": "10'02\"",
     "velocidad_kmh": 5.98,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 2
   },
   {
     "dorsal": 125,
@@ -9629,7 +10230,8 @@
     "posicion_categoria": 41,
     "pace": "10'36\"",
     "velocidad_kmh": 5.66,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 41
   },
   {
     "dorsal": 1009,
@@ -9645,7 +10247,8 @@
     "posicion_categoria": 2,
     "pace": "2'57\"",
     "velocidad_kmh": 20.28,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 2
   },
   {
     "dorsal": 60,
@@ -9661,7 +10264,8 @@
     "posicion_categoria": 38,
     "pace": "11'28\"",
     "velocidad_kmh": 5.23,
-    "sin_tiempo": false
+    "sin_tiempo": false,
+    "total_categoria": 38
   },
   {
     "dorsal": 1082,
@@ -9677,7 +10281,8 @@
     "posicion_categoria": 0,
     "pace": "",
     "velocidad_kmh": 0,
-    "sin_tiempo": true
+    "sin_tiempo": true,
+    "total_categoria": 68
   },
   {
     "dorsal": 1088,
@@ -9693,7 +10298,8 @@
     "posicion_categoria": 0,
     "pace": "",
     "velocidad_kmh": 0,
-    "sin_tiempo": true
+    "sin_tiempo": true,
+    "total_categoria": 100
   },
   {
     "dorsal": 1089,
@@ -9709,7 +10315,8 @@
     "posicion_categoria": 0,
     "pace": "",
     "velocidad_kmh": 0,
-    "sin_tiempo": true
+    "sin_tiempo": true,
+    "total_categoria": 63
   },
   {
     "dorsal": 1092,
@@ -9725,6 +10332,7 @@
     "posicion_categoria": 0,
     "pace": "",
     "velocidad_kmh": 0,
-    "sin_tiempo": true
+    "sin_tiempo": true,
+    "total_categoria": 100
   }
 ]
