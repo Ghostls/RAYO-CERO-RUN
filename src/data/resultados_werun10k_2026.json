@@ -10334,5 +10334,22 @@
     "velocidad_kmh": 0,
     "sin_tiempo": true,
     "total_categoria": 100
+  },
+  {
+    "dorsal": 824,
+    "nombre_completo": "ARIZON SOTELO",
+    "categoria": "MASC MASTER A 40-49",
+    "genero": "M",
+    "tiempo_oficial": "",
+    "tiempo_chip": "01:03:10",
+    "tiempo_bruto": "",
+    "tiempo_neto": "",
+    "posicion_general": 299,
+    "posicion_genero": 215,
+    "posicion_categoria": 40,
+    "pace": "",
+    "velocidad_kmh": 0,
+    "sin_tiempo": false,
+    "total_categoria": 63
   }
 ]

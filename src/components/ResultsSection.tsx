@@ -374,25 +374,55 @@ const CSS = `
     .rs-search-wrap { padding: 0 1.25rem 3rem; }
     .rs-card { padding: 0 1.25rem 4rem; }
     .rs-tabla-section { padding: 0 1.25rem 4rem; }
-    .rs-stats-grid { grid-template-columns: repeat(2, 1fr); }
-    .rs-athlete-row { grid-template-columns: 1fr; gap: 1.5rem; }
-    .rs-sponsors-center { flex-direction: row; align-items: center; justify-content: flex-start; gap: 1rem; align-self: auto; }
-    .rs-sponsor-pill-sm { flex: unset; padding: 10px 18px; }
-    .rs-sponsor-pill-sm img { height: 36px; }
-    .rs-status-col { align-items: flex-start; flex-direction: column; }
-    .rs-action-btns { justify-content: flex-start; }
-    .rs-time-hero { grid-template-columns: 1fr; gap: 1.5rem; }
+
+    /* Stats — 2 columnas en mobile */
+    .rs-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0; }
+    .rs-stat { padding: 1rem 0; padding-right: 1rem; margin-right: 1rem; }
+
+    /* Atleta row — stack vertical */
+    .rs-athlete-row { grid-template-columns: 1fr; gap: 1.25rem; }
+    .rs-sponsors-center { flex-direction: row; align-items: center; justify-content: flex-start; gap: 0.75rem; align-self: auto; }
+    .rs-sponsor-pill-sm { flex: unset; padding: 8px 14px; }
+    .rs-sponsor-pill-sm img { height: 28px; }
+
+    /* Status + botones — stack izquierda */
+    .rs-status-col { align-items: flex-start; flex-direction: column; gap: 0.6rem; padding-top: 0; }
+    .rs-action-btns { justify-content: flex-start; flex-wrap: wrap; gap: 6px; }
+    .rs-share-btn { padding: 9px 14px; font-size: 8px; letter-spacing: 0.12em; }
+
+    /* Tiempos */
+    .rs-time-hero { grid-template-columns: 1fr; gap: 1.25rem; }
+    .rs-time-value { font-size: clamp(3rem, 15vw, 6rem); }
     .rs-bib-watermark { display: none; }
     .rs-card-inner { padding: 2rem 0; }
-    .rs-athlete-name-first, .rs-athlete-name-last { font-size: clamp(2.5rem, 11vw, 4rem); }
-    .rs-time-value { font-size: clamp(3rem, 15vw, 6rem); }
-    .rs-search-input { font-size: 2rem; padding: 16px 20px; }
-    .rs-search-btn { padding: 16px 20px; font-size: 0.75rem; }
+
+    /* Nombre atleta */
+    .rs-athlete-name-first, .rs-athlete-name-last { font-size: clamp(2.2rem, 10vw, 3.5rem); }
+
+    /* Search */
+    .rs-search-input { font-size: 1.8rem; padding: 14px 16px; }
+    .rs-search-btn { padding: 14px 18px; font-size: 0.72rem; }
+
+    /* Tabla */
     .rs-tbl-head { display: none; }
     .rs-tbl-row { grid-template-columns: 40px 1fr; grid-template-rows: auto auto; gap: 0.3rem 0.6rem; padding: 0.85rem 1rem; border-radius: 0; }
     .rs-tbl-cat-col, .rs-tbl-pace, .rs-tbl-catpos { display: none; }
     .rs-tbl-time { text-align: left; grid-column: 2; grid-row: 2; font-size: 0.9rem; }
     .rs-tbl-pos { grid-row: 1 / span 2; align-self: center; }
+    .rs-tabla-stats { gap: 1rem; }
+  }
+
+  /* Pantallas muy pequeñas (≤ 380px) */
+  @media (max-width: 380px) {
+    .rs-title { font-size: clamp(44px, 15vw, 72px); }
+    .rs-search-input { font-size: 1.5rem; padding: 12px 14px; }
+    .rs-search-btn { padding: 12px 14px; font-size: 0.65rem; letter-spacing: 0.1em; }
+    .rs-athlete-name-first, .rs-athlete-name-last { font-size: clamp(1.9rem, 9vw, 3rem); }
+    .rs-stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .rs-stat-value { font-size: 1.6rem; }
+    .rs-share-btn { padding: 8px 12px; font-size: 7.5px; }
+    .rs-action-btns { gap: 4px; }
+    .rs-time-value { font-size: clamp(2.5rem, 14vw, 5rem); }
   }
 `;
 
@@ -914,12 +944,12 @@ export default function ResultsSection() {
                 <div className="rs-cert-metrics">
 
                   <div className="rs-cert-metric-box">
-                    <div className="rs-cert-metric-lbl">TIEMPO PISTOLA</div>
+                    <div className="rs-cert-metric-lbl">TIEMPO PISTOLA (OFICIAL)</div>
                     <div className="rs-cert-metric-val">{gunTime}</div>
                   </div>
 
                   <div className="rs-cert-metric-box">
-                    <div className="rs-cert-metric-lbl">TIEMPO CHIP</div>
+                    <div className="rs-cert-metric-lbl">TIEMPO CHIP (NETO)</div>
                     <div className="rs-cert-metric-val">{chipTime}</div>
                   </div>
 
@@ -971,7 +1001,7 @@ export default function ResultsSection() {
 
                 {/* Footer */}
                 <div className="rs-cert-footer">
-                  <div className="rs-cert-watermark">WE RUN RAYOCERO · BARQUISIMETO 2026</div>
+                  <div className="rs-cert-watermark">RAYOCERO · WE RUN · BARQUISIMETO 2026</div>
                   {/* Powered by Valkyron — pequeño y elegante */}
                   <div style={{ display:'flex', alignItems:'center', gap:14 }}>
                     <span style={{ fontSize:16, fontWeight:700, letterSpacing:'0.25em',
