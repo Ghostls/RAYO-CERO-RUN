@@ -1,17 +1,16 @@
 /**
- * RAYO CERO — RACE OPERATIVE DETAIL (EVOLUTION V12.0 - MULTI-RACE DYNAMIC)
+ * RAYO CERO — RACE OPERATIVE DETAIL (EVOLUTION V13.0 - CORO BANNERS + COUNTDOWN)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V12.0:
- * [V12-1] Componente dinámico — lee race desde Supabase por ID de URL
- * [V12-2] RACE_CONFIGS: mapa de configuración por race.name
- *         - Barquisimeto → mapa + ruta + flyer premios (igual que antes)
- *         - Cualquier otra carrera sin config → pantalla "Próximamente"
- * [V12-3] Pantalla Próximamente: glassmorphism táctico, fecha, ubicación,
- *         botón inscripción con flag INSCRIPCIONES_ABIERTAS
- * [V12-4] Toda la lógica de Barquisimeto preservada sin tocar
+ * CHANGELOG V13.0:
+ * [V13-1] RACE_BANNERS: mapa de imagen operativa por nombre de carrera
+ *         - "499" / "Agosto" → PORTADA_499.png
+ *         - "Coro"/"Falcón"/"Octubre" → flyer-coro-inscripciones.png
+ * [V13-2] ComingSoonPanel ahora muestra el banner real de la carrera (si existe).
+ * [V13-3] Countdown en vivo también en el panel de detalle.
+ * [V13-4] Toda la lógica V12 de Barquisimeto preservada sin tocar.
  */
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -26,6 +25,10 @@ import { supabase } from "@/lib/supabase";
 import { INSCRIPCIONES_ABIERTAS } from "@/lib/registrationConfig";
 import flyerPremios from "@/assets/flier_premios_info.png";
 
+// ── BANNERS OPERATIVOS — CORO FALCÓN ────────────────────────────────────────
+import portada499Agosto from "@/assets/PORTADA_499.png";
+import flyerOctubreInscripciones from "@/assets/flyer-coro-inscripciones.png";
+
 const MapComp    = MapContainer as any;
 const TileComp   = TileLayer   as any;
 const PolyComp   = Polyline    as any;
@@ -38,14 +41,52 @@ const CircleComp = Circle      as any;
 const RACE_CONFIGS: Record<string, { hasMap: boolean }> = {
   "Rayocero Night Fest Barquisimeto":      { hasMap: true },
   "RAYOCERO NIGHT FEST BARQUISIMETO":      { hasMap: true },
-  // Coro Falcón — sin mapa aún
   "We Run Rayocero — Coro Falcón":         { hasMap: false },
+  "499 Run — Coro Falcón":                 { hasMap: false },
 };
 
 const hasMapConfig = (name: string): boolean => {
-  // Match parcial case-insensitive para Barquisimeto
   if (name?.toLowerCase().includes("barquisimeto") || name?.toLowerCase().includes("night fest")) return true;
   return RACE_CONFIGS[name]?.hasMap ?? false;
+};
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* RACE BANNERS — imagen operativa según carrera (match parcial por keyword)  */
+/* ─────────────────────────────────────────────────────────────────────────── */
+const getRaceBanner = (name: string = ""): string | null => {
+  const n = name.toLowerCase();
+  if (n.includes("499") || n.includes("agosto")) return portada499Agosto;
+  if (n.includes("coro") || n.includes("falcón") || n.includes("falcon") || n.includes("octubre")) return flyerOctubreInscripciones;
+  return null;
+};
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* COUNTDOWN — días/horas restantes hasta la carrera                          */
+/* ─────────────────────────────────────────────────────────────────────────── */
+const useCountdown = (targetDate?: string) => {
+  const [remaining, setRemaining] = useState<{ days: number; hours: number } | null>(null);
+
+  useEffect(() => {
+    if (!targetDate) return;
+    const target = new Date(targetDate + "T00:00:00").getTime();
+
+    const tick = () => {
+      const diff = target - Date.now();
+      if (diff <= 0) {
+        setRemaining(null);
+        return;
+      }
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      setRemaining({ days, hours });
+    };
+
+    tick();
+    const interval = setInterval(tick, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [targetDate]);
+
+  return remaining;
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
@@ -83,7 +124,7 @@ const MapController = ({ bounds }: { bounds: L.LatLngBoundsExpression }) => {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* PANTALLA PRÓXIMAMENTE                                                       */
+/* PANTALLA PRÓXIMAMENTE — con banner real                                    */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
   race: any;
@@ -94,6 +135,9 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
   const dateStr = race?.date
     ? new Date(race.date + "T00:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" }).toUpperCase()
     : "—";
+
+  const banner = getRaceBanner(race?.name ?? "");
+  const countdown = useCountdown(race?.date);
 
   return (
     <div className="min-h-screen w-full bg-[#03070b] flex flex-col text-white relative font-sans pt-[85px] md:pt-[104px] pb-12 overflow-y-auto">
@@ -124,70 +168,97 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
-          className="w-full bg-white/[0.02] border border-white/8 rounded-[2.5rem] backdrop-blur-2xl p-7 sm:p-10 md:p-12 shadow-[0_30px_80px_rgba(0,0,0,0.6)] flex flex-col items-center text-center gap-6"
+          className="w-full bg-white/[0.02] border border-white/8 rounded-[2.5rem] backdrop-blur-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.6)] flex flex-col items-center text-center"
         >
-          {/* Badge */}
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-400/20">
-            <motion.span className="w-1.5 h-1.5 rounded-full bg-amber-400"
-              animate={{ opacity: [1, 0.2, 1] }}
-              transition={{ duration: 1.8, repeat: Infinity }} />
-            <span className="text-[8px] font-black tracking-[0.4em] uppercase text-amber-300">
-              Detalles Operativos En Preparación
-            </span>
-          </div>
-
-          {/* Título */}
-          <div>
-            <h1 className="text-3xl sm:text-4xl md:text-6xl font-black italic uppercase tracking-tighter leading-[0.9] text-white mb-3">
-              {race?.name ?? "PRÓXIMA MISIÓN"}
-            </h1>
-            <p className="text-white/30 text-sm font-bold tracking-widest uppercase">
-              La ruta táctica se revelará pronto
-            </p>
-          </div>
-
-          {/* Info grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
-            {[
-              { icon: MapPin,    label: "Ubicación",   val: race?.location ?? "—" },
-              { icon: Calendar,  label: "Fecha",       val: dateStr },
-              { icon: Users,     label: "Inscritos",   val: `${registeredCount}` },
-            ].map((item, i) => (
-              <div key={i} className="flex flex-col items-center gap-3 p-5 bg-white/[0.02] border border-white/5 rounded-2xl">
-                <item.icon className="h-5 w-5 text-cyan-400" />
-                <div>
-                  <p className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1">{item.label}</p>
-                  <p className="text-sm font-black text-white uppercase">{item.val}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Separador */}
-          <div className="w-full h-px bg-white/5" />
-
-          {/* Mensaje táctico */}
-          <div className="flex items-start gap-4 text-left bg-cyan-500/[0.04] border border-cyan-400/10 rounded-2xl p-5 w-full">
-            <Shield className="h-5 w-5 text-cyan-400 mt-0.5 shrink-0" />
-            <p className="text-[11px] text-white/50 leading-relaxed">
-              El mapa de ruta, waypoints de hidratación, cronometraje y estructura de premios 
-              serán publicados en las próximas semanas. Mantente atento al canal oficial de Rayocero.
-            </p>
-          </div>
-
-          {/* Botón inscripción */}
-          {INSCRIPCIONES_ABIERTAS ? (
-            <button onClick={onRegister}
-              className="w-full py-6 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 bg-cyan-500 hover:bg-cyan-400 text-black shadow-[0_0_30px_rgba(0,242,255,0.2)] active:scale-95">
-              INSCRIBIRME <Zap className="h-4 w-4 fill-current" />
-            </button>
-          ) : (
-            <button onClick={onRegister}
-              className="w-full py-6 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
-              style={{ background: "rgba(255,40,40,0.08)", border: "1px solid rgba(255,60,60,0.28)", color: "#F87171" }}>
-              <Lock className="h-4 w-4" /> CUPO COMPLETO
-            </button>
+          {/* Banner real de la carrera (si existe) */}
+          {banner && (
+            <div className="w-full relative">
+              <img
+                src={banner}
+                alt={race?.name ?? "Banner de carrera"}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-auto object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#03070b] via-transparent to-transparent" />
+            </div>
           )}
+
+          <div className="w-full flex flex-col items-center gap-6 p-7 sm:p-10 md:p-12">
+
+            {/* Badge */}
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-400/20">
+              <motion.span className="w-1.5 h-1.5 rounded-full bg-amber-400"
+                animate={{ opacity: [1, 0.2, 1] }}
+                transition={{ duration: 1.8, repeat: Infinity }} />
+              <span className="text-[8px] font-black tracking-[0.4em] uppercase text-amber-300">
+                Detalles Operativos En Preparación
+              </span>
+            </div>
+
+            {/* Título */}
+            <div>
+              <h1 className="text-3xl sm:text-4xl md:text-6xl font-black italic uppercase tracking-tighter leading-[0.9] text-white mb-3">
+                {race?.name ?? "PRÓXIMA MISIÓN"}
+              </h1>
+              <p className="text-white/30 text-sm font-bold tracking-widest uppercase">
+                La ruta táctica se revelará pronto
+              </p>
+            </div>
+
+            {/* Countdown en vivo */}
+            {countdown && (
+              <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-cyan-500/[0.06] border border-cyan-400/15">
+                <Zap className="h-4 w-4 text-cyan-400" />
+                <span className="text-xs font-black text-cyan-300 tracking-[0.3em] uppercase">
+                  Faltan {countdown.days} días {countdown.hours}h
+                </span>
+              </div>
+            )}
+
+            {/* Info grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
+              {[
+                { icon: MapPin,    label: "Ubicación",   val: race?.location ?? "—" },
+                { icon: Calendar,  label: "Fecha",       val: dateStr },
+                { icon: Users,     label: "Inscritos",   val: `${registeredCount}` },
+              ].map((item, i) => (
+                <div key={i} className="flex flex-col items-center gap-3 p-5 bg-white/[0.02] border border-white/5 rounded-2xl">
+                  <item.icon className="h-5 w-5 text-cyan-400" />
+                  <div>
+                    <p className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1">{item.label}</p>
+                    <p className="text-sm font-black text-white uppercase">{item.val}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Separador */}
+            <div className="w-full h-px bg-white/5" />
+
+            {/* Mensaje táctico */}
+            <div className="flex items-start gap-4 text-left bg-cyan-500/[0.04] border border-cyan-400/10 rounded-2xl p-5 w-full">
+              <Shield className="h-5 w-5 text-cyan-400 mt-0.5 shrink-0" />
+              <p className="text-[11px] text-white/50 leading-relaxed">
+                El mapa de ruta, waypoints de hidratación, cronometraje y estructura de premios
+                serán publicados en las próximas semanas. Mantente atento al canal oficial de Rayocero.
+              </p>
+            </div>
+
+            {/* Botón inscripción */}
+            {INSCRIPCIONES_ABIERTAS ? (
+              <button onClick={onRegister}
+                className="w-full py-6 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 bg-cyan-500 hover:bg-cyan-400 text-black shadow-[0_0_30px_rgba(0,242,255,0.2)] active:scale-95">
+                INSCRIBIRME <Zap className="h-4 w-4 fill-current" />
+              </button>
+            ) : (
+              <button onClick={onRegister}
+                className="w-full py-6 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
+                style={{ background: "rgba(255,40,40,0.08)", border: "1px solid rgba(255,60,60,0.28)", color: "#F87171" }}>
+                <Lock className="h-4 w-4" /> CUPO COMPLETO
+              </button>
+            )}
+          </div>
         </motion.div>
       </div>
 

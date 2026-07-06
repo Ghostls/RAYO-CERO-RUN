@@ -1,27 +1,81 @@
 /**
- * RAYO CERO — RACE CALENDAR (EVOLUTION V8.0 - CORO FALCÓN + COMPLETADA)
+ * RAYO CERO — RACE CALENDAR (EVOLUTION V9.2 - MULTI-REGIÓN + COUNTDOWN + IMGS LOCALES)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
- * Grado: Militar / Operativo / Diseñador
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V8.0 (WE RUN CORO FALCÓN):
- * [V8-1] Badge "Completada" — estilo dorado/amber con ícono de trofeo.
- *        Card con overlay de desaturación sutil para carreras pasadas.
- * [V8-2] Botón de acción en carrera completada → "VER RESULTADOS" (link a /resultados).
- * [V8-3] Preservada toda lógica V7: INSCRIPCIONES_ABIERTAS flag, badge dinámico,
- *        "CUPO COMPLETO" state, Supabase fetch.
- * [V8-4] getStatusConfig() — función centralizada para todos los estados de status.
+ * CHANGELOG V9.2:
+ * [V9.2-1] getRaceImage() — ahora mapea también flyer-coro-inscripciones.png
+ *          para la carrera de octubre (Coro Falcón), además de PORTADA_499.png
+ *          para la de agosto. Orden de matching: 499/agosto PRIMERO para evitar
+ *          colisión con el match genérico de "coro"/"falcón".
+ * [V9-1] Countdown en vivo para carreras no completadas (días/horas restantes).
+ * [V9-2] Tag de región dinámico (Lara / Falcón / otro) inferido de race.location.
+ * [V9-3] Jerarquía visual: completadas quedan al final del grid automáticamente.
+ * [V9-4] Preservada TODA la lógica V8 — getStatusConfig, CardImageSlider, botones.
  */
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { MapPin, Calendar, Clock, Info, Zap, Loader2, Lock, Trophy, CheckCircle2 } from "lucide-react";
+import { MapPin, Calendar, Clock, Info, Zap, Loader2, Lock, Trophy, CheckCircle2, Compass } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { INSCRIPCIONES_ABIERTAS } from "@/lib/registrationConfig";
 
+// ── IMÁGENES LOCALES PARA CARRERAS SIN image_url EN SUPABASE ────────────────
+import portada499Agosto from "@/assets/PORTADA_499.png";
+import flyerOctubreInscripciones from "@/assets/flyer-coro-inscripciones.png";
+
 const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1594882645126-14020914d58d?q=80&w=800";
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* IMAGEN — mapeo local por nombre, con fallback a Supabase/default            */
+/* ─────────────────────────────────────────────────────────────────────────── */
+const getRaceImage = (name: string = "", fallbackUrl?: string): string => {
+  const n = name.toLowerCase();
+  if (n.includes("499") || n.includes("agosto")) return portada499Agosto;
+  if (n.includes("coro") || n.includes("falcón") || n.includes("falcon") || n.includes("octubre")) return flyerOctubreInscripciones;
+  return fallbackUrl || DEFAULT_IMAGE;
+};
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* REGIÓN — inferencia por ubicación                                          */
+/* ─────────────────────────────────────────────────────────────────────────── */
+const getRegionTag = (location: string = ""): { label: string; color: string } | null => {
+  const l = location.toLowerCase();
+  if (l.includes("barquisimeto") || l.includes("lara")) return { label: "LARA", color: "#00f2ff" };
+  if (l.includes("coro") || l.includes("falcón") || l.includes("falcon")) return { label: "FALCÓN", color: "#FCD34D" };
+  return null;
+};
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* COUNTDOWN — días/horas restantes hasta la carrera                          */
+/* ─────────────────────────────────────────────────────────────────────────── */
+const useCountdown = (targetDate: string) => {
+  const [remaining, setRemaining] = useState<{ days: number; hours: number } | null>(null);
+
+  useEffect(() => {
+    if (!targetDate) return;
+    const target = new Date(targetDate + "T00:00:00").getTime();
+
+    const tick = () => {
+      const diff = target - Date.now();
+      if (diff <= 0) {
+        setRemaining(null);
+        return;
+      }
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      setRemaining({ days, hours });
+    };
+
+    tick();
+    const interval = setInterval(tick, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [targetDate]);
+
+  return remaining;
+};
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 /* STATUS CONFIG — fuente única de verdad para estilos y lógica de status     */
@@ -40,6 +94,19 @@ const getStatusConfig = (rawStatus: string, inscripcionesAbiertas: boolean) => {
       dotColor: "bg-amber-400",
       isCompleted: true,
       isClosed: false,
+      isComingSoon: false,
+    };
+  }
+
+  if (s === "próximamente" || s === "proximamente") {
+    return {
+      key: "proximamente" as StatusKey,
+      label: "Próximamente",
+      badgeClass: "bg-white/5 border-white/10 text-white/50",
+      dotColor: null,
+      isCompleted: false,
+      isClosed: false,
+      isComingSoon: true,
     };
   }
 
@@ -52,17 +119,7 @@ const getStatusConfig = (rawStatus: string, inscripcionesAbiertas: boolean) => {
       dotColor: "bg-red-400",
       isCompleted: false,
       isClosed: true,
-    };
-  }
-
-  if (s === "próximamente" || s === "proximamente") {
-    return {
-      key: "proximamente" as StatusKey,
-      label: "Próximamente",
-      badgeClass: "bg-white/5 border-white/10 text-white/50",
-      dotColor: null,
-      isCompleted: false,
-      isClosed: false,
+      isComingSoon: false,
     };
   }
 
@@ -75,6 +132,7 @@ const getStatusConfig = (rawStatus: string, inscripcionesAbiertas: boolean) => {
     dotColor: "bg-cyan-400",
     isCompleted: false,
     isClosed: false,
+    isComingSoon: false,
   };
 };
 
@@ -85,10 +143,12 @@ const CardImageSlider = ({
   image,
   alt,
   status,
+  region,
 }: {
   image: string;
   alt: string;
   status: string;
+  region: { label: string; color: string } | null;
 }) => {
   const cfg = getStatusConfig(status, INSCRIPCIONES_ABIERTAS);
 
@@ -130,12 +190,45 @@ const CardImageSlider = ({
         </span>
       </div>
 
+      {/* Tag de región */}
+      {region && (
+        <div className="absolute top-6 right-6 z-20">
+          <span
+            className="text-[8px] font-black uppercase tracking-[0.3em] px-3 py-2 rounded-full border backdrop-blur-md flex items-center gap-1.5"
+            style={{
+              background: `${region.color}14`,
+              borderColor: `${region.color}40`,
+              color: region.color,
+            }}
+          >
+            <Compass className="h-3 w-3" /> {region.label}
+          </span>
+        </div>
+      )}
+
       {/* Overlay de trofeo para completadas */}
       {cfg.isCompleted && (
         <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
           <Trophy className="h-16 w-16 text-amber-400/20" strokeWidth={1} />
         </div>
       )}
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* COUNTDOWN CHIP                                                              */
+/* ─────────────────────────────────────────────────────────────────────────── */
+const CountdownChip = ({ date }: { date: string }) => {
+  const remaining = useCountdown(date);
+  if (!remaining) return null;
+
+  return (
+    <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-cyan-500/[0.06] border border-cyan-400/15 mb-4">
+      <Zap className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+      <span className="text-[10px] font-black text-cyan-300 tracking-widest uppercase">
+        Faltan {remaining.days}d {remaining.hours}h
+      </span>
     </div>
   );
 };
@@ -157,7 +250,15 @@ const RacesSection = () => {
           .eq("is_active", true)
           .order("date", { ascending: true });
         if (error) throw error;
-        setRaces(data || []);
+
+        // Jerarquía visual: completadas al final, resto en orden cronológico
+        const sorted = [...(data || [])].sort((a, b) => {
+          const aCompleted = (a.status ?? "").toLowerCase().includes("completa") ? 1 : 0;
+          const bCompleted = (b.status ?? "").toLowerCase().includes("completa") ? 1 : 0;
+          return aCompleted - bCompleted;
+        });
+
+        setRaces(sorted);
       } catch (err) {
         console.error("[MIA ERROR] Fallo en enlace de datos:", err);
       } finally {
@@ -191,7 +292,7 @@ const RacesSection = () => {
           >
             <Calendar className="h-3 w-3 text-cyan-400" />
             <span className="text-[9px] font-black tracking-[0.4em] text-white/60 uppercase">
-              Calendario Operativo Valkyron
+              Calendario Operativo Rayocero
             </span>
           </motion.div>
 
@@ -208,7 +309,7 @@ const RacesSection = () => {
         <div className="flex flex-col items-center justify-center py-20 text-cyan-500 font-mono italic">
           <Loader2 className="h-10 w-10 animate-spin mb-4" />
           <span className="text-[10px] uppercase tracking-[0.5em] animate-pulse">
-            Sincronizando_Ecosistema...
+            Sincronizando Ecosistema...
           </span>
         </div>
       ) : (
@@ -216,6 +317,7 @@ const RacesSection = () => {
           {races.length > 0 ? (
             races.map((race, idx) => {
               const cfg = getStatusConfig(race.status ?? "", INSCRIPCIONES_ABIERTAS);
+              const region = getRegionTag(race.location ?? "");
 
               return (
                 <motion.div
@@ -231,14 +333,15 @@ const RacesSection = () => {
                   }`}
                 >
                   <CardImageSlider
-                    image={race.image_url}
+                    image={getRaceImage(race.name, race.image_url)}
                     alt={race.name}
                     status={race.status ?? ""}
+                    region={region}
                   />
 
                   <div className="p-8 flex flex-col flex-grow relative z-20">
                     <h3
-                      className={`text-3xl font-black italic mb-6 tracking-tighter uppercase leading-[0.9] min-h-[3.5rem] transition-colors ${
+                      className={`text-3xl font-black italic mb-4 tracking-tighter uppercase leading-[0.9] min-h-[3.5rem] transition-colors ${
                         cfg.isCompleted
                           ? "text-white/50 group-hover:text-amber-400/70"
                           : "text-white group-hover:text-cyan-400"
@@ -246,6 +349,9 @@ const RacesSection = () => {
                     >
                       {race.name}
                     </h3>
+
+                    {/* Countdown solo si no está completada y tiene fecha futura */}
+                    {!cfg.isCompleted && race.date && <CountdownChip date={race.date} />}
 
                     <div className="space-y-4 mb-10 flex-grow">
                       {[
@@ -298,6 +404,15 @@ const RacesSection = () => {
                               }}
                             >
                               <Trophy className="h-3 w-3" /> VER RESULTADOS
+                            </button>
+                          </Link>
+                        </>
+                      ) : cfg.isComingSoon ? (
+                        /* Carrera próximamente: Detalles full width */
+                        <>
+                          <Link to={`/carrera/${race.id}`} className="w-full sm:col-span-2">
+                            <button className="w-full h-full py-5 bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 rounded-2xl text-[9px] font-black text-white italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase backdrop-blur-md active:scale-95">
+                              <Info className="h-3 w-3 text-cyan-400" /> VER DETALLES OPERATIVOS
                             </button>
                           </Link>
                         </>

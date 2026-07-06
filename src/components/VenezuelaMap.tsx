@@ -27,7 +27,7 @@ interface StateRace { status: RaceStatus; eventName?: string; date?: string; }
 
 const RACE_STATES: Record<string, StateRace> = {
   "Lara":   { status: "completada", eventName: "We Run 10K Barquisimeto", date: "06.06.26" },
-  "Falcón": { status: "proxima",    eventName: "We Run Coro Falcón",      date: "31.10.26" },
+  "Falcón": { status: "proxima",    eventName: "We Run 8K Coro Falcón",      date: "31.10.26" },
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */

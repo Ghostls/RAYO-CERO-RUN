@@ -1,16 +1,18 @@
 /**
- * RAYO CERO — HOME CORE MODULE (EVOLUTION V8.0 - CORO FALCÓN + MISSION MAP)
+ * RAYO CERO — HOME CORE MODULE (EVOLUTION V8.1 - CORO FALCÓN CARRUSEL ROTATIVO)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Diseñador / Operativo
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V8.0:
- * [V8-1] FLYERS: Reemplazados flier_inscripciones_abiertas + precio (Barquisimeto)
- *        por flyer-coro-inscripciones + flyer-coro-precios (Coro Falcón).
+ * CHANGELOG V8.1:
+ * [V8.1-1] FLYERS: Reemplazado bloque estático de flyers Coro Falcón
+ *          por <CoroBannerCarousel /> — rotación automática Agosto/Octubre.
+ * [V8.1-2] Imports directos de flyer-coro-inscripciones/precios movidos
+ *          dentro de CoroBannerCarousel.tsx (encapsulado).
  * [V8-2] MAPA: Integrado VenezuelaMap — módulo de expansión territorial LED.
  *        Lara = completada (cyan), Falcón = próxima (amber).
- * [V8-3] Toda la lógica V7.9.5 preservada (Aurora, Carousel, Paneles).
+ * [V8-3] Toda la lógica V7.9.5 preservada (Aurora, Carousel Sponsors, Paneles).
  */
 
 import { useState } from "react";
@@ -22,15 +24,11 @@ import { Zap, ShieldCheck, Trophy, ArrowRight, Activity, Crosshair, Map, Smartph
 import HeroSection from "@/components/HeroSection";
 import RacesSection from "@/components/RacesSection";
 import VenezuelaMap from "@/components/VenezuelaMap";
+import CoroBannerCarousel from "@/components/CoroBannerCarousel";
 
 // Importación de activos gráficos
 import logoValkyron from "@/assets/12.png";
 import logoWeRun from "@/assets/we-run-logo.png";
-
-// ── FLYERS CORO FALCÓN (V8.0) ──────────────────────────────────────────────
-import flyerInscripciones from "@/assets/flyer-coro-inscripciones.png";
-import flyerPrecios from "@/assets/flyer-coro-precios.png";
-// ──────────────────────────────────────────────────────────────────────────
 
 // Sponsors
 import logo1 from "@/assets/1.png"; import logo2 from "@/assets/2.png"; import logo3 from "@/assets/3.png";
@@ -74,37 +72,9 @@ const Index = () => {
       {/* 1. MÓDULO HERO */}
       <HeroSection />
 
-      {/* ─── FLYERS CORO FALCÓN ─── */}
-      <section className="relative w-full overflow-hidden flex flex-col justify-center items-center py-10 md:py-16 gap-10 md:gap-16 z-10 bg-gradient-to-b from-transparent via-[#050b14] to-transparent">
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "100px" }} transition={{ duration: 0.6 }}
-          className="w-full max-w-7xl px-4 sm:px-6 lg:px-8"
-        >
-          <img
-            src={flyerInscripciones}
-            alt="We Run Rayocero — Coro Falcón · Inscripciones Abiertas"
-            loading="lazy"
-            decoding="async"
-            className="w-full h-auto object-contain drop-shadow-[0_0_35px_rgba(80,232,227,0.18)] rounded-2xl"
-          />
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "100px" }} transition={{ duration: 0.6, delay: 0.1 }}
-          className="w-full max-w-7xl px-4 sm:px-6 lg:px-8"
-        >
-          <img
-            src={flyerPrecios}
-            alt="We Run Rayocero — Coro Falcón · Precio $40"
-            loading="lazy"
-            decoding="async"
-            className="w-full h-auto object-contain drop-shadow-[0_0_35px_rgba(80,232,227,0.18)] rounded-2xl"
-          />
-        </motion.div>
-
+      {/* ─── FLYERS CORO FALCÓN — CARRUSEL ROTATIVO (V8.1) ─── */}
+      <section className="relative w-full overflow-hidden flex flex-col justify-center items-center py-10 md:py-16 gap-10 z-10 bg-gradient-to-b from-transparent via-[#050b14] to-transparent">
+        <CoroBannerCarousel />
       </section>
 
       {/* ─── SPONSORS CAROUSEL ─── */}
