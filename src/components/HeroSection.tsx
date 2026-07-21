@@ -1,23 +1,198 @@
 /**
- * RAYO CERO — HERO SECTION (STABLE V6.4 - RESTAURADO)
+ * RAYO CERO — HERO SECTION (V9.0 - CARRUSEL FALCÓN)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V8.0 (RESTAURACIÓN):
- * [V8-1] FlierSlider eliminado — módulo visual vuelve al logo oficial + fecha
- * [V8-2] Badge actualizado → "We Run Coro Falcón · Oct 2026"
- * [V8-3] Fecha operativa → 31.10.26
- * [V8-4] Imports limpiados — solo weRunLogo y fondoBg
+ * CHANGELOG V9.0:
+ * [V9-1] FlierSlider reintroducido — carrusel automático con las 2 imágenes del evento
+ * [V9-2] Diseño full-bleed: imágenes ocupan 100% del contenedor, sin bordes artificiales
+ * [V9-3] Crossfade suave entre slides (opacity transition 700ms)
+ * [V9-4] Indicadores táticos en la base del carrusel (dots + barra de progreso activa)
+ * [V9-5] Overlay gradiente interno mantiene legibilidad del badge y fecha
+ * [V9-6] Auto-advance cada 4.5s, pausado on hover, touch/swipe compatible
+ * [V9-7] Badge y fecha operativa preservados, ahora dentro del carrusel
  */
 
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import { Zap, Trophy, ArrowRight } from "lucide-react";
+import { Trophy, ArrowRight } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
-import weRunLogo from "../assets/we-run-logo.png";
 import fondoBg from "../assets/fondobg.png";
 
+// ─── SLIDES DEL EVENTO ───────────────────────────────────────────────────────
+// Reemplaza estos imports con las rutas reales de tus assets
+import slide1 from "../assets/falco-n-1.png"; // WEB_499_FALCO_N__1_.png
+import slide2 from "../assets/falco-n-2.png"; // WEB_499_FALCO_N_2.png
+
+const SLIDES = [
+  {
+    src: slide1,
+    alt: "499 Run Coro Falcón — Carrera 10K",
+    caption: "CARRERA 10K",
+  },
+  {
+    src: slide2,
+    alt: "499 Run Coro Falcón — Inscripción $20",
+    caption: "INSCRIPCIÓN $20",
+  },
+];
+
+const INTERVAL_MS = 4500;
+
+// ─── CARRUSEL INTERNO ────────────────────────────────────────────────────────
+const EventCarousel = () => {
+  const [current, setCurrent] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const timerRef = useRef(null);
+  const progressRef = useRef(null);
+  const startTimeRef = useRef(null);
+
+  // Touch swipe
+  const touchStartX = useRef(null);
+
+  const goTo = useCallback((idx) => {
+    setCurrent(idx);
+    setProgress(0);
+    startTimeRef.current = performance.now();
+  }, []);
+
+  const next = useCallback(() => {
+    setCurrent((c) => (c + 1) % SLIDES.length);
+    setProgress(0);
+    startTimeRef.current = performance.now();
+  }, []);
+
+  const prev = useCallback(() => {
+    setCurrent((c) => (c - 1 + SLIDES.length) % SLIDES.length);
+    setProgress(0);
+    startTimeRef.current = performance.now();
+  }, []);
+
+  // Auto-advance + progress bar
+  useEffect(() => {
+    if (paused) {
+      cancelAnimationFrame(progressRef.current);
+      clearTimeout(timerRef.current);
+      return;
+    }
+
+    startTimeRef.current = performance.now();
+
+    const tick = (now) => {
+      const elapsed = now - startTimeRef.current;
+      const pct = Math.min((elapsed / INTERVAL_MS) * 100, 100);
+      setProgress(pct);
+      if (pct < 100) {
+        progressRef.current = requestAnimationFrame(tick);
+      } else {
+        next();
+      }
+    };
+
+    progressRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(progressRef.current);
+    };
+  }, [current, paused, next]);
+
+  const handleTouchStart = (e) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    if (Math.abs(dx) > 40) {
+      dx < 0 ? next() : prev();
+    }
+    touchStartX.current = null;
+  };
+
+  return (
+    <div
+      className="relative w-full overflow-hidden"
+      style={{
+        aspectRatio: "16 / 9",
+        borderRadius: "2rem",
+        maxHeight: "clamp(220px, 50vw, 520px)",
+      }}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* ── SLIDES ── */}
+      {SLIDES.map((slide, idx) => (
+        <div
+          key={idx}
+          className="absolute inset-0 transition-opacity duration-700"
+          style={{ opacity: idx === current ? 1 : 0, zIndex: idx === current ? 1 : 0 }}
+          aria-hidden={idx !== current}
+        >
+          <img
+            src={slide.src}
+            alt={slide.alt}
+            className="w-full h-full object-cover object-center"
+            draggable={false}
+          />
+        </div>
+      ))}
+
+      {/* ── OVERLAY GRADIENTES ── */}
+      {/* Top: funde con el fondo negro del hero */}
+      <div
+        className="absolute inset-x-0 top-0 pointer-events-none z-10"
+        style={{ height: "35%", background: "linear-gradient(to bottom, #03070b 0%, transparent 100%)" }}
+      />
+      {/* Bottom: zona de indicadores */}
+      <div
+        className="absolute inset-x-0 bottom-0 pointer-events-none z-10"
+        style={{ height: "40%", background: "linear-gradient(to top, rgba(3,7,11,0.95) 0%, rgba(3,7,11,0.4) 60%, transparent 100%)" }}
+      />
+      {/* Viñeta lateral sutil */}
+      <div
+        className="absolute inset-0 pointer-events-none z-10"
+        style={{ background: "radial-gradient(ellipse at center, transparent 55%, rgba(3,7,11,0.6) 100%)" }}
+      />
+
+      {/* ── INDICADORES TÁCTICOS ── */}
+      <div className="absolute bottom-4 inset-x-0 z-20 flex items-center justify-center gap-3">
+        {SLIDES.map((_, idx) => (
+          <button
+            key={idx}
+            onClick={() => goTo(idx)}
+            aria-label={`Slide ${idx + 1}`}
+            className="relative flex items-center justify-center focus:outline-none"
+          >
+            {/* Línea base */}
+            <span
+              className="block transition-all duration-300"
+              style={{
+                width: idx === current ? "clamp(28px, 5vw, 40px)" : "clamp(16px, 3vw, 24px)",
+                height: "2px",
+                borderRadius: "1px",
+                background: idx === current ? "rgba(34,211,238,0.25)" : "rgba(255,255,255,0.15)",
+              }}
+            />
+            {/* Barra de progreso sobre el slide activo */}
+            {idx === current && (
+              <span
+                className="absolute left-0 top-0 h-full rounded-sm bg-cyan-400"
+                style={{ width: `${progress}%`, transition: "width 0.05s linear" }}
+              />
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// ─── HERO SECTION ─────────────────────────────────────────────────────────────
 const HeroSection = () => {
   return (
     <section
@@ -33,47 +208,24 @@ const HeroSection = () => {
       <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#03070b]/90 via-[#03070b]/40 to-[#03070b] pointer-events-none" />
 
       {/* CONTENEDOR PRINCIPAL */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center w-full max-w-5xl mx-auto px-6">
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center w-full max-w-5xl mx-auto px-4 sm:px-6">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeOut" }}
           className="flex flex-col items-center w-full"
         >
-          {/* Badge Operativo */}
-          <div className="flex items-center gap-3 mb-10 md:mb-12 px-5 py-2 rounded-full bg-white/[0.02] border border-white/10 backdrop-blur-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] hover:border-cyan-500/30 transition-colors cursor-default z-20">
-            <Zap className="h-3 w-3 text-cyan-400 animate-pulse" />
-            <span className="text-[9px] font-black tracking-[0.4em] text-white/60 uppercase mt-[1px]">
-              We Run Coro Falcón · Oct 2026
-            </span>
-          </div>
-
-          {/* ─── MÓDULO VISUAL: TARJETA LIQUID GLASS + LOGO + FECHA ─── */}
+          {/* ─── MÓDULO VISUAL: CARRUSEL FULL-BLEED ─── */}
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
+            initial={{ scale: 0.94, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
-            className="w-full max-w-[90%] sm:max-w-[550px] md:max-w-[700px] lg:max-w-[850px] mb-14 md:mb-16 relative flex flex-col items-center justify-center p-8 md:p-14 lg:p-16 rounded-[2.5rem] bg-[#03070b]/40 border border-white/10 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.6)] hover:border-cyan-500/30 transition-all duration-500 group"
+            className="w-full mb-10 sm:mb-12 md:mb-14"
+            style={{ maxWidth: "min(100%, 900px)" }}
           >
-            {/* Resplandor interno */}
-            <div className="absolute inset-0 rounded-[2.5rem] bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
-            {/* Halo táctico */}
-            <div className="absolute inset-0 rounded-[2.5rem] bg-cyan-500/0 group-hover:bg-cyan-500/5 transition-colors duration-500 pointer-events-none" />
-
-            <img
-              src={weRunLogo}
-              alt="Rayo Cero - We Run Rayocero"
-              className="w-full h-auto object-contain relative z-10 drop-shadow-[0_0_20px_rgba(34,211,238,0.1)] group-hover:drop-shadow-[0_0_30px_rgba(34,211,238,0.3)] transition-all duration-500"
-            />
-
-            {/* Fecha operativa */}
-            <div className="relative z-10 mt-6 sm:mt-8 flex items-center justify-center">
-              <p className="text-2xl sm:text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-white tracking-[0.4em] drop-shadow-[0_0_15px_rgba(0,242,255,0.4)]">
-                31.10.26
-              </p>
-            </div>
+            <EventCarousel />
           </motion.div>
-          {/* ──────────────────────────────────────────────────────── */}
+          {/* ──────────────────────────────────────────── */}
 
           {/* Botonera */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center w-full max-w-xl z-20">

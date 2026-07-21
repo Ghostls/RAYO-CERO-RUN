@@ -24,7 +24,7 @@ import { Zap, ShieldCheck, Trophy, ArrowRight, Activity, Crosshair, Map, Smartph
 import HeroSection from "@/components/HeroSection";
 import RacesSection from "@/components/RacesSection";
 import VenezuelaMap from "@/components/VenezuelaMap";
-import CoroBannerCarousel from "@/components/CoroBannerCarousel";
+
 
 // Importación de activos gráficos
 import logoValkyron from "@/assets/12.png";
@@ -72,10 +72,6 @@ const Index = () => {
       {/* 1. MÓDULO HERO */}
       <HeroSection />
 
-      {/* ─── FLYERS CORO FALCÓN — CARRUSEL ROTATIVO (V8.1) ─── */}
-      <section className="relative w-full overflow-hidden flex flex-col justify-center items-center py-10 md:py-16 gap-10 z-10 bg-gradient-to-b from-transparent via-[#050b14] to-transparent">
-        <CoroBannerCarousel />
-      </section>
 
       {/* ─── SPONSORS CAROUSEL ─── */}
       <div className="w-full border-y border-white/5 bg-white/[0.01] py-12 relative z-10 overflow-hidden">
