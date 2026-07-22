@@ -1,16 +1,23 @@
 /**
- * RAYO CERO — RACE OPERATIVE DETAIL (EVOLUTION V13.0 - CORO BANNERS + COUNTDOWN)
+ * RAYO CERO — RACE OPERATIVE DETAIL (EVOLUTION V14.1 - MULTI-RACE COUNT + FLAG DINÁMICO)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V13.0:
- * [V13-1] RACE_BANNERS: mapa de imagen operativa por nombre de carrera
- *         - "499" / "Agosto" → PORTADA_499.png
- *         - "Coro"/"Falcón"/"Octubre" → flyer-coro-inscripciones.png
- * [V13-2] ComingSoonPanel ahora muestra el banner real de la carrera (si existe).
- * [V13-3] Countdown en vivo también en el panel de detalle.
- * [V13-4] Toda la lógica V12 de Barquisimeto preservada sin tocar.
+ * CHANGELOG V14.1:
+ * [V14.1-1] COUNT POR CARRERA: Lara cuenta runners legacy (race_id IS NULL),
+ *           Coro y futuras cuentan solo runners con race_id = id de la carrera.
+ * [V14.1-2] FLAG DINÁMICO: CoroDetail y ComingSoonPanel leen
+ *           race.inscripciones_abiertas de Supabase (fallback al estático).
+ *           El botón INSCRIBIRME aparece al activar el flag en la BD.
+ *
+ * CHANGELOG V14.0:
+ * [V14-1] coroRoute: 24 coordenadas reales de la carrera 499 Run — Coro Falcón (20 Ago)
+ * [V14-2] CORO_WAYPOINTS: marcadores 1K–9K + META con POIs distribuidos
+ * [V14-3] CoroDetail: componente idéntico en estructura a BarquisimetoDetail
+ * [V14-4] RACE_CONFIGS + hasMapConfig actualizados para reconocer carreras de Coro
+ * [V14-5] Router en RaceDetail: Barquisimeto → BarquisimetoDetail, Coro → CoroDetail
+ * [V14-6] Toda la lógica V13 preservada sin tocar.
  */
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -25,7 +32,7 @@ import { supabase } from "@/lib/supabase";
 import { INSCRIPCIONES_ABIERTAS } from "@/lib/registrationConfig";
 import flyerPremios from "@/assets/flier_premios_info.png";
 
-// ── BANNERS OPERATIVOS — CORO FALCÓN ────────────────────────────────────────
+// ── BANNERS OPERATIVOS ───────────────────────────────────────────────────────
 import portada499Agosto from "@/assets/PORTADA_499.png";
 import flyerOctubreInscripciones from "@/assets/flyer-coro-inscripciones.png";
 
@@ -36,22 +43,30 @@ const MarkerComp = Marker      as any;
 const CircleComp = Circle      as any;
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* RACE CONFIGS — agrega aquí cada carrera cuando tenga datos                 */
+/* RACE CONFIGS                                                                */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const RACE_CONFIGS: Record<string, { hasMap: boolean }> = {
-  "Rayocero Night Fest Barquisimeto":      { hasMap: true },
-  "RAYOCERO NIGHT FEST BARQUISIMETO":      { hasMap: true },
-  "We Run Rayocero — Coro Falcón":         { hasMap: false },
-  "499 Run — Coro Falcón":                 { hasMap: false },
+  "Rayocero Night Fest Barquisimeto":  { hasMap: true  },
+  "RAYOCERO NIGHT FEST BARQUISIMETO":  { hasMap: true  },
+  "We Run Rayocero — Coro Falcón":     { hasMap: true  },
+  "499 Run — Coro Falcón":             { hasMap: true  },
 };
 
 const hasMapConfig = (name: string): boolean => {
-  if (name?.toLowerCase().includes("barquisimeto") || name?.toLowerCase().includes("night fest")) return true;
+  if (!name) return false;
+  const n = name.toLowerCase();
+  if (n.includes("barquisimeto") || n.includes("night fest")) return true;
+  if (n.includes("coro") || n.includes("falcón") || n.includes("falcon") || n.includes("499")) return true;
   return RACE_CONFIGS[name]?.hasMap ?? false;
 };
 
+const isBarquisimetoRace = (name: string): boolean => {
+  const n = name?.toLowerCase() ?? "";
+  return n.includes("barquisimeto") || n.includes("night fest");
+};
+
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* RACE BANNERS — imagen operativa según carrera (match parcial por keyword)  */
+/* RACE BANNERS                                                                */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const getRaceBanner = (name: string = ""): string | null => {
   const n = name.toLowerCase();
@@ -61,7 +76,7 @@ const getRaceBanner = (name: string = ""): string | null => {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* COUNTDOWN — días/horas restantes hasta la carrera                          */
+/* COUNTDOWN                                                                   */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const useCountdown = (targetDate?: string) => {
   const [remaining, setRemaining] = useState<{ days: number; hours: number } | null>(null);
@@ -72,11 +87,8 @@ const useCountdown = (targetDate?: string) => {
 
     const tick = () => {
       const diff = target - Date.now();
-      if (diff <= 0) {
-        setRemaining(null);
-        return;
-      }
-      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      if (diff <= 0) { setRemaining(null); return; }
+      const days  = Math.floor(diff / (1000 * 60 * 60 * 24));
       const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       setRemaining({ days, hours });
     };
@@ -106,7 +118,7 @@ const createCompoundIcon = (waypoint: any) => {
   return L.divIcon({
     className: "custom-compound-marker",
     html: `<div style="display:flex;align-items:center;width:max-content;pointer-events:none;">${mainCircle}${poiHtml}</div>`,
-    iconSize: [0, 0],
+    iconSize:   [0, 0],
     iconAnchor: waypoint.isMeta ? [20, 20] : [15, 15],
   });
 };
@@ -124,7 +136,60 @@ const MapController = ({ bounds }: { bounds: L.LatLngBoundsExpression }) => {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* PANTALLA PRÓXIMAMENTE — con banner real                                    */
+/* RUTA — 499 RUN CORO FALCÓN (20 AGO 2026)                                  */
+/* Salida/Meta: Av. Manaure                                                   */
+/* ─────────────────────────────────────────────────────────────────────────── */
+const coroRoute: [number, number][] = [
+  [11.409922, -69.675254], // Av. Manaure — SALIDA / META
+  [11.408140, -69.674525], // C. Gárces — ~1K
+  [11.405352, -69.673543], // Punto ref
+  [11.401830, -69.672276], // Av. Rómulo
+  [11.402671, -69.669663], // Av. Rómulo
+  [11.404142, -69.665417], // Av. Rómulo
+  [11.404920, -69.662972], // Calle Sol
+  [11.406875, -69.663787], // Punto ref
+  [11.409608, -69.664795], // Purureche
+  [11.410785, -69.659327], // Av. Buchivacoa
+  [11.411626, -69.655788], // Punto ref
+  [11.412109, -69.653579], // Av. Buchivacoa
+  [11.414632, -69.654480], // Av. Dr. Rafael
+  [11.418016, -69.655681], // Av. Independencia
+  [11.416061, -69.658941], // Av. Independencia
+  [11.414127, -69.662265], // Callejones
+  [11.412362, -69.665781], // Coro
+  [11.418158, -69.668000], // Lara-Falcón
+  [11.422750, -69.669504], // Plaza
+  [11.418158, -69.668000], // Lara-Falcón (regreso)
+  [11.416152, -69.667408], // Cruce
+  [11.414895, -69.672463], // Av. Josefa
+  [11.413179, -69.679237], // Estacionamiento
+  [11.409250, -69.678246], // Av. Miranda
+  [11.409938, -69.675271], // Av. Manaure — 10K / META
+];
+
+const CORO_WAYPOINTS = [
+  {
+    pos: [11.409922, -69.675254], isMeta: true, label: "META",
+    pois: [
+      { icon: "♪", color: "#a855f7" },
+      { icon: "B", color: "#94a3b8" },
+      { icon: "+", color: "#22c55e" },
+      { icon: "C", color: "#eab308" },
+    ],
+  },
+  { pos: [11.408140, -69.674525], label: "1K",  pois: [{ icon: "♪", color: "#a855f7" }] },
+  { pos: [11.405352, -69.673543], label: "2K",  pois: [] },
+  { pos: [11.402671, -69.669663], label: "3K",  pois: [{ icon: "P", color: "#3b82f6" }] },
+  { pos: [11.404920, -69.662972], label: "4K",  pois: [{ icon: "♪", color: "#a855f7" }] },
+  { pos: [11.409608, -69.664795], label: "5K",  pois: [{ icon: "C", color: "#eab308" }] },
+  { pos: [11.411626, -69.655788], label: "6K",  pois: [{ icon: "P", color: "#3b82f6" }] },
+  { pos: [11.414632, -69.654480], label: "7K",  pois: [{ icon: "♪", color: "#a855f7" }, { icon: "+", color: "#22c55e" }] },
+  { pos: [11.416061, -69.658941], label: "8K",  pois: [] },
+  { pos: [11.418158, -69.668000], label: "9K",  pois: [{ icon: "♪", color: "#a855f7" }] },
+];
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* COMING SOON PANEL                                                           */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
   race: any;
@@ -136,25 +201,25 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
     ? new Date(race.date + "T00:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" }).toUpperCase()
     : "—";
 
-  const banner = getRaceBanner(race?.name ?? "");
+  const banner   = getRaceBanner(race?.name ?? "");
   const countdown = useCountdown(race?.date);
+
+  // [V14.1-2] Flag dinámico desde Supabase; fallback al estático
+  const inscAbiertas = race?.inscripciones_abiertas ?? INSCRIPCIONES_ABIERTAS;
 
   return (
     <div className="min-h-screen w-full bg-[#03070b] flex flex-col text-white relative font-sans pt-[85px] md:pt-[104px] pb-12 overflow-y-auto">
 
-      {/* Fondo glow ambiental */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-amber-500/5 blur-[120px] rounded-full" />
         <div className="absolute bottom-1/4 left-1/3 w-[400px] h-[300px] bg-cyan-500/5 blur-[100px] rounded-full" />
       </div>
 
-      {/* Textura táctica */}
       <div className="absolute inset-0 opacity-[0.025] pointer-events-none"
         style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` }} />
 
       <div className="relative z-10 w-full max-w-2xl mx-auto px-4 sm:px-6 flex flex-col items-center py-8">
 
-        {/* Back button */}
         <div className="w-full flex justify-start mb-8">
           <button onClick={onBack}
             className="flex items-center gap-2 group bg-white/[0.03] hover:bg-white/10 py-2 px-4 rounded-full transition-all border border-white/5">
@@ -163,30 +228,21 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
           </button>
         </div>
 
-        {/* Card principal */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
           className="w-full bg-white/[0.02] border border-white/8 rounded-[2.5rem] backdrop-blur-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.6)] flex flex-col items-center text-center"
         >
-          {/* Banner real de la carrera (si existe) */}
           {banner && (
             <div className="w-full relative">
-              <img
-                src={banner}
-                alt={race?.name ?? "Banner de carrera"}
-                loading="lazy"
-                decoding="async"
-                className="w-full h-auto object-cover"
-              />
+              <img src={banner} alt={race?.name ?? "Banner de carrera"} loading="lazy" decoding="async" className="w-full h-auto object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-[#03070b] via-transparent to-transparent" />
             </div>
           )}
 
           <div className="w-full flex flex-col items-center gap-6 p-7 sm:p-10 md:p-12">
 
-            {/* Badge */}
             <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-400/20">
               <motion.span className="w-1.5 h-1.5 rounded-full bg-amber-400"
                 animate={{ opacity: [1, 0.2, 1] }}
@@ -196,7 +252,6 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
               </span>
             </div>
 
-            {/* Título */}
             <div>
               <h1 className="text-3xl sm:text-4xl md:text-6xl font-black italic uppercase tracking-tighter leading-[0.9] text-white mb-3">
                 {race?.name ?? "PRÓXIMA MISIÓN"}
@@ -206,7 +261,6 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
               </p>
             </div>
 
-            {/* Countdown en vivo */}
             {countdown && (
               <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-cyan-500/[0.06] border border-cyan-400/15">
                 <Zap className="h-4 w-4 text-cyan-400" />
@@ -216,12 +270,11 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
               </div>
             )}
 
-            {/* Info grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
               {[
-                { icon: MapPin,    label: "Ubicación",   val: race?.location ?? "—" },
-                { icon: Calendar,  label: "Fecha",       val: dateStr },
-                { icon: Users,     label: "Inscritos",   val: `${registeredCount}` },
+                { icon: MapPin,   label: "Ubicación", val: race?.location ?? "—"  },
+                { icon: Calendar, label: "Fecha",     val: dateStr                 },
+                { icon: Users,    label: "Inscritos", val: `${registeredCount}`    },
               ].map((item, i) => (
                 <div key={i} className="flex flex-col items-center gap-3 p-5 bg-white/[0.02] border border-white/5 rounded-2xl">
                   <item.icon className="h-5 w-5 text-cyan-400" />
@@ -233,10 +286,8 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
               ))}
             </div>
 
-            {/* Separador */}
             <div className="w-full h-px bg-white/5" />
 
-            {/* Mensaje táctico */}
             <div className="flex items-start gap-4 text-left bg-cyan-500/[0.04] border border-cyan-400/10 rounded-2xl p-5 w-full">
               <Shield className="h-5 w-5 text-cyan-400 mt-0.5 shrink-0" />
               <p className="text-[11px] text-white/50 leading-relaxed">
@@ -245,8 +296,7 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
               </p>
             </div>
 
-            {/* Botón inscripción */}
-            {INSCRIPCIONES_ABIERTAS ? (
+            {inscAbiertas ? (
               <button onClick={onRegister}
                 className="w-full py-6 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 bg-cyan-500 hover:bg-cyan-400 text-black shadow-[0_0_30px_rgba(0,242,255,0.2)] active:scale-95">
                 INSCRIBIRME <Zap className="h-4 w-4 fill-current" />
@@ -268,7 +318,7 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* BARQUISIMETO DETAIL — idéntico al original                                 */
+/* BARQUISIMETO DETAIL                                                         */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const BarquisimetoDetail = ({ registeredCount, onRegister }: {
   registeredCount: number;
@@ -426,14 +476,168 @@ const BarquisimetoDetail = ({ registeredCount, onRegister }: {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
+/* CORO DETAIL — 499 RUN CORO FALCÓN (20 AGO 2026)                           */
+/* ─────────────────────────────────────────────────────────────────────────── */
+const CoroDetail = ({ race, registeredCount, onRegister }: {
+  race: any;
+  registeredCount: number;
+  onRegister: (e: React.MouseEvent) => void;
+}) => {
+  const navigate   = useNavigate();
+  const mapBounds  = useMemo(() => L.latLngBounds(coroRoute), []);
+  const banner     = getRaceBanner(race?.name ?? "");
+
+  // [V14.1-2] Flag dinámico desde Supabase; fallback al estático si la columna no existe
+  const inscAbiertas = race?.inscripciones_abiertas ?? INSCRIPCIONES_ABIERTAS;
+
+  const dateStr = race?.date
+    ? new Date(race.date + "T00:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" }).toUpperCase()
+    : "20 . AGO . 2026";
+
+  return (
+    <div className="h-screen w-full bg-[#03070b] flex flex-col lg:flex-row overflow-hidden text-white relative font-sans pt-[85px] md:pt-[104px] z-0">
+
+      {/* MAPA */}
+      <div className="relative w-full lg:w-[65%] h-[45vh] lg:h-full bg-[#080808] z-0">
+        <MapComp bounds={mapBounds} zoom={14} className="h-full w-full z-10" zoomControl={false}>
+          <MapController bounds={mapBounds} />
+          <TileComp url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution="&copy; CARTO" />
+          <CircleComp
+            center={[11.409922, -69.675254]}
+            radius={300}
+            pathOptions={{ color: "#00f2ff", fillColor: "#00f2ff", fillOpacity: 0.08, weight: 1, className: "radar-pulse" }}
+          />
+          <PolyComp
+            positions={coroRoute}
+            pathOptions={{ color: "#00f2ff", weight: 5, opacity: 0.9, className: "glow-path" }}
+          />
+          {CORO_WAYPOINTS.map((wp, idx) => (
+            <MarkerComp key={idx} position={wp.pos} icon={createCompoundIcon(wp)} />
+          ))}
+        </MapComp>
+        <div className="absolute bottom-10 left-10 z-[500] pointer-events-none hidden md:block">
+          <h2 className="text-white font-black italic text-7xl leading-[0.8] tracking-tighter uppercase opacity-30 select-none drop-shadow-2xl">
+            499 RUN<br />CORO <span className="text-cyan-500">10K</span>
+          </h2>
+        </div>
+      </div>
+
+      {/* SIDEBAR */}
+      <aside className="w-full lg:w-[35%] h-[55vh] lg:h-full overflow-y-auto bg-[#03070b] p-8 lg:p-12 custom-scrollbar border-l border-white/5 relative z-10">
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8 pb-6 border-b border-white/5">
+          <button onClick={() => navigate(-1)}
+            className="flex items-center gap-2 group bg-white/[0.03] hover:bg-white/10 py-2 px-4 rounded-full transition-all border border-white/5">
+            <ArrowLeft className="h-4 w-4 text-cyan-400 group-hover:-translate-x-1 transition-transform" />
+            <span className="font-black text-[9px] tracking-[0.3em] uppercase text-white/70">Volver</span>
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-[9px] font-black text-cyan-400 tracking-widest leading-none">RAYOCERO</p>
+              <p className="text-[7px] text-white/30 font-bold uppercase mt-1">499 RUN CORO FALCÓN</p>
+            </div>
+            <div className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_10px_#00f2ff]" />
+          </div>
+        </div>
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-12 pb-10">
+
+          {/* Flyer banner */}
+          {banner && (
+            <div className="w-full relative rounded-2xl overflow-hidden border border-white/10 shadow-[0_0_40px_rgba(34,211,238,0.08)] group">
+              <div className="absolute inset-0 bg-gradient-to-t from-[#03070b] via-transparent to-transparent opacity-50 z-10 pointer-events-none" />
+              <img src={banner} alt={race?.name ?? "499 Run Coro Falcón"}
+                className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+            </div>
+          )}
+
+          {/* Título */}
+          <header className="space-y-4">
+            <h1 className="text-7xl font-black italic uppercase leading-none tracking-tighter">
+              10<span className="text-cyan-400">K</span>
+            </h1>
+            <p className="text-sm font-black tracking-[0.5em] text-white/30 uppercase">{dateStr}</p>
+          </header>
+
+          {/* Info grid */}
+          <div className="grid grid-cols-1 gap-4">
+            {[
+              { icon: MapPin, label: "Salida / Meta",       val: "Av. Manaure, Coro"   },
+              { icon: Clock,  label: "Hora Operativa",      val: race?.time ?? "Por confirmar" },
+              { icon: Users,  label: "Atletas Confirmados", val: `${registeredCount}`  },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-6 p-5 bg-white/[0.02] border border-white/5 rounded-3xl group hover:border-cyan-500/30 transition-all backdrop-blur-md">
+                <div className="h-12 w-12 flex items-center justify-center bg-cyan-400/10 rounded-2xl text-cyan-400 transition-colors group-hover:bg-cyan-400 group-hover:text-black">
+                  <item.icon className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[9px] font-black text-white/20 uppercase tracking-widest">{item.label}</p>
+                  <p className="font-bold text-lg uppercase text-white">{item.val}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* CTA — [V14.1-2] flag dinámico desde Supabase */}
+          {inscAbiertas ? (
+            <button onClick={onRegister}
+              className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 bg-cyan-500 hover:bg-cyan-400 text-black shadow-[0_0_30px_rgba(0,242,255,0.2)] active:scale-95">
+              INSCRIBIRME <Zap className="h-4 w-4 fill-current" />
+            </button>
+          ) : (
+            <button onClick={onRegister}
+              className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
+              style={{ background: "rgba(255,40,40,0.08)", border: "1px solid rgba(255,60,60,0.28)", color: "#F87171" }}>
+              <Lock className="h-4 w-4" /> CUPO COMPLETO
+              <motion.span className="w-2 h-2 rounded-full" style={{ background: "#FF4444" }}
+                animate={{ opacity: [1, 0.2, 1] }} transition={{ duration: 2, repeat: Infinity }} />
+            </button>
+          )}
+
+          {/* Leyenda */}
+          <div className="pt-6 border-t border-white/5">
+            <p className="text-[9px] font-black tracking-[0.3em] text-white/40 uppercase mb-6">Leyenda Operativa</p>
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-5">
+              {[
+                { color: "#00f2ff", icon: "1K", label: "KM"          },
+                { color: "#3b82f6", icon: "P",  label: "HIDRATACIÓN" },
+                { color: "#a855f7", icon: "♪",  label: "MÚSICA"      },
+                { color: "#eab308", icon: "C",  label: "CRONO"       },
+                { color: "#22c55e", icon: "+",  label: "MÉDICO"      },
+                { color: "#94a3b8", icon: "B",  label: "BAÑOS"       },
+              ].map((l) => (
+                <div key={l.label} className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-full border flex items-center justify-center text-[10px] font-black"
+                    style={{ borderColor: l.color, color: l.color }}>{l.icon}</div>
+                  <span className="text-[10px] font-bold text-white/60">{l.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      </aside>
+
+      <style>{`
+        .glow-path { filter: drop-shadow(0 0 15px rgba(0,242,255,0.5)); }
+        .radar-pulse { animation: radar 3s ease-out infinite; transform-origin: center; }
+        @keyframes radar { 0% { r: 50; opacity: 0.8; } 100% { r: 400; opacity: 0; } }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
+      `}</style>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────────────────── */
 /* MAIN COMPONENT — router dinámico                                           */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const RaceDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [race, setRace] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [registeredCount, setRegisteredCount] = useState(1);
+  const [race, setRace]                   = useState<any>(null);
+  const [loading, setLoading]             = useState(true);
+  const [registeredCount, setRegisteredCount] = useState(0);
 
   useEffect(() => {
     const fetchRace = async () => {
@@ -450,16 +654,30 @@ const RaceDetail = () => {
     fetchRace();
   }, [id]);
 
+  // [V14.1-1] Count filtrado por carrera:
+  //  - Lara/Barquisimeto: runners legacy sin race_id → cuenta todos los confirmados sin race_id
+  //  - Coro y futuras: cuenta solo runners con race_id = id de esta carrera
   useEffect(() => {
+    if (!race || !id) return;
     const fetchCount = async () => {
       try {
-        const { count, error } = await supabase
-          .from("runners").select("*", { count: "exact", head: true }).eq("estado", "confirmado");
-        if (!error && count !== null && count > 0) setRegisteredCount(count);
+        let query = supabase
+          .from("runners")
+          .select("*", { count: "exact", head: true })
+          .eq("estado", "confirmado");
+
+        if (isBarquisimetoRace(race.name)) {
+          query = query.is("race_id", null); // legacy runners de Lara
+        } else {
+          query = query.eq("race_id", id);
+        }
+
+        const { count, error } = await query;
+        if (!error && count !== null) setRegisteredCount(count);
       } catch (err) { console.error("[MIA] Error fetching count:", err); }
     };
     fetchCount();
-  }, []);
+  }, [race, id]);
 
   const handleRegister = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -477,12 +695,23 @@ const RaceDetail = () => {
     );
   }
 
-  // Decide qué renderizar según la carrera
+  // ── ROUTER ──────────────────────────────────────────────────────────────────
   if (race && hasMapConfig(race.name)) {
-    return <BarquisimetoDetail registeredCount={registeredCount} onRegister={handleRegister} />;
+    if (isBarquisimetoRace(race.name)) {
+      return <BarquisimetoDetail registeredCount={registeredCount} onRegister={handleRegister} />;
+    }
+    // Coro Falcón — 499 Run y cualquier futura carrera en Coro
+    return <CoroDetail race={race} registeredCount={registeredCount} onRegister={handleRegister} />;
   }
 
-  return <ComingSoonPanel race={race} registeredCount={registeredCount} onBack={() => navigate(-1)} onRegister={handleRegister} />;
+  return (
+    <ComingSoonPanel
+      race={race}
+      registeredCount={registeredCount}
+      onBack={() => navigate(-1)}
+      onRegister={handleRegister}
+    />
+  );
 };
 
 export default RaceDetail;

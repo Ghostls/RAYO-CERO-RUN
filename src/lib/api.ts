@@ -1,10 +1,22 @@
 /**
- * VALKYRON GROUP — RAYO CERO API LAYER (V2.5 - STABLE)
+ * VALKYRON GROUP — RAYO CERO API LAYER (V2.6 - MULTI-RACE)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Grado: Operativo / Militar
  * REGLA DE ORO: Código completo sin omisiones.
- * FIX: Integración de parámetro Movilidad Reducida en Zod y reestructuración exacta de categorías.
+ *
+ * CHANGELOG V2.6:
+ * [V2.6-1] race_id añadido al schema Zod. CRÍTICO: schema.parse() de Zod
+ *          elimina campos no declarados — sin esto, el race_id que envía
+ *          el RegistrationForm se borraba antes del insert y los inscritos
+ *          de Coro caían al archivo de Lara (race_id NULL).
+ * [V2.6-2] insert incluye race_id.
+ * [V2.6-3] Mensaje 23505 actualizado: la unicidad ahora es POR CARRERA
+ *          (índices compuestos cedula+race_id / email+race_id en la BD).
+ *          Un atleta de Lara puede inscribirse en Coro sin conflicto.
+ *
+ * V2.5: Integración de parámetro Movilidad Reducida en Zod y
+ *       reestructuración exacta de categorías.
  */
 
 import { z } from "zod";
@@ -35,18 +47,18 @@ export function calcularVelocidad(tiempoSegundos: number, distanciaKm: number): 
 
 // MIA CORE: Motor de Asignación de Categorías Oficiales Rayo Cero
 export function calcularCategoria(edad: number, genero: "M" | "F", movilidadReducida: boolean = false): string {
-  // Overrride supremo: Si tiene movilidad reducida, se ignora edad y género.
+  // Override supremo: Si tiene movilidad reducida, se ignora edad y género.
   if (movilidadReducida) {
     return "Movilidad Reducida Absoluto";
   }
 
   const g = genero === "M" ? "Masculino" : "Femenino";
-  
+
   if (edad >= 16 && edad <= 19) return `Juvenil ${g}`;
   if (edad >= 20 && edad <= 29) return `Libre ${g}`;
   if (edad >= 30 && edad <= 39) return `Submaster ${g}`;
   if (edad >= 40) return `Master ${g}`;
-  
+
   return `Absoluto ${g}`; // Fallback táctico
 }
 
@@ -58,7 +70,7 @@ export const registrationSchema = z.object({
   cedula: z
     .string()
     .regex(/^[VEJPGvejpg]?\d{5,10}$/, "Formato de cédula inválido")
-    .transform((val) => val.toUpperCase().replace(/[^0-9]/g, "")), 
+    .transform((val) => val.toUpperCase().replace(/[^0-9]/g, "")),
   email: z.string().email("Email inválido"),
   telefono: z.string().optional().or(z.literal("")),
   fechaNacimiento: z.string().refine((val) => {
@@ -66,12 +78,15 @@ export const registrationSchema = z.object({
     return edad >= 16 && edad <= 99; // Ajustado a 16 años (Mínimo Juvenil)
   }, "Edad permitida: 16+ años"),
   genero: z.enum(["M", "F"]),
-  talla: z.enum(["XS", "S", "M", "L", "XL", "XXL",  "NA"]),
-  movilidadReducida: z.boolean().default(false), // <-- INYECCIÓN TÁCTICA ZOD
+  talla: z.enum(["XS", "S", "M", "L", "XL", "XXL", "NA"]),
+  movilidadReducida: z.boolean().default(false),
   referenciaPago: z.string().min(4, "Referencia bancaria inválida"),
   contactoEmergencia: z.string().min(3),
   telefonoEmergencia: z.string(),
   aceptaDeslinde: z.literal(true),
+  // [V2.6-1] Carrera a la que pertenece la inscripción.
+  // Opcional para retrocompatibilidad; el RegistrationForm V26+ siempre lo envía.
+  race_id: z.string().uuid("race_id inválido").optional(),
 });
 
 export type RegistrationFormData = z.infer<typeof registrationSchema>;
@@ -116,18 +131,23 @@ export async function registerRunner(formData: RegistrationFormData): Promise<Re
       genero: parsed.genero,
       categoria: categoria,
       talla_camiseta: parsed.talla,
-      "movilidadReducida": parsed.movilidadReducida, // <-- ENVÍO A BD (Forzando nombre exacto de columna)
-      referencia_pago: parsed.referenciaPago, 
+      "movilidadReducida": parsed.movilidadReducida,
+      referencia_pago: parsed.referenciaPago,
       contacto_emergencia: parsed.contactoEmergencia,
       telefono_emergencia: parsed.telefonoEmergencia,
       acepta_deslinde: true,
       timestamp_aceptacion: new Date().toISOString(),
+      // [V2.6-2] Enlace a la carrera activa. NULL = archivo legacy (Lara).
+      race_id: parsed.race_id ?? null,
     }])
     .select("bib_number, id, categoria")
     .single();
 
   if (error) {
-    if (error.code === "23505") throw new Error("Cédula o Email ya registrados en el sistema.");
+    // [V2.6-3] 23505 = unique violation. Con los índices compuestos
+    // (cedula, race_id) y (email, race_id), esto solo dispara si el
+    // atleta ya está inscrito EN ESTA MISMA carrera.
+    if (error.code === "23505") throw new Error("Ya estás inscrito en esta carrera con esta cédula o email.");
     throw new Error(error.message);
   }
   return data as RegistrationResult;
@@ -167,8 +187,8 @@ export async function getResultsByBib(bib: string): Promise<RunnerResultData> {
     .select("*", { count: "exact", head: true });
 
   const runnerData = data as any;
-  const raceData = runnerData.race_results && runnerData.race_results.length > 0 
-    ? runnerData.race_results[0] 
+  const raceData = runnerData.race_results && runnerData.race_results.length > 0
+    ? runnerData.race_results[0]
     : null;
 
   if (!raceData) {

@@ -1,3 +1,27 @@
+/**
+ * RAYO CERO — ADMIN DASHBOARD (EVOLUTION V2.1 - MULTI-RACE SCOPE + BIB PER RACE)
+ * Senior Dev: MIA (Valkyron Group)
+ * CEO: Lualdo Sciscioli
+ * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
+ *
+ * CHANGELOG V2.1:
+ * [V2.1-1] EscuadronesList: embed race_results!race_results_bib_number_fkey
+ *          reemplazado por join manual — la FK se eliminó al migrar a
+ *          dorsales por carrera (bib 0001 en cada evento).
+ *
+ * CHANGELOG V2.0:
+ * [V2-1] RaceScopeBar: selector global de carrera. Auto-selecciona la activa
+ *        (inscripciones_abiertas = true). Las pasadas aparecen como ARCHIVO.
+ * [V2-2] AtletasList filtrada por scope: Lara (legacy) = race_id IS NULL,
+ *        carreras nuevas = race_id exacto. Admin limpio para la 499.
+ * [V2-3] TasaConfig por carrera: lee/edita la fila de system_config con
+ *        race_id de la carrera seleccionada; fallback a fila id=1 (legacy).
+ * [V2-4] ModuloEntregaKits y ModuloChequeoKits: búsquedas y stats filtradas
+ *        por el scope activo (los dorsales de cada carrera viven aislados).
+ * [V2-5] Tarjeta de participación muestra el nombre de la carrera activa.
+ * [V2-6] Todo lo demás (PDF, escuadrones, telemetría, expurgo) intacto.
+ */
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../lib/supabase';
@@ -37,6 +61,7 @@ interface Runner {
   pago_verificado?: boolean;
   rfid_epc?: string | null;
   kit_entregado?: boolean;
+  race_id?: string | null;
 }
 
 const BUCKET = 'comprobantes-pago';
@@ -68,6 +93,113 @@ const getCategoryColor = (categoria: string): [number, number, number] => {
   if (c.includes('masculino') || c.includes(' m')) return [59, 130, 246];
   if (c.includes('femenino') || c.includes(' f')) return [244, 114, 182];
   return [156, 163, 175];
+};
+
+/* ────────────────────────────────────────────────────────────── */
+/* [V2-1] RACE SCOPE — selector de carrera global                 */
+/* ────────────────────────────────────────────────────────────── */
+
+export interface RaceScope {
+  raceId: string | null;
+  legacy: boolean;   // true = runners sin race_id (Lara)
+  name: string;
+  isActive: boolean; // inscripciones_abiertas
+}
+
+const isLegacyRace = (name: string): boolean => {
+  const n = (name || '').toLowerCase();
+  return n.includes('barquisimeto') || n.includes('night fest');
+};
+
+/** Aplica el filtro de carrera a cualquier query de runners */
+const applyScopeFilter = (query: any, scope: RaceScope) => {
+  if (scope.legacy) return query.is('race_id', null);
+  if (scope.raceId) return query.eq('race_id', scope.raceId);
+  return query;
+};
+
+const RaceScopeBar = ({
+  scope,
+  onChange,
+}: {
+  scope: RaceScope | null;
+  onChange: (scope: RaceScope) => void;
+}) => {
+  const [races, setRaces] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRaces = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('races')
+          .select('id, name, date, inscripciones_abiertas')
+          .order('date', { ascending: false });
+        if (error) throw error;
+        setRaces(data || []);
+
+        if (!scope && data && data.length > 0) {
+          const activa = data.find(r => r.inscripciones_abiertas) || data[0];
+          onChange({
+            raceId: activa.id,
+            legacy: isLegacyRace(activa.name),
+            name: activa.name,
+            isActive: !!activa.inscripciones_abiertas,
+          });
+        }
+      } catch (err) {
+        console.error('[MIA] RaceScopeBar:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRaces();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="mb-8 h-16 rounded-2xl bg-white/[0.02] border border-white/5 animate-pulse flex items-center px-6">
+        <span className="text-[9px] text-gray-600 uppercase tracking-widest font-black">Cargando carreras...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-8 p-4 rounded-2xl bg-black/40 border border-white/10 flex flex-wrap items-center gap-3">
+      <div className="flex items-center gap-2 mr-2">
+        <Filter size={14} className="text-cyan-400" />
+        <span className="text-[9px] text-gray-500 uppercase tracking-widest font-black">Carrera:</span>
+      </div>
+      {races.map(r => {
+        const legacy = isLegacyRace(r.name);
+        const selected = scope?.raceId === r.id;
+        return (
+          <button
+            key={r.id}
+            onClick={() => onChange({ raceId: r.id, legacy, name: r.name, isActive: !!r.inscripciones_abiertas })}
+            className={`px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center gap-2 border ${
+              selected
+                ? r.inscripciones_abiertas
+                  ? 'bg-cyan-500 text-black border-cyan-500 shadow-lg shadow-cyan-500/20'
+                  : 'bg-amber-500/90 text-black border-amber-500 shadow-lg shadow-amber-500/20'
+                : 'bg-white/5 hover:bg-white/10 text-gray-400 border-white/10'
+            }`}
+          >
+            {r.inscripciones_abiertas ? (
+              <span className={`w-1.5 h-1.5 rounded-full ${selected ? 'bg-black' : 'bg-cyan-400 animate-pulse'}`} />
+            ) : (
+              <Clock size={11} />
+            )}
+            {r.name}
+            {!r.inscripciones_abiertas && (
+              <span className={`text-[8px] px-1.5 py-0.5 rounded ${selected ? 'bg-black/20' : 'bg-white/5'}`}>ARCHIVO</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
 };
 
 /* ────────────────────────────────────────────────────────────── */
@@ -134,10 +266,11 @@ type PDFMode = 'segmented' | 'specific' | 'general';
 
 interface PDFExportModalProps {
   atletas: Runner[];
+  raceName: string;
   onClose: () => void;
 }
 
-const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mode: PDFMode) => {
+const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mode: PDFMode, raceName: string) => {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
@@ -166,11 +299,11 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
   doc.text('RAYOCERO', pageW / 2, 42, { align: 'center' });
   doc.setFontSize(12);
   doc.setTextColor(200, 200, 200);
-  doc.text('NIGHT FEST · 06 JUN 2026 · 06:00 PM', pageW / 2, 50, { align: 'center' });
+  doc.text(raceName.toUpperCase(), pageW / 2, 50, { align: 'center' });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
   doc.setTextColor(120, 120, 120);
-  doc.text('Monumento al Sol, Barquisimeto · Valkyron Group', pageW / 2, 56, { align: 'center' });
+  doc.text('Valkyron Group', pageW / 2, 56, { align: 'center' });
   doc.setDrawColor(34, 211, 238);
   doc.setLineWidth(0.5);
   doc.line(20, 64, pageW - 20, 64);
@@ -274,7 +407,7 @@ const generateCategoryPDF = (atletas: Runner[], selectedCategories: string[], mo
   doc.save(`RAYOCERO_${suffix}_${Date.now()}.pdf`);
 };
 
-const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, onClose }) => {
+const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, raceName, onClose }) => {
   const [mode, setMode] = useState<PDFMode>('segmented');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -293,7 +426,7 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, onClose }) => 
       } else {
         categoriesToInclude = [...new Set(atletas.map(a => a.categoria || 'Sin categoría'))];
       }
-      generateCategoryPDF(atletas, categoriesToInclude, mode);
+      generateCategoryPDF(atletas, categoriesToInclude, mode, raceName);
     } catch (err: any) {
       alert(`Error al generar PDF: ${err.message}`);
     } finally {
@@ -306,7 +439,7 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, onClose }) => 
         <div className="flex justify-between items-start mb-6">
           <div>
             <h3 className="text-xl font-black text-white uppercase italic tracking-widest">Exportar PDF</h3>
-            <p className="text-[9px] text-gray-500 uppercase tracking-widest mt-1">Selecciona el modo de exportación</p>
+            <p className="text-[9px] text-gray-500 uppercase tracking-widest mt-1">{raceName} · Selecciona el modo de exportación</p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-white"><X size={20} /></button>
         </div>
@@ -356,10 +489,10 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, onClose }) => 
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* MÓDULO ENTREGA DE KITS Y RFID                                  */
+/* [V2-4] MÓDULO ENTREGA DE KITS Y RFID — filtrado por scope      */
 /* ────────────────────────────────────────────────────────────── */
 
-const ModuloEntregaKits = () => {
+const ModuloEntregaKits = ({ scope }: { scope: RaceScope }) => {
   const [bibInput, setBibInput] = useState<string>('');
   const [epcInput, setEpcInput] = useState<string>('');
   const [activeRunner, setActiveRunner] = useState<Runner | null>(null);
@@ -371,11 +504,13 @@ const ModuloEntregaKits = () => {
     if (e) e.preventDefault();
     if (!bibInput) return;
     setIsLoading(true); setStatusMsg(null); setActiveRunner(null);
-    const { data, error } = await supabase.from('runners')
+    let query = supabase.from('runners')
       .select('id, bib_number, nombre, apellido, cedula, categoria, rfid_epc, talla_camiseta')
-      .eq('bib_number', parseInt(bibInput, 10)).single();
+      .eq('bib_number', parseInt(bibInput, 10));
+    query = applyScopeFilter(query, scope);
+    const { data, error } = await query.maybeSingle();
     setIsLoading(false);
-    if (error || !data) { setStatusMsg({ text: `Objetivo DORSAL #${bibInput} no localizado en la base.`, type: 'error' }); return; }
+    if (error || !data) { setStatusMsg({ text: `Objetivo DORSAL #${bibInput} no localizado en ${scope.name}.`, type: 'error' }); return; }
     if (data.rfid_epc) { setStatusMsg({ text: `ALERTA: El dorsal ${data.bib_number} ya posee el chip enlazado (${data.rfid_epc}).`, type: 'error' }); return; }
     setActiveRunner(data as Runner);
     setStatusMsg({ text: 'Identidad confirmada. Proceda a escanear el chip RFID sobre el sensor HID.', type: 'info' });
@@ -396,7 +531,7 @@ const ModuloEntregaKits = () => {
 
   return (
     <div className="max-w-4xl mx-auto bg-black/40 border border-cyan-500/20 rounded-2xl p-8 shadow-2xl relative overflow-hidden animate-in fade-in">
-      <div className="absolute top-0 right-0 bg-cyan-500/10 text-cyan-400 font-black text-xs px-4 py-2 rounded-bl-2xl border-b border-l border-cyan-500/20">ENLACE RFID ACTIVO</div>
+      <div className="absolute top-0 right-0 bg-cyan-500/10 text-cyan-400 font-black text-xs px-4 py-2 rounded-bl-2xl border-b border-l border-cyan-500/20">ENLACE RFID · {scope.name.toUpperCase()}</div>
       <h3 className="text-xl font-black text-white uppercase italic tracking-widest flex items-center gap-3 mb-8"><Package className="text-cyan-400" /> Centro de Aprovisionamiento</h3>
       {statusMsg && (
         <div className={`p-4 mb-8 rounded-xl border backdrop-blur-md font-mono text-xs uppercase font-bold tracking-wider ${statusMsg.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' : statusMsg.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'}`}>
@@ -457,10 +592,10 @@ const ModuloEntregaKits = () => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* MÓDULO CHEQUEO DE KITS                                         */
+/* [V2-4] MÓDULO CHEQUEO DE KITS — filtrado por scope             */
 /* ────────────────────────────────────────────────────────────── */
 
-const ModuloChequeoKits = () => {
+const ModuloChequeoKits = ({ scope }: { scope: RaceScope }) => {
   const [bibInput, setBibInput] = useState<string>('');
   const [activeRunner, setActiveRunner] = useState<Runner | null>(null);
   const [statusMsg, setStatusMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -468,25 +603,29 @@ const ModuloChequeoKits = () => {
   const [stats, setStats] = useState({ total: 0, entregados: 0, pendientes: 0 });
   const bibInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { fetchStats(); }, []);
-
-  const fetchStats = async () => {
-    const { data } = await supabase.from('runners').select('kit_entregado');
+  const fetchStats = useCallback(async () => {
+    let query = supabase.from('runners').select('kit_entregado');
+    query = applyScopeFilter(query, scope);
+    const { data } = await query;
     if (data) {
       const entregados = data.filter(r => r.kit_entregado).length;
       setStats({ total: data.length, entregados, pendientes: data.length - entregados });
     }
-  };
+  }, [scope.raceId, scope.legacy]);
+
+  useEffect(() => { fetchStats(); }, [fetchStats]);
 
   const searchRunner = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!bibInput.trim()) return;
     setIsLoading(true); setStatusMsg(null); setActiveRunner(null);
-    const { data, error } = await supabase.from('runners')
+    let query = supabase.from('runners')
       .select('id, bib_number, nombre, apellido, cedula, categoria, talla_camiseta, kit_entregado, pago_verificado')
-      .eq('bib_number', parseInt(bibInput, 10)).single();
+      .eq('bib_number', parseInt(bibInput, 10));
+    query = applyScopeFilter(query, scope);
+    const { data, error } = await query.maybeSingle();
     setIsLoading(false);
-    if (error || !data) { setStatusMsg({ text: `Dorsal #${bibInput} no encontrado.`, type: 'error' }); return; }
+    if (error || !data) { setStatusMsg({ text: `Dorsal #${bibInput} no encontrado en ${scope.name}.`, type: 'error' }); return; }
     setActiveRunner(data as Runner);
     if (data.kit_entregado) setStatusMsg({ text: `⚠️ ALERTA: El kit del Dorsal #${data.bib_number} ya fue entregado anteriormente.`, type: 'error' });
     else setStatusMsg({ text: `Atleta identificado. Confirme la entrega del kit.`, type: 'info' });
@@ -519,7 +658,7 @@ const ModuloChequeoKits = () => {
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in">
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-black/40 border border-white/10 rounded-2xl p-6 text-center">
-          <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-1">Total</p>
+          <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-1">Total · {scope.name}</p>
           <p className="text-4xl font-black italic text-white">{stats.total}</p>
         </div>
         <div className="bg-black/40 border border-green-500/20 rounded-2xl p-6 text-center">
@@ -541,7 +680,7 @@ const ModuloChequeoKits = () => {
         </div>
       </div>
       <div className="bg-black/40 border border-amber-500/20 rounded-2xl p-8 relative overflow-hidden">
-        <div className="absolute top-0 right-0 bg-amber-500/10 text-amber-400 font-black text-xs px-4 py-2 rounded-bl-2xl border-b border-l border-amber-500/20">CHEQUEO DE KITS</div>
+        <div className="absolute top-0 right-0 bg-amber-500/10 text-amber-400 font-black text-xs px-4 py-2 rounded-bl-2xl border-b border-l border-amber-500/20">CHEQUEO · {scope.name.toUpperCase()}</div>
         <h3 className="text-xl font-black text-white uppercase italic tracking-widest flex items-center gap-3 mb-8"><Gift className="text-amber-400" /> Entrega de Kit</h3>
         {statusMsg && (
           <div className={`p-4 mb-6 rounded-xl border font-mono text-xs uppercase font-bold tracking-wider ${statusMsg.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' : statusMsg.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-400'}`}>
@@ -601,10 +740,10 @@ const ModuloChequeoKits = () => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* TASA CONFIG                                                    */
+/* [V2-3] TASA CONFIG — por carrera (system_config.race_id)       */
 /* ────────────────────────────────────────────────────────────── */
 
-const TasaConfig = () => {
+const TasaConfig = ({ scope }: { scope: RaceScope }) => {
   const [tasaActual, setTasaActual] = useState<number | null>(null);
   const [nuevaTasa, setNuevaTasa] = useState('');
   const [costoUSDActual, setCostoUSDActual] = useState<number | null>(null);
@@ -613,28 +752,50 @@ const TasaConfig = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState(false);
+  const [configRowId, setConfigRowId] = useState<number | null>(null);
 
-  useEffect(() => { fetchConfig(); }, []);
-
-  const fetchConfig = async () => {
+  const fetchConfig = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.from('system_config').select('*').eq('id', 1).single();
-      if (error) throw error;
+      let data: any = null;
+
+      // Carrera nueva → busca su fila por race_id
+      if (!scope.legacy && scope.raceId) {
+        const byRace = await supabase
+          .from('system_config')
+          .select('*')
+          .eq('race_id', scope.raceId)
+          .maybeSingle();
+        data = byRace.data;
+      }
+
+      // Legacy (Lara) o sin fila propia → fila id=1
+      if (!data) {
+        const fallback = await supabase.from('system_config').select('*').eq('id', 1).single();
+        data = fallback.data;
+      }
+
       if (data) {
+        setConfigRowId(data.id);
         setTasaActual(data.tasa_bcv); setNuevaTasa(String(data.tasa_bcv));
         setCostoUSDActual(data.costo_usd || 40); setNuevoCostoUSD(String(data.costo_usd || 40));
         setUltimaActualizacion(new Date(data.ultima_actualizacion).toLocaleString('es-VE'));
       }
     } catch (err) { console.error(err); } finally { setIsLoading(false); }
-  };
+  }, [scope.raceId, scope.legacy]);
+
+  useEffect(() => { fetchConfig(); }, [fetchConfig]);
 
   const handleUpdateProtocol = async (e: React.FormEvent) => {
     e.preventDefault(); setIsSaving(true);
     try {
+      if (configRowId === null) throw new Error('Fila de configuración no localizada');
       const parsedTasa = parseFloat(nuevaTasa.replace(',', '.'));
       const parsedCosto = parseFloat(nuevoCostoUSD.replace(',', '.'));
-      const { error } = await supabase.from('system_config').update({ tasa_bcv: parsedTasa, costo_usd: parsedCosto, ultima_actualizacion: new Date().toISOString() }).eq('id', 1);
+      const { error } = await supabase
+        .from('system_config')
+        .update({ tasa_bcv: parsedTasa, costo_usd: parsedCosto, ultima_actualizacion: new Date().toISOString() })
+        .eq('id', configRowId);
       if (error) throw error;
       await fetchConfig(); setSuccessMsg(true); setTimeout(() => setSuccessMsg(false), 3000);
     } catch (err: any) { alert(err.message); } finally { setIsSaving(false); }
@@ -643,7 +804,10 @@ const TasaConfig = () => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
       <div className="bg-black/40 border border-cyan-500/20 rounded-2xl p-8">
-        <h4 className="text-sm font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2"><Settings size={18} className="text-cyan-400" /> Parámetros Financieros</h4>
+        <h4 className="text-sm font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+          <Settings size={18} className="text-cyan-400" /> Parámetros Financieros
+          <span className="text-[8px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded font-black uppercase ml-2">{scope.name}</span>
+        </h4>
         <form onSubmit={handleUpdateProtocol} className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -679,10 +843,10 @@ const TasaConfig = () => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* ATLETAS LIST                                                   */
+/* [V2-2] ATLETAS LIST — filtrada por scope                       */
 /* ────────────────────────────────────────────────────────────── */
 
-const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => void }) => {
+const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount?: (count: number) => void }) => {
   const [atletas, setAtletas] = useState<Runner[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -696,16 +860,18 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
   const [isTogglingKit, setIsTogglingKit] = useState<string | null>(null);
   const [showPDFModal, setShowPDFModal] = useState(false);
 
-  const fetchAtletas = async () => {
+  const fetchAtletas = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('runners').select('*').order('created_at', { ascending: false });
+      let query = supabase.from('runners').select('*').order('created_at', { ascending: false });
+      query = applyScopeFilter(query, scope);
+      const { data, error } = await query;
       if (error) throw error;
       setAtletas(data || []);
     } catch (err) { console.error(err); } finally { setLoading(false); }
-  };
+  }, [scope.raceId, scope.legacy]);
 
-  useEffect(() => { fetchAtletas(); }, []);
+  useEffect(() => { fetchAtletas(); }, [fetchAtletas]);
   useEffect(() => { if (onUpdateCount) onUpdateCount(atletas.length); }, [atletas.length, onUpdateCount]);
 
   const toggleVerificacionPago = async (id: string, currentStatus: boolean | undefined) => {
@@ -802,6 +968,10 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
             <tbody className="divide-y divide-white/5">
               {loading ? (
                 <tr><td colSpan={5} className="p-20 text-center text-cyan-500 font-black animate-pulse uppercase tracking-widest">Reconstruyendo Hangar...</td></tr>
+              ) : filteredAtletas.length === 0 ? (
+                <tr><td colSpan={5} className="p-20 text-center text-gray-600 font-black uppercase tracking-widest text-[10px]">
+                  {searchTerm ? 'Sin coincidencias' : `Sin atletas registrados en ${scope.name} todavía`}
+                </td></tr>
               ) : filteredAtletas.map(a => (
                 <tr key={a.id} className="hover:bg-white/[0.02] transition-colors">
                   <td className="p-4">
@@ -845,7 +1015,7 @@ const AtletasList = ({ onUpdateCount }: { onUpdateCount?: (count: number) => voi
         </div>
       </div>
 
-      {showPDFModal && <PDFExportModal atletas={atletas} onClose={() => setShowPDFModal(false)} />}
+      {showPDFModal && <PDFExportModal atletas={atletas} raceName={scope.name} onClose={() => setShowPDFModal(false)} />}
 
       {selectedAtleta && createPortal(
         <div onClick={() => setSelectedAtleta(null)} className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/95 p-4 backdrop-blur-sm">
@@ -925,10 +1095,17 @@ const EscuadronesList = () => {
         if (teamsError) throw teamsError;
         if (!teamsData || teamsData.length === 0) { setEquipos([]); return; }
         const runnerIds = [...new Set(teamsData.flatMap(t => [t.runner_m1_id, t.runner_m2_id, t.runner_f1_id, t.runner_f2_id]).filter(Boolean))];
+        // [V2.1] Join manual: la FK race_results_bib_number_fkey fue eliminada
+        // al pasar a dorsales por carrera, así que el embed ya no existe.
         const { data: runnersData, error: runnersError } = await supabase.from('runners')
-          .select(`id, nombre, apellido, bib_number, telefono, talla_camiseta, categoria, race_results:race_results!race_results_bib_number_fkey ( tiempo_chip )`)
+          .select('id, nombre, apellido, bib_number, telefono, talla_camiseta, categoria')
           .in('id', runnerIds);
         if (runnersError) throw runnersError;
+        const bibs = (runnersData || []).map(r => r.bib_number).filter(Boolean);
+        const { data: resultsData } = bibs.length > 0
+          ? await supabase.from('race_results').select('bib_number, tiempo_chip').in('bib_number', bibs)
+          : { data: [] as any[] };
+        const resultsMap = new Map((resultsData || []).map(r => [r.bib_number, r]));
         const runnersMap = new Map(runnersData?.map(r => [r.id, r]));
         const processedTeams = teamsData.map(team => {
           const membersIds = [team.runner_m1_id, team.runner_m2_id, team.runner_f1_id, team.runner_f2_id];
@@ -936,7 +1113,7 @@ const EscuadronesList = () => {
           const detailedMembers = membersIds.map(id => {
             const memberData = runnersMap.get(id);
             if (!memberData) return null;
-            const timeRaw = (memberData as any).race_results?.[0]?.tiempo_chip;
+            const timeRaw = resultsMap.get((memberData as any).bib_number)?.tiempo_chip;
             const secs = parseTimeToSeconds(timeRaw);
             if (secs > 0) totalSeconds += secs; else allFinished = false;
             return { nombre: `${memberData.nombre} ${memberData.apellido}`, bib: memberData.bib_number, telefono: memberData.telefono, talla_camiseta: memberData.talla_camiseta, categoria: memberData.categoria, tiempoStr: secs > 0 ? formatSeconds(secs) : 'EN PISTA', secs };
@@ -1017,14 +1194,12 @@ const PreRaceOverlay: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, []);
 
-  // Color transition: green → yellow → red as countdown approaches 0
   const pct = seconds / 60;
   const r = pct > 0.5 ? Math.round((1 - pct) * 2 * 255) : 255;
   const g = pct > 0.5 ? 255 : Math.round(pct * 2 * 255);
   const color = `rgb(${r},${g},0)`;
   const glowColor = `rgba(${r},${g},0,0.35)`;
 
-  // Arc progress
   const radius = 140;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - seconds / 60);
@@ -1034,7 +1209,6 @@ const PreRaceOverlay: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       className="fixed inset-0 z-[9999999] flex flex-col items-center justify-center"
       style={{ background: fired ? 'rgba(0,255,80,0.08)' : 'rgba(0,0,0,0.96)', backdropFilter: 'blur(8px)', transition: 'background 0.4s' }}
     >
-      {/* Ambient glow pulse */}
       <div className="absolute inset-0 pointer-events-none" style={{
         background: `radial-gradient(ellipse at center, ${glowColor} 0%, transparent 65%)`,
         animation: seconds <= 10 && !fired ? 'prerace-pulse 0.5s ease infinite' : undefined,
@@ -1048,17 +1222,13 @@ const PreRaceOverlay: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
       {!fired ? (
         <>
-          {/* Label */}
           <p className="text-white/40 text-xs font-black uppercase tracking-[0.5em] mb-12 relative z-10">
             PRE-CARRERA · ALERTA ATLETAS
           </p>
 
-          {/* Circular countdown */}
           <div className="relative flex items-center justify-center mb-12">
             <svg width="320" height="320" style={{ transform: 'rotate(-90deg)' }}>
-              {/* Track */}
               <circle cx="160" cy="160" r={radius} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
-              {/* Progress arc */}
               <circle
                 cx="160" cy="160" r={radius}
                 fill="none"
@@ -1070,7 +1240,6 @@ const PreRaceOverlay: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 style={{ transition: 'stroke-dashoffset 0.9s linear, stroke 0.5s ease', filter: `drop-shadow(0 0 12px ${color})` }}
               />
             </svg>
-            {/* Number */}
             <div className="absolute flex flex-col items-center" style={{ transform: 'rotate(0deg)' }}>
               <span
                 className="font-black tabular-nums leading-none"
@@ -1089,7 +1258,6 @@ const PreRaceOverlay: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             </div>
           </div>
 
-          {/* Urgency bars when ≤10s */}
           {seconds <= 10 && (
             <div className="flex gap-2 mb-8">
               {Array.from({ length: seconds }).map((_, i) => (
@@ -1099,10 +1267,9 @@ const PreRaceOverlay: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           )}
 
           <p className="text-white/20 text-[10px] font-black uppercase tracking-[0.3em] relative z-10">
-            WE RUN 10K NIGHT FEST · 06 JUN 2026
+            RAYOCERO RUNNING · VALKYRON GROUP
           </p>
 
-          {/* Manual close */}
           <button
             onClick={onClose}
             className="absolute top-8 right-8 text-white/20 hover:text-white/60 transition-colors text-xs font-black uppercase tracking-widest flex items-center gap-2"
@@ -1111,7 +1278,6 @@ const PreRaceOverlay: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </button>
         </>
       ) : (
-        /* FIRED state */
         <div className="flex flex-col items-center gap-6" style={{ animation: 'fired-bounce 0.6s cubic-bezier(0.16,1,0.3,1) forwards' }}>
           <div style={{ fontSize: '8rem', lineHeight: 1 }}>🏁</div>
           <p className="text-white font-black text-4xl uppercase italic tracking-widest" style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>¡CARRERA INICIADA!</p>
@@ -1132,7 +1298,7 @@ const PreRaceOverlay: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
 type RaceState = 'idle' | 'running' | 'paused' | 'finished';
 
-const TelemetryModule = () => {
+const TelemetryModule = ({ scope }: { scope: RaceScope }) => {
   const [raceState, setRaceState] = useState<RaceState>('idle');
   const [elapsedMs, setElapsedMs] = useState(0);
   const [startTimestamp, setStartTimestamp] = useState<number | null>(null);
@@ -1179,18 +1345,20 @@ const TelemetryModule = () => {
     setSavingStart(true);
     setSaveMsg(null);
     try {
-      const { error } = await supabase
+      // [V2-4] La pistola solo marca start_time a los runners de la carrera activa
+      let query = supabase
         .from('runners')
         .update({ start_time: isoNow, race_status: 'in_progress' })
         .is('start_time', null);
+      query = applyScopeFilter(query, scope);
+      const { error } = await query;
       if (error) throw error;
-      // Señal race_start → RaceSignalProvider en clientes la recibe
       await supabase.from('race_signals').insert({
         type: 'race_start',
         message: isoNow,
         created_by: 'admin',
       });
-      setSaveMsg({ text: '✅ Pistola disparada · Señal enviada a atletas', ok: true });
+      setSaveMsg({ text: `✅ Pistola disparada · Señal enviada a atletas de ${scope.name}`, ok: true });
     } catch (err: any) {
       setSaveMsg({ text: `⚠️ Cronómetro corriendo — error: ${err.message}`, ok: false });
     } finally {
@@ -1246,7 +1414,7 @@ const TelemetryModule = () => {
           <div>
             <h2 className="text-2xl font-black italic uppercase text-white tracking-widest"
               style={{ fontFamily: 'Barlow Condensed, sans-serif' }}>Control de Carrera</h2>
-            <p className="text-[9px] text-gray-500 uppercase tracking-widest mt-1">WE RUN 10K · 06 JUN 2026 · Barquisimeto</p>
+            <p className="text-[9px] text-gray-500 uppercase tracking-widest mt-1">{scope.name}</p>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full" style={{
@@ -1351,7 +1519,7 @@ const TelemetryModule = () => {
               <p className="text-white font-black uppercase tracking-widest text-sm">Pistola de Salida</p>
               <p className="text-gray-500 text-[10px] uppercase tracking-widest mt-0.5">
                 {raceState === 'idle'
-                  ? 'Usa DISPARAR PISTOLA — inicia cronómetro + escribe start_time en Supabase + señal race_start a atletas'
+                  ? `Usa DISPARAR PISTOLA — inicia cronómetro + escribe start_time solo a los atletas de ${scope.name} + señal race_start`
                   : raceState === 'running'
                     ? `En curso desde ${officialStartTime ? new Date(officialStartTime).toLocaleTimeString('es-VE') : '—'}`
                     : raceState === 'paused' ? 'Pausado — presiona REANUDAR'
@@ -1401,6 +1569,7 @@ const TelemetryModule = () => {
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'race_config' | 'results' | 'teams' | 'kit_delivery' | 'kit_chequeo' | 'telemetry' | 'inscripcion'>('overview');
   const [totalAtletas, setTotalAtletas] = useState(0);
+  const [raceScope, setRaceScope] = useState<RaceScope | null>(null);
 
   return (
     <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-cyan-500/30">
@@ -1412,7 +1581,9 @@ export default function AdminDashboard() {
             </div>
             <div>
               <h1 className="text-lg font-black italic uppercase leading-none">RayoCero HQ</h1>
-              <p className="text-[8px] text-gray-500 uppercase tracking-widest mt-1">Valkyron Group</p>
+              <p className="text-[8px] text-gray-500 uppercase tracking-widest mt-1">
+                Valkyron Group{raceScope ? ` · ${raceScope.name}` : ''}
+              </p>
             </div>
           </div>
           <button className="flex items-center gap-2 text-[10px] uppercase text-gray-400 hover:text-white transition-colors">
@@ -1422,6 +1593,10 @@ export default function AdminDashboard() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-6 py-12">
+
+        {/* [V2-1] Selector global de carrera */}
+        <RaceScopeBar scope={raceScope} onChange={setRaceScope} />
+
         <div className="flex flex-wrap gap-4 mb-12 border-b border-white/5 pb-6">
           {[
             { id: 'overview',     label: 'Dashboard',    icon: null },
@@ -1446,34 +1621,45 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        {activeTab === 'overview' && (
+        {/* Mientras carga el scope, no renderizamos módulos dependientes */}
+        {!raceScope ? (
+          <div className="py-20 text-center bg-white/[0.02] rounded-2xl border border-white/5 animate-pulse">
+            <p className="text-[10px] font-black tracking-[0.4em] text-cyan-500 uppercase">Sincronizando carrera activa...</p>
+          </div>
+        ) : (
           <>
-            <TasaConfig />
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2"><AtletasList onUpdateCount={setTotalAtletas} /></div>
-              <div>
-                <div className="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-3xl p-8 text-black shadow-2xl relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><Activity size={80} /></div>
-                  <h4 className="text-xs font-black uppercase relative z-10">Participación Total</h4>
-                  <p className="text-7xl font-black italic relative z-10">{totalAtletas.toString().padStart(3, '0')}</p>
-                  <p className="text-[10px] font-bold uppercase mt-4 opacity-70">Unidades en Base</p>
+            {activeTab === 'overview' && (
+              <>
+                <TasaConfig scope={raceScope} />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  <div className="lg:col-span-2"><AtletasList scope={raceScope} onUpdateCount={setTotalAtletas} /></div>
+                  <div>
+                    <div className="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-3xl p-8 text-black shadow-2xl relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><Activity size={80} /></div>
+                      <h4 className="text-xs font-black uppercase relative z-10">Participación · {raceScope.name}</h4>
+                      <p className="text-7xl font-black italic relative z-10">{totalAtletas.toString().padStart(3, '0')}</p>
+                      <p className="text-[10px] font-bold uppercase mt-4 opacity-70">
+                        {raceScope.isActive ? 'Carrera Activa' : 'Archivo Histórico'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
+              </>
+            )}
+
+            {activeTab === 'kit_delivery' && <ModuloEntregaKits scope={raceScope} />}
+            {activeTab === 'kit_chequeo'  && <ModuloChequeoKits scope={raceScope} />}
+            {activeTab === 'telemetry'    && <TelemetryModule scope={raceScope} />}
+            {activeTab === 'inscripcion'  && <ModuloInscripcionAdmin />}
+            {activeTab === 'teams'        && <EscuadronesList />}
+            {activeTab === 'race_config'  && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in slide-in-from-bottom-4">
+                <RaceForm /><RouteConfig />
               </div>
-            </div>
+            )}
+            {activeTab === 'results' && <div className="animate-in fade-in"><ResultsTable /></div>}
           </>
         )}
-
-        {activeTab === 'kit_delivery' && <ModuloEntregaKits />}
-        {activeTab === 'kit_chequeo'  && <ModuloChequeoKits />}
-        {activeTab === 'telemetry'    && <TelemetryModule />}
-        {activeTab === 'inscripcion'  && <ModuloInscripcionAdmin />}
-        {activeTab === 'teams'        && <EscuadronesList />}
-        {activeTab === 'race_config'  && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-in slide-in-from-bottom-4">
-            <RaceForm /><RouteConfig />
-          </div>
-        )}
-        {activeTab === 'results' && <div className="animate-in fade-in"><ResultsTable /></div>}
       </main>
     </div>
   );
