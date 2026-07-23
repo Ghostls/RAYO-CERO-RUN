@@ -1,34 +1,36 @@
 /**
- * RAYO CERO — REGISTRATION TERMINAL (STABLE BUILD V26.1_MULTI_RACE)
+ * RAYOCERO — REGISTRATION TERMINAL (STABLE BUILD V30_DORSAL_FINAL)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V26.1:
- * [V26.1-1] FIX TS2353: race_id se envía con cast tipado porque
- *           RegistrationFormData (api.ts) no incluye ese campo aún.
- *           OPCIONAL: añadir `race_id?: string` a RegistrationFormData
- *           en src/lib/api.ts y quitar el cast.
+ * CHANGELOG V30 (layout según arte marcado por el CEO):
+ * [V30-1] Número: centrado en la zona marcada del lienzo blanco (bibY 400).
+ * [V30-2] Nombre: en BLANCO, DENTRO de la franja marrón (nameY 688).
+ *         nameX 645 = centro real de la franja (está a la derecha del
+ *         logo 499, por eso 600 lo dejaba corrido a la izquierda).
+ * [V30-3] Categoría: se queda donde está (catY 835, marrón sobre blanco).
  *
- * CHANGELOG V26:
- * [V26-1] MULTI-RACE ENGINE: detecta carrera activa desde Supabase
- *         (races WHERE inscripciones_abiertas = true AND is_active = true).
- * [V26-2] RACE CONFIG MAP: cada carrera tiene EVENTO, ruta GPS, waypoints,
- *         datos de pago y mapa por keyword (lara / coro).
- * [V26-3] CORO 499 RUN: monto desde system_config filtrado por race_id,
- *         con fallback a la fila id=1. Editable desde AdminDashboard.
- * [V26-4] LARA cerrada: inscripciones_abiertas = false en Supabase.
- * [V26-5] Datos bancarios dinámicos por carrera.
+ * CHANGELOG V29:
+ * [V29-1..3] Iteración de layout previa (superseded por V30).
  *
- * SUPABASE — cambios requeridos:
- *   races:         ALTER TABLE races ADD COLUMN inscripciones_abiertas BOOLEAN DEFAULT false;
- *                  ALTER TABLE races ADD COLUMN slug TEXT;
- *                  UPDATE races SET inscripciones_abiertas = true, slug = 'coro-499'
- *                    WHERE name ILIKE '%499%';
- *   system_config: ALTER TABLE system_config ADD COLUMN race_id UUID REFERENCES races(id);
- *                  INSERT INTO system_config (race_id, tasa_bcv, costo_usd, ultima_actualizacion)
- *                    VALUES ('<uuid-de-coro>', <tasa>, <monto>, now());
- *   runners:       (opcional) ALTER TABLE runners ADD COLUMN race_id UUID REFERENCES races(id);
+ * CHANGELOG V28:
+ * [V28-1] PURGA LARA: eliminada toda referencia a Barquisimeto / Night Fest
+ *         (ruta, waypoints, config, dorsal-bg.png). Este terminal es
+ *         exclusivo del 499 RUN — CORO FALCÓN.
+ * [V28-2] Import dorsal-bg.png eliminado. Único arte: dorsal-coro.png.
+ * [V28-3] resolveRaceConfig eliminado — config única CORO.
+ * [V28-4] Branding corregido: "RAYOCERO" (una sola palabra) en todo el UI.
+ *
+ * CHANGELOG V27:
+ * [V27-1] DORSAL ENGINE: config de dorsal (fondo, número, nombre, categoría).
+ * [V27-2] Dorsal 499 Coro: número marrón en lienzo blanco, nombre en BLANCO
+ *         dentro de la FRANJA MARRÓN, categoría bajo la franja.
+ * [V27-4] Preview y export PNG comparten coordenadas → WYSIWYG.
+ * [V27-5] Nombre de archivo de descarga incluye el slug de la carrera.
+ *
+ * ASSET REQUERIDO:
+ *   src/assets/dorsal-coro.png   (DORSAL_OFICIAL_499_CORO-02.png)
  */
 
 import { useState, useEffect, useMemo } from "react";
@@ -52,7 +54,8 @@ import { registerRunner, calcularEdad, type RegistrationFormData } from "@/lib/a
 import { supabase } from "@/lib/supabase";
 
 import logoPrincipal from "../assets/logo.png";
-import dorsalBgSrc from "../assets/dorsal-bg.png";
+/* [V28-2] Único arte de dorsal — 499 Run Coro */
+import dorsalCoroSrc from "../assets/dorsal-coro.png";
 
 const MapComp    = MapContainer as any;
 const TileComp   = TileLayer   as any;
@@ -80,6 +83,27 @@ interface WaypointDef {
   pois: { icon: string; color: string }[];
 }
 
+/* Config del arte de dorsal. Coordenadas de canvas en base 1200×900.
+ * Las posiciones del preview en pantalla se derivan de estas mismas
+ * coordenadas (WYSIWYG). */
+interface DorsalConfig {
+  bg: string;
+  /** Número de dorsal */
+  bibY: number;
+  bibSize: number;
+  bibColor: string;
+  bibItalic: boolean;
+  bibShadow: boolean;
+  /** Nombre del atleta */
+  nameX: number;         // la franja marrón no está centrada
+  nameY: number;
+  nameSize: number;
+  nameColor: string;
+  /** Categoría */
+  catY: number;
+  catColor: string;
+}
+
 interface RaceStaticConfig {
   evento: {
     nombre: string;
@@ -103,22 +127,12 @@ interface RaceStaticConfig {
     banco: string;
     cuenta: string;
   };
+  dorsal: DorsalConfig;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
- * RUTAS GPS
+ * RUTA GPS — CORO
  * ══════════════════════════════════════════════════════════════════════════════ */
-const LARA_ROUTE: [number, number][] = [
-  [10.077576, -69.283447], [10.067250, -69.284621], [10.062852, -69.282465],
-  [10.061500, -69.276373], [10.064014, -69.288046], [10.065609, -69.295721],
-  [10.068926, -69.296563], [10.068897, -69.298359], [10.073951, -69.297750],
-  [10.073542, -69.296712], [10.070855, -69.294501], [10.069175, -69.293670],
-  [10.069175, -69.292201], [10.070609, -69.291723], [10.079514, -69.288873],
-  [10.078963, -69.285316], [10.079192, -69.283498], [10.080416, -69.281270],
-  [10.078575, -69.280296], [10.076105, -69.280867], [10.076149, -69.283252],
-  [10.077576, -69.283447],
-];
-
 const CORO_ROUTE: [number, number][] = [
   [11.409922, -69.675254], // Av. Manaure — SALIDA / META
   [11.408140, -69.674525], // C. Gárces — 1K
@@ -147,22 +161,6 @@ const CORO_ROUTE: [number, number][] = [
   [11.409938, -69.675271], // Av. Manaure — 10K / META
 ];
 
-/* ══════════════════════════════════════════════════════════════════════════════
- * WAYPOINTS
- * ══════════════════════════════════════════════════════════════════════════════ */
-const LARA_WAYPOINTS: WaypointDef[] = [
-  { pos: [10.077576, -69.283447], isMeta: true, label: "META", pois: [{ icon: "♪", color: "#a855f7" }, { icon: "B", color: "#94a3b8" }, { icon: "+", color: "#22c55e" }, { icon: "C", color: "#eab308" }] },
-  { pos: [10.067250, -69.284621], label: "9K", pois: [{ icon: "♪", color: "#a855f7" }] },
-  { pos: [10.062852, -69.282465], label: "8K", pois: [] },
-  { pos: [10.061500, -69.276373], label: "7K", pois: [{ icon: "♪", color: "#a855f7" }] },
-  { pos: [10.064014, -69.288046], label: "6K", pois: [{ icon: "P", color: "#3b82f6" }] },
-  { pos: [10.065609, -69.295721], label: "5K", pois: [{ icon: "♪", color: "#a855f7" }, { icon: "C", color: "#eab308" }] },
-  { pos: [10.073542, -69.296712], label: "4K", pois: [] },
-  { pos: [10.070855, -69.294501], label: "3K", pois: [{ icon: "♪", color: "#a855f7" }, { icon: "+", color: "#22c55e" }] },
-  { pos: [10.070609, -69.291723], label: "2K", pois: [{ icon: "P", color: "#3b82f6" }] },
-  { pos: [10.079514, -69.288873], label: "1K", pois: [] },
-];
-
 const CORO_WAYPOINTS: WaypointDef[] = [
   { pos: [11.409922, -69.675254], isMeta: true, label: "META", pois: [{ icon: "♪", color: "#a855f7" }, { icon: "B", color: "#94a3b8" }, { icon: "+", color: "#22c55e" }, { icon: "C", color: "#eab308" }] },
   { pos: [11.408140, -69.674525], label: "1K", pois: [{ icon: "♪", color: "#a855f7" }] },
@@ -177,66 +175,42 @@ const CORO_WAYPOINTS: WaypointDef[] = [
 ];
 
 /* ══════════════════════════════════════════════════════════════════════════════
- * RACE STATIC CONFIGS
+ * CONFIG ÚNICA — 499 RUN CORO FALCÓN
  * ══════════════════════════════════════════════════════════════════════════════ */
-const RACE_STATIC_CONFIGS: Record<string, RaceStaticConfig> = {
-  lara: {
-    evento: {
-      nombre:    "RAYOCERO 10K · NIGHT FEST",
-      fecha:     "06 JUN 2026",
-      hora:      "06:00 PM",
-      distancia: "10K",
-      atletas:   "+1.000",
-      lugar:     "MONUMENTO AL SOL",
-      proximaEd: "TEMPORADA 2026",
-      targetDate: new Date("2026-06-06T18:00:00"),
-    },
-    route:       LARA_ROUTE,
-    waypoints:   LARA_WAYPOINTS,
-    mapCenter:   [10.077576, -69.283447],
-    mapLabel:    "NIGHT FEST 10K",
-    mapSubLabel: "BARQUISIMETO · RUTA OFICIAL",
-    pago: {
-      titular:   "Rayocero Eventos C.A",
-      cedula:    "J-505771710",
-      pagoMovil: "0414-5643372",
-      banco:     "Banco Nacional de Crédito",
-      cuenta:    "0191-0060-0921-6016-9493",
-    },
+const CORO_CONFIG: RaceStaticConfig = {
+  evento: {
+    nombre:    "499 RUN — CORO FALCÓN",
+    fecha:     "20 AGO 2026",
+    hora:      "06:00 PM",
+    distancia: "10K",
+    atletas:   "+500",
+    lugar:     "CENTRO HISTÓRICO DE CORO",
+    proximaEd: "TEMPORADA 2026",
+    targetDate: new Date("2026-08-20T18:00:00"),
   },
-  coro: {
-    evento: {
-      nombre:    "499 RUN — CORO FALCÓN",
-      fecha:     "20 AGO 2026",
-      hora:      "06:00 PM",
-      distancia: "10K",
-      atletas:   "+500",
-      lugar:     "CENTRO HISTÓRICO DE CORO",
-      proximaEd: "TEMPORADA 2026",
-      targetDate: new Date("2026-08-20T18:00:00"),
-    },
-    route:       CORO_ROUTE,
-    waypoints:   CORO_WAYPOINTS,
-    mapCenter:   [11.409922, -69.675254],
-    mapLabel:    "499 RUN 10K",
-    mapSubLabel: "CORO FALCÓN · RUTA OFICIAL",
-    pago: {
-      titular:   "Lualdo Sciscioli",
-      cedula:    "17.627.699",
-      pagoMovil: "0414-5643372",
-      banco:     "Banco Nacional de Crédito",
-      cuenta:    "",
-    },
+  route:       CORO_ROUTE,
+  waypoints:   CORO_WAYPOINTS,
+  mapCenter:   [11.409922, -69.675254],
+  mapLabel:    "499 RUN 10K",
+  mapSubLabel: "CORO FALCÓN · RUTA OFICIAL",
+  pago: {
+    titular:   "Rayocero",
+    cedula:    "17.627.699",
+    pagoMovil: "0414-5643372",
+    banco:     "Banco Nacional de Crédito",
+    cuenta:    "",
   },
-};
-
-/** Resuelve config estática por keyword del slug/nombre de la carrera */
-const resolveRaceConfig = (race: ActiveRace): RaceStaticConfig => {
-  const key = `${race.slug ?? ""} ${race.name ?? ""}`.toLowerCase();
-  if (key.includes("coro") || key.includes("499") || key.includes("falcón") || key.includes("falcon")) {
-    return RACE_STATIC_CONFIGS.coro;
-  }
-  return RACE_STATIC_CONFIGS.lara;
+  /* [V30] Layout final según arte marcado:
+   *  - Número: zona central del lienzo blanco (bibY 400).
+   *  - Nombre: en BLANCO, DENTRO de la franja marrón (nameY 688).
+   *    La franja está desplazada a la derecha del logo 499 → nameX 645.
+   *  - Categoría: intacta en el blanco inferior (catY 835). */
+  dorsal: {
+    bg: dorsalCoroSrc,
+    bibY: 430, bibSize: 300, bibColor: "#3A2416", bibItalic: false, bibShadow: false,
+    nameX: 645, nameY: 688, nameSize: 46, nameColor: "#F5EFE6",
+    catY: 835, catColor: "#3A2416",
+  },
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
@@ -324,7 +298,7 @@ const MapBoundsController = ({ bounds }: { bounds: L.LatLngBoundsExpression }) =
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
- * MAPA DINÁMICO — recibe config de la carrera
+ * MAPA — ruta oficial Coro
  * ══════════════════════════════════════════════════════════════════════════════ */
 const RealRouteMap = ({ cfg }: { cfg: RaceStaticConfig }) => {
   const bounds = useMemo(() => L.latLngBounds(cfg.route), [cfg.route]);
@@ -470,7 +444,7 @@ const RegistrationLockedScreen = ({ cfg }: { cfg: RaceStaticConfig }) => {
       <div className="relative z-10 max-w-4xl mx-auto flex flex-col items-center">
 
         <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-8">
-          <img src={logoPrincipal} alt="RayoCero Running" className="h-10 w-auto object-contain" style={{ filter: "brightness(1.05)" }} />
+          <img src={logoPrincipal} alt="RAYOCERO Running" className="h-10 w-auto object-contain" style={{ filter: "brightness(1.05)" }} />
         </motion.div>
 
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.1, duration: 0.45 }}
@@ -666,7 +640,7 @@ const initialForm: FormData = {
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════
- * FORMULARIO INTERNO — recibe activeRace y raceCfg
+ * FORMULARIO INTERNO — recibe activeRace (config única: CORO)
  * ══════════════════════════════════════════════════════════════════════════════ */
 const RegistrationFormInner = ({
   activeRace,
@@ -698,7 +672,7 @@ const RegistrationFormInner = ({
     : null;
   const esMenorDeEdad = age !== null && age < 16;
 
-  /* [V26-3] Monto desde system_config filtrado por race_id, fallback fila id=1 */
+  /* Monto desde system_config filtrado por race_id, fallback fila id=1 */
   useEffect(() => {
     if (step !== 2 || exchangeRate !== null) return;
     const fetchFinance = async () => {
@@ -760,17 +734,8 @@ const RegistrationFormInner = ({
           .upload(`${data.cedula}_${Date.now()}.${ext}`, comprobanteFile, { cacheControl: "3600", upsert: false });
       }
       /**
-       * [V26.1-1] FIX TS2353:
-       * RegistrationFormData no incluye race_id todavía. El cast tipado
-       * permite enviarlo sin romper el build. Para eliminar el cast,
-       * añade en src/lib/api.ts:
-       *
-       *   export interface RegistrationFormData {
-       *     ...campos existentes...
-       *     race_id?: string;
-       *   }
-       *
-       * y asegúrate de que registerRunner lo inserte en la tabla runners.
+       * FIX TS2353: cast tipado hasta que RegistrationFormData
+       * incluya race_id?: string en src/lib/api.ts.
        */
       return registerRunner({ ...data, race_id: activeRace.id } as RegistrationFormData & { race_id: string });
     },
@@ -788,34 +753,46 @@ const RegistrationFormInner = ({
     onError: (error: Error) => setSubmitError(error.message),
   });
 
+  /* Export PNG — arte oficial 499 Run Coro */
   const handleDownloadPNG = async () => {
     setIsExporting(true);
     try {
+      const d = raceCfg.dorsal;
       const canvas = document.createElement("canvas");
       canvas.width = 1200; canvas.height = 900;
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("No se pudo iniciar el contexto 2D");
       const img = new Image();
-      img.crossOrigin = "anonymous"; img.src = dorsalBgSrc;
+      img.crossOrigin = "anonymous"; img.src = d.bg;
       await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(); });
       ctx.drawImage(img, 0, 0, 1200, 900);
       await document.fonts.ready;
       const formattedBib = bibNumber?.toString().padStart(4, "0") || "0000";
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 30; ctx.shadowOffsetY = 20;
-      ctx.font = "italic 900 280px sans-serif"; ctx.fillStyle = "#ffffff";
-      ctx.fillText(formattedBib, 600, 380);
+
+      /* Número — marrón colonial sobre el lienzo blanco */
+      if (d.bibShadow) {
+        ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 30; ctx.shadowOffsetY = 20;
+      }
+      ctx.font = `${d.bibItalic ? "italic " : ""}900 ${d.bibSize}px sans-serif`;
+      ctx.fillStyle = d.bibColor;
+      ctx.fillText(formattedBib, 600, d.bibY);
       ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-      ctx.font = "900 56px sans-serif"; ctx.fillStyle = "#03070b";
+
+      /* Nombre — en blanco DENTRO de la franja marrón */
+      ctx.font = `900 ${d.nameSize}px sans-serif`; ctx.fillStyle = d.nameColor;
       (ctx as any).letterSpacing = "4px";
-      ctx.fillText(`${form.nombre} ${form.apellido}`.toUpperCase(), 600, 670);
+      ctx.fillText(`${form.nombre} ${form.apellido}`.toUpperCase(), d.nameX, d.nameY);
+
+      /* Categoría — bajo la franja */
       if (category) {
-        ctx.font = "900 22px sans-serif"; ctx.fillStyle = "#1a1a1a";
+        ctx.font = "900 22px sans-serif"; ctx.fillStyle = d.catColor;
         (ctx as any).letterSpacing = "6px";
-        ctx.fillText(`CATEGORÍA: ${category.toUpperCase()}`, 600, 730);
+        ctx.fillText(`CATEGORÍA: ${category.toUpperCase()}`, d.nameX, d.catY);
       }
       const link = document.createElement("a");
-      link.download = `DORSAL_RAYOCERO_${form.cedula}.png`;
+      const raceTag = activeRace.slug?.toUpperCase().replace(/-/g, "_") || "CORO_499";
+      link.download = `DORSAL_${raceTag}_${form.cedula}.png`;
       link.href = canvas.toDataURL("image/png", 1.0);
       link.click();
     } catch (err) {
@@ -851,7 +828,7 @@ const RegistrationFormInner = ({
 
   const inputClass = "w-full rounded-2xl bg-white/[0.03] border border-white/[0.08] px-5 py-4 text-xs font-bold text-white placeholder:text-white/25 focus:outline-none focus:border-cyan-400/60 focus:ring-1 focus:ring-cyan-400/30 focus:bg-white/[0.05] transition-all backdrop-blur-2xl uppercase tracking-wider shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]";
 
-  const { pago, evento } = raceCfg;
+  const { pago, evento, dorsal } = raceCfg;
 
   const steps = [
     {
@@ -932,7 +909,7 @@ const RegistrationFormInner = ({
               </div>
             </div>
 
-            {/* [V26-5] Datos bancarios dinámicos por carrera */}
+            {/* Datos bancarios */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 relative z-10 text-[10px] font-bold uppercase text-white/40 tracking-widest leading-relaxed">
               <div><span className="block text-cyan-400/50 mb-1">Titular</span><span className="text-white text-sm">{pago.titular}</span></div>
               <div><span className="block text-cyan-400/50 mb-1">Cédula / RIF</span><span className="text-white text-sm">{pago.cedula}</span></div>
@@ -983,6 +960,13 @@ const RegistrationFormInner = ({
   /* ── SUCCESS SCREEN ── */
   if (submitted && bibNumber) {
     const formattedBib = bibNumber.toString().padStart(4, "0");
+    /* Posiciones del preview derivadas de las coords de canvas (1200×900)
+     * → mismos porcentajes que el PNG exportado. WYSIWYG total. */
+    const bibTopPct   = `${((dorsal.bibY  / 900) * 100).toFixed(2)}%`;
+    const nameTopPct  = `${((dorsal.nameY / 900) * 100).toFixed(2)}%`;
+    const catTopPct   = `${((dorsal.catY  / 900) * 100).toFixed(2)}%`;
+    const nameLeftPct = `${((dorsal.nameX / 1200) * 100).toFixed(2)}%`;
+
     return (
       <section id="success-bib" className="relative min-h-screen pt-32 pb-24 px-4 sm:px-6 bg-[#03070b] flex items-center justify-center font-sans overflow-hidden">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#00f2ff]/[0.06] blur-[140px] rounded-full z-0" />
@@ -992,20 +976,44 @@ const RegistrationFormInner = ({
             <CheckCircle className="h-3.5 w-3.5 text-green-400" />
             <span className="text-[9px] font-black tracking-[0.4em] text-green-400 uppercase">Acreditación Confirmada</span>
           </motion.div>
+
           <div className="relative w-full max-w-[600px] aspect-[4/3] rounded-2xl shadow-[0_40px_80px_-15px_rgba(0,242,255,0.15)] border border-white/[0.08] overflow-hidden bg-black">
             {!dorsalLoaded && <DorsalSkeleton />}
-            <img src={dorsalBgSrc} alt="Dorsal Preview"
+            <img src={dorsal.bg} alt="Dorsal Oficial 499 Run"
               className={`absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-500 ${dorsalLoaded ? "opacity-100" : "opacity-0"}`}
               onLoad={() => setDorsalLoaded(true)} />
-            <div className="absolute top-[42%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-full flex justify-center px-4">
-              <h2 className="font-[900] text-white tracking-tighter italic drop-shadow-2xl leading-none text-center" style={{ fontSize: "clamp(4.5rem,18vw,11rem)" }}>{formattedBib}</h2>
+
+            {/* Número — marrón colonial en el lienzo blanco */}
+            <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-full flex justify-center px-4"
+              style={{ top: bibTopPct }}>
+              <h2 className={`font-[900] tracking-tighter leading-none text-center ${dorsal.bibItalic ? "italic" : ""} ${dorsal.bibShadow ? "drop-shadow-2xl" : ""}`}
+                style={{ fontSize: "clamp(4.5rem,18vw,11rem)", color: dorsal.bibColor }}>
+                {formattedBib}
+              </h2>
             </div>
-            <div className="absolute top-[72%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-full max-w-[85%] flex flex-col items-center justify-center">
-              <h3 className="font-black text-[#03070b] uppercase tracking-[0.06em] text-center leading-tight m-0 p-0 w-full truncate" style={{ fontSize: "clamp(0.85rem,3.5vw,1.875rem)" }}>{form.nombre} {form.apellido}</h3>
-              {category && <p className="font-black text-gray-800 uppercase tracking-[0.2em] mt-1 text-center m-0 p-0" style={{ fontSize: "clamp(0.5rem,1.2vw,0.75rem)" }}>CATEGORÍA: {category}</p>}
+
+            {/* Nombre — en blanco DENTRO de la franja marrón */}
+            <div className="absolute -translate-x-1/2 -translate-y-1/2 z-10 w-full max-w-[55%] flex justify-center"
+              style={{ top: nameTopPct, left: nameLeftPct }}>
+              <h3 className="font-black uppercase tracking-[0.06em] text-center leading-tight m-0 p-0 w-full truncate"
+                style={{ fontSize: "clamp(0.85rem,3.2vw,1.55rem)", color: dorsal.nameColor }}>
+                {form.nombre} {form.apellido}
+              </h3>
             </div>
+
+            {/* Categoría — bajo la franja */}
+            {category && (
+              <div className="absolute -translate-x-1/2 -translate-y-1/2 z-10 w-full max-w-[80%] flex justify-center"
+                style={{ top: catTopPct, left: nameLeftPct }}>
+                <p className="font-black uppercase tracking-[0.2em] text-center m-0 p-0"
+                  style={{ fontSize: "clamp(0.5rem,1.2vw,0.75rem)", color: dorsal.catColor }}>
+                  CATEGORÍA: {category}
+                </p>
+              </div>
+            )}
             <div className="absolute top-0 left-0 right-0 h-16 bg-gradient-to-b from-white/[0.04] to-transparent pointer-events-none z-20" />
           </div>
+
           <div className="mt-10 w-full grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-[600px]">
             <button onClick={handleDownloadPNG} disabled={isExporting}
               className="flex items-center justify-center gap-3 rounded-2xl bg-[#00f2ff] hover:bg-cyan-400 text-[#03070b] px-10 py-5 text-[11px] font-black uppercase tracking-widest shadow-xl transition-all transform hover:-translate-y-1 active:scale-95 disabled:opacity-50">
@@ -1062,7 +1070,7 @@ const RegistrationFormInner = ({
               <div className="p-4 bg-white/[0.02] border border-white/[0.07] rounded-2xl shadow-inner backdrop-blur-xl">{steps[step].icon}</div>
               <div>
                 <h3 className="text-xl sm:text-2xl font-black text-white uppercase italic">{steps[step].title}</h3>
-                <p className="text-[10px] text-white/30 font-bold uppercase mt-1">RAYO CERO TERMINAL</p>
+                <p className="text-[10px] text-white/30 font-bold uppercase mt-1">RAYOCERO TERMINAL</p>
               </div>
             </div>
 
@@ -1145,20 +1153,17 @@ const RegistrationForm = () => {
     );
   }
 
-  // Sin carrera activa o error → pantalla de cierre (config Coro por default,
-  // ya que es la próxima carrera en el calendario)
+  // Sin carrera activa o error → pantalla de cierre
   if (error || race === null) {
-    return <RegistrationLockedScreen cfg={RACE_STATIC_CONFIGS.coro} />;
+    return <RegistrationLockedScreen cfg={CORO_CONFIG} />;
   }
-
-  const raceCfg = resolveRaceConfig(race);
 
   // Safety net por si el query devuelve una fila con flag apagado
   if (!race.inscripciones_abiertas) {
-    return <RegistrationLockedScreen cfg={raceCfg} />;
+    return <RegistrationLockedScreen cfg={CORO_CONFIG} />;
   }
 
-  return <RegistrationFormInner activeRace={race} raceCfg={raceCfg} />;
+  return <RegistrationFormInner activeRace={race} raceCfg={CORO_CONFIG} />;
 };
 
 export default RegistrationForm;
