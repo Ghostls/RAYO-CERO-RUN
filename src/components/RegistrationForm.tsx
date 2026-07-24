@@ -180,7 +180,7 @@ const CORO_WAYPOINTS: WaypointDef[] = [
 const CORO_CONFIG: RaceStaticConfig = {
   evento: {
     nombre:    "499 RUN — CORO FALCÓN",
-    fecha:     "20 AGO 2026",
+    fecha:     "29 AGO 2026",
     hora:      "06:00 PM",
     distancia: "10K",
     atletas:   "+500",

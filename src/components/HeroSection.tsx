@@ -2,7 +2,7 @@
  * RAYO CERO — HERO SECTION (V9.0 - CARRUSEL FALCÓN)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
- * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
+ * 
  *
  * CHANGELOG V9.0:
  * [V9-1] FlierSlider reintroducido — carrusel automático con las 2 imágenes del evento
