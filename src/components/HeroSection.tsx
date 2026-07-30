@@ -101,28 +101,28 @@ const HeroSection = () => {
 
       {/* ══════════════════════════════════════════════════════════════════
           ██  MOBILE LAYOUT (< md)  ██
-          100svh, posicionamiento absoluto igual que desktop.
-          499 enorme en el centro-top, runners anclados al bottom
-          a cada lado, botones al fondo.
+          499 centrado en la pantalla (zona roja del sketch).
+          Runners casi full-height flanqueando el número (zona amarilla).
+          Botones al fondo sobre un fade oscuro.
       ══════════════════════════════════════════════════════════════════ */}
       <div
-        className="relative z-10 md:hidden w-full"
+        className="relative z-10 md:hidden w-full overflow-hidden"
         style={{ height: "100svh", minHeight: "600px" }}
       >
-        {/* ── 499 centrado arriba ── */}
+        {/* ── 499: enorme, centrado verticalmente ── */}
         <motion.div
           aria-hidden="true"
-          style={{ y: typeY }}
-          className="absolute inset-x-0 top-[18%] z-[2] flex justify-center pointer-events-none select-none"
+          style={{ top: "26%", y: typeY }}
+          className="absolute inset-x-0 z-[2] flex justify-center pointer-events-none select-none"
         >
           <h1
             className="absolute font-black leading-none"
             style={{
-              fontSize: "clamp(7rem, 38vw, 12rem)",
+              fontSize: "clamp(8rem, 44vw, 14rem)",
               letterSpacing: "-0.055em",
               fontVariantNumeric: "tabular-nums",
               color: "transparent",
-              WebkitTextStroke: "clamp(2px, 0.8vw, 6px) rgba(148,163,184,0.15)",
+              WebkitTextStroke: "clamp(2px, 1vw, 6px) rgba(148,163,184,0.15)",
               WebkitFontSmoothing: "antialiased",
             }}
           >
@@ -131,25 +131,47 @@ const HeroSection = () => {
           <h1
             className="relative font-black leading-none"
             style={{
-              fontSize: "clamp(7rem, 38vw, 12rem)",
+              fontSize: "clamp(8rem, 44vw, 14rem)",
               letterSpacing: "-0.055em",
               fontVariantNumeric: "tabular-nums",
               color: "transparent",
-              WebkitTextStroke: "clamp(1px, 0.4vw, 3px) rgba(226,232,240,0.75)",
-              maskImage: "linear-gradient(180deg, black 0%, black 45%, rgba(0,0,0,0.3) 80%, transparent 100%)",
-              WebkitMaskImage: "linear-gradient(180deg, black 0%, black 45%, rgba(0,0,0,0.3) 80%, transparent 100%)",
+              WebkitTextStroke: "clamp(1.5px, 0.5vw, 3.5px) rgba(226,232,240,0.78)",
+              maskImage: "linear-gradient(180deg, black 0%, black 50%, rgba(0,0,0,0.2) 85%, transparent 100%)",
+              WebkitMaskImage: "linear-gradient(180deg, black 0%, black 50%, rgba(0,0,0,0.2) 85%, transparent 100%)",
               WebkitFontSmoothing: "antialiased",
+              filter: "drop-shadow(0 0 30px rgba(34,211,238,0.07))",
             }}
           >
             499
           </h1>
         </motion.div>
 
-        {/* ── Runner derecho — z-[3], anclado bottom-right ── */}
+        {/* ── Runner izquierdo: full-height, pegado al borde izq ── */}
+        <motion.div
+          style={{ y: runnerLeftY }}
+          className="absolute left-[-4vw] bottom-[10%] z-[3] pointer-events-none select-none"
+          initial={{ opacity: 0, x: prefersReducedMotion ? 0 : -30 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
+        >
+          <img
+            src={runnerHero}
+            alt="Atleta corriendo — 499 Run Coro Falcón"
+            draggable={false}
+            style={{
+              height: "clamp(380px, 82vw, 560px)",
+              width: "auto",
+              objectFit: "contain",
+              filter: dropShadowNear,
+            }}
+          />
+        </motion.div>
+
+        {/* ── Runner derecho: ligeramente más pequeño (profundidad), pegado al borde der ── */}
         <motion.div
           style={{ y: runnerRightY }}
-          className="absolute right-0 bottom-[14%] z-[3] pointer-events-none select-none"
-          initial={{ opacity: 0, x: prefersReducedMotion ? 0 : 40 }}
+          className="absolute right-[-4vw] bottom-[10%] z-[3] pointer-events-none select-none"
+          initial={{ opacity: 0, x: prefersReducedMotion ? 0 : 30 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
         >
@@ -159,41 +181,26 @@ const HeroSection = () => {
             aria-hidden="true"
             draggable={false}
             style={{
-              height: "clamp(260px, 58vw, 400px)",
+              height: "clamp(320px, 70vw, 480px)",
               width: "auto",
               objectFit: "contain",
-              filter: `brightness(0.78) saturate(0.88) ${dropShadowFar}`,
+              filter: `brightness(0.82) saturate(0.9) ${dropShadowFar}`,
             }}
           />
         </motion.div>
 
-        {/* ── Runner izquierdo — z-[3], anclado bottom-left, más grande ── */}
-        <motion.div
-          style={{ y: runnerLeftY }}
-          className="absolute left-0 bottom-[14%] z-[3] pointer-events-none select-none"
-          initial={{ opacity: 0, x: prefersReducedMotion ? 0 : -40 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
-        >
-          <img
-            src={runnerHero}
-            alt="Atleta corriendo — 499 Run Coro Falcón"
-            draggable={false}
-            style={{
-              height: "clamp(300px, 68vw, 460px)",
-              width: "auto",
-              objectFit: "contain",
-              filter: dropShadowNear,
-            }}
-          />
-        </motion.div>
+        {/* ── Fade oscuro sobre el fondo para que los botones sean legibles ── */}
+        <div
+          className="absolute inset-x-0 bottom-0 z-[4] pointer-events-none"
+          style={{ height: "28%", background: "linear-gradient(to top, #03070b 40%, transparent 100%)" }}
+        />
 
-        {/* ── Botones anclados al fondo — z-[4] por encima de runners ── */}
+        {/* ── Botones anclados al fondo ── */}
         <motion.div
           initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.9 }}
-          className="absolute inset-x-0 bottom-6 z-[4] flex flex-col gap-3 px-5"
+          className="absolute inset-x-0 bottom-6 z-[5] flex flex-col gap-3 px-5"
         >
           <Link to="/registro" className="w-full">
             <button className="w-full py-4 rounded-[1.25rem] bg-cyan-500 hover:bg-cyan-400 text-black font-black text-[10px] tracking-[0.2em] uppercase transition-all duration-300 flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(0,242,255,0.3)] active:scale-95 group">
