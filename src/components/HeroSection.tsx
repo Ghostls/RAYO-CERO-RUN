@@ -101,105 +101,99 @@ const HeroSection = () => {
 
       {/* ══════════════════════════════════════════════════════════════════
           ██  MOBILE LAYOUT (< md)  ██
-          Stack vertical: runners flanqueando el 499, mismo depth trick
-          comprimido para pantallas angostas
+          100svh, posicionamiento absoluto igual que desktop.
+          499 enorme en el centro-top, runners anclados al bottom
+          a cada lado, botones al fondo.
       ══════════════════════════════════════════════════════════════════ */}
-      <div className="relative z-10 flex flex-col items-center md:hidden pt-24 pb-8 min-h-screen">
-
-        {/* ESCENA MOBILE: contenedor relativo donde vive el sandwich */}
-        <div className="relative w-full flex justify-center items-end" style={{ height: "clamp(280px, 70vw, 420px)" }}>
-
-          {/* PLANO 3 (atrás): Runner derecho — z-[1] */}
-          <motion.div
-            style={{ y: runnerRightY }}
-            className="absolute right-0 bottom-0 z-[1] pointer-events-none select-none"
-            initial={{ opacity: 0, x: prefersReducedMotion ? 0 : 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
+      <div
+        className="relative z-10 md:hidden w-full"
+        style={{ height: "100svh", minHeight: "600px" }}
+      >
+        {/* ── 499 centrado arriba ── */}
+        <motion.div
+          aria-hidden="true"
+          style={{ y: typeY }}
+          className="absolute inset-x-0 top-[18%] z-[2] flex justify-center pointer-events-none select-none"
+        >
+          <h1
+            className="absolute font-black leading-none"
+            style={{
+              fontSize: "clamp(7rem, 38vw, 12rem)",
+              letterSpacing: "-0.055em",
+              fontVariantNumeric: "tabular-nums",
+              color: "transparent",
+              WebkitTextStroke: "clamp(2px, 0.8vw, 6px) rgba(148,163,184,0.15)",
+              WebkitFontSmoothing: "antialiased",
+            }}
           >
-            <img
-              src={runnerRight}
-              alt=""
-              aria-hidden="true"
-              draggable={false}
-              style={{
-                height: "clamp(200px, 48vw, 340px)",
-                width: "auto",
-                objectFit: "contain",
-                mixBlendMode: "multiply",
-                filter: `brightness(0.65) saturate(0.75) ${dropShadowFar}`,
-                opacity: 0.85,
-              }}
-            />
-          </motion.div>
+            499
+          </h1>
+          <h1
+            className="relative font-black leading-none"
+            style={{
+              fontSize: "clamp(7rem, 38vw, 12rem)",
+              letterSpacing: "-0.055em",
+              fontVariantNumeric: "tabular-nums",
+              color: "transparent",
+              WebkitTextStroke: "clamp(1px, 0.4vw, 3px) rgba(226,232,240,0.75)",
+              maskImage: "linear-gradient(180deg, black 0%, black 45%, rgba(0,0,0,0.3) 80%, transparent 100%)",
+              WebkitMaskImage: "linear-gradient(180deg, black 0%, black 45%, rgba(0,0,0,0.3) 80%, transparent 100%)",
+              WebkitFontSmoothing: "antialiased",
+            }}
+          >
+            499
+          </h1>
+        </motion.div>
 
-          {/* PLANO 2 (medio): 499 stroke only */}
-          <motion.div
+        {/* ── Runner derecho — z-[3], anclado bottom-right ── */}
+        <motion.div
+          style={{ y: runnerRightY }}
+          className="absolute right-0 bottom-[14%] z-[3] pointer-events-none select-none"
+          initial={{ opacity: 0, x: prefersReducedMotion ? 0 : 40 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
+        >
+          <img
+            src={runnerRight}
+            alt=""
             aria-hidden="true"
-            style={{ y: typeY }}
-            className="absolute inset-x-0 top-0 z-[2] flex justify-center pointer-events-none select-none"
-          >
-            {/* stroke grueso sombra */}
-            <h1
-              className="absolute font-black leading-none"
-              style={{
-                fontSize: "clamp(5.5rem, 26vw, 9rem)",
-                letterSpacing: "-0.055em",
-                fontVariantNumeric: "tabular-nums",
-                color: "transparent",
-                WebkitTextStroke: "clamp(2px, 0.6vw, 5px) rgba(148,163,184,0.15)",
-                WebkitFontSmoothing: "antialiased",
-              }}
-            >
-              499
-            </h1>
-            {/* stroke fino con fade */}
-            <h1
-              className="relative font-black leading-none"
-              style={{
-                fontSize: "clamp(5.5rem, 26vw, 9rem)",
-                letterSpacing: "-0.055em",
-                fontVariantNumeric: "tabular-nums",
-                color: "transparent",
-                WebkitTextStroke: "clamp(1px, 0.3vw, 2.5px) rgba(226,232,240,0.72)",
-                maskImage: "linear-gradient(180deg, black 0%, black 45%, rgba(0,0,0,0.3) 80%, transparent 100%)",
-                WebkitMaskImage: "linear-gradient(180deg, black 0%, black 45%, rgba(0,0,0,0.3) 80%, transparent 100%)",
-                WebkitFontSmoothing: "antialiased",
-              }}
-            >
-              499
-            </h1>
-          </motion.div>
+            draggable={false}
+            style={{
+              height: "clamp(260px, 58vw, 400px)",
+              width: "auto",
+              objectFit: "contain",
+              filter: `brightness(0.78) saturate(0.88) ${dropShadowFar}`,
+            }}
+          />
+        </motion.div>
 
-          {/* PLANO 1 (delante): Runner izquierdo — z-[3], espejado */}
-          <motion.div
-            style={{ y: runnerLeftY }}
-            className="absolute left-0 bottom-0 z-[3] pointer-events-none select-none"
-            initial={{ opacity: 0, x: prefersReducedMotion ? 0 : -40 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
-          >
-            <img
-              src={runnerHero}
-              alt="Atleta corriendo — 499 Run Coro Falcón"
-              draggable={false}
-              style={{
-                height: "clamp(220px, 52vw, 360px)",
-                width: "auto",
-                objectFit: "contain",
-                mixBlendMode: "multiply",
-                filter: dropShadowNear,
-              }}
-            />
-          </motion.div>
-        </div>
+        {/* ── Runner izquierdo — z-[3], anclado bottom-left, más grande ── */}
+        <motion.div
+          style={{ y: runnerLeftY }}
+          className="absolute left-0 bottom-[14%] z-[3] pointer-events-none select-none"
+          initial={{ opacity: 0, x: prefersReducedMotion ? 0 : -40 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
+        >
+          <img
+            src={runnerHero}
+            alt="Atleta corriendo — 499 Run Coro Falcón"
+            draggable={false}
+            style={{
+              height: "clamp(300px, 68vw, 460px)",
+              width: "auto",
+              objectFit: "contain",
+              filter: dropShadowNear,
+            }}
+          />
+        </motion.div>
 
-        {/* Botonera mobile */}
+        {/* ── Botones anclados al fondo — z-[4] por encima de runners ── */}
         <motion.div
           initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.9 }}
-          className="flex flex-col gap-3 w-full max-w-sm px-5 mt-10"
+          className="absolute inset-x-0 bottom-6 z-[4] flex flex-col gap-3 px-5"
         >
           <Link to="/registro" className="w-full">
             <button className="w-full py-4 rounded-[1.25rem] bg-cyan-500 hover:bg-cyan-400 text-black font-black text-[10px] tracking-[0.2em] uppercase transition-all duration-300 flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(0,242,255,0.3)] active:scale-95 group">
@@ -208,7 +202,7 @@ const HeroSection = () => {
             </button>
           </Link>
           <Link to="/resultados" className="w-full">
-            <button className="w-full py-4 rounded-[1.25rem] bg-[#03070b]/60 border border-white/15 text-white font-black text-[10px] tracking-[0.2em] uppercase backdrop-blur-xl transition-all duration-300 flex items-center justify-center gap-3 active:scale-95 group shadow-[0_10px_30px_rgba(0,0,0,0.4)]">
+            <button className="w-full py-4 rounded-[1.25rem] bg-[#03070b]/80 border border-white/15 text-white font-black text-[10px] tracking-[0.2em] uppercase backdrop-blur-xl transition-all duration-300 flex items-center justify-center gap-3 active:scale-95 group shadow-[0_10px_30px_rgba(0,0,0,0.4)]">
               <Trophy className="h-4 w-4 text-cyan-400/60 group-hover:text-cyan-400 transition-colors" />
               VER RESULTADOS
             </button>
@@ -276,7 +270,6 @@ const HeroSection = () => {
                 width: "auto",
                 objectFit: "contain",
                 // Levemente más oscura → refuerza distancia, pero visible
-                mixBlendMode: "multiply",
                 filter: `brightness(0.78) saturate(0.88) ${dropShadowFar}`,
                 opacity: 0.95,
                 transform: "translateZ(0)",
@@ -365,7 +358,6 @@ const HeroSection = () => {
                 height: "clamp(420px, 86vh, 940px)",
                 width: "auto",
                 objectFit: "contain",
-                mixBlendMode: "multiply",
                 transform: "translateZ(0)",
                 filter: dropShadowNear,
               }}
