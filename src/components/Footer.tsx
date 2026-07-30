@@ -43,7 +43,7 @@ const Footer = () => {
                 className="h-7 w-auto object-contain filter drop-shadow-[0_0_10px_rgba(80,232,227,0.25)]"
               />
               <span className="text-[10px] font-black tracking-[0.3em] text-[#50E8E3] uppercase bg-[#50E8E3]/10 px-2.5 py-1 rounded">
-                NIGHT FEST 10K
+                499 RUN CORO
               </span>
             </div>
             <p className="text-xs text-white/40 leading-relaxed font-medium max-w-sm text-center md:text-left mx-auto md:mx-0">

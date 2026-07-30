@@ -297,10 +297,7 @@ const RacesSection = () => {
           </motion.div>
 
           <h2 className="text-5xl md:text-[5.5rem] font-black italic text-white tracking-tighter uppercase leading-[0.85] drop-shadow-2xl">
-            PRÓXIMOS <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-white">
-              DESAFÍOS.
-            </span>
+            PRÓXIMOS DESAFÍOS.<br />
           </h2>
         </div>
       </div>
