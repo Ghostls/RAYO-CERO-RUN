@@ -1,8 +1,15 @@
 /**
- * RAYO CERO — CORE ROUTER V7.5 (STABLE EVOLUTION - VALKYRON SHIELD)
- * Senior Dev: MIA / Gemini (Valkyron Group)
+ * RAYO CERO — CORE ROUTER V7.6 (CONFIRMATION_ROUTE)
+ * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
- * EVOLUCIÓN V7.5: RaceSignalProvider integrado — countdown pre-carrera en todos los dispositivos
+ *
+ * CHANGELOG V7.6:
+ * [V7.6-1] Ruta `/confirmacion` añadida — ConfirmationPage con flujo dual
+ *          (carrera 10K/4K con BIB dorsal / caninata 5K sin BIB).
+ * [V7.6-2] `/confirmacion` excluida de isAdminRoute para mostrar Navbar y Footer.
+ *
+ * CHANGELOG V7.5 (base — sin modificaciones):
+ * [V7.5-1] RaceSignalProvider integrado — countdown pre-carrera en todos los dispositivos.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -46,11 +53,14 @@ const wrap = (Component: React.ComponentType) => (
 );
 
 // PÁGINAS — lazy load
-const Index          = lazy(() => import("./pages/Index"));
-const RaceDetail     = lazy(() => import("./pages/RaceDetail"));
-const NotFound       = lazy(() => import("./pages/NotFound"));
-const AdminLogin     = lazy(() => import("./pages/AdminLogin"));
-const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const Index            = lazy(() => import("./pages/Index"));
+const RaceDetail       = lazy(() => import("./pages/RaceDetail"));
+const NotFound         = lazy(() => import("./pages/NotFound"));
+const AdminLogin       = lazy(() => import("./pages/AdminLogin"));
+const AdminDashboard   = lazy(() => import("./pages/AdminDashboard"));
+
+// ✅ [V7.6-1] Página de confirmación — flujo dual carrera / caninata
+const ConfirmationPage = lazy(() => import("./pages/ConfirmationPage"));
 
 // MÓDULOS ESPECÍFICOS — lazy load
 const RegistrationForm = lazy(() => import("./components/RegistrationForm"));
@@ -77,10 +87,11 @@ const AppContent = ({ session, loading }: { session: any; loading: boolean }) =>
 
   const isAdminRoute =
     location.pathname.startsWith('/admin') ||
-    location.pathname === '/v-access' ||
+    location.pathname === '/v-access'      ||
     location.pathname.startsWith('/tracker') ||
-    location.pathname === '/acceso' ||
+    location.pathname === '/acceso'        ||
     location.pathname === '/perfil';
+  // NOTA: `/confirmacion` NO está en isAdminRoute → muestra Navbar y Footer
 
   return (
     <div className="min-h-screen bg-[#03070b] text-white flex flex-col selection:bg-cyan-500/30">
@@ -90,11 +101,14 @@ const AppContent = ({ session, loading }: { session: any; loading: boolean }) =>
       <main className="flex-grow">
         <Routes>
           {/* RUTAS PÚBLICAS */}
-          <Route path="/"           element={wrap(Index)} />
-          <Route path="/carreras"   element={wrap(RacesSection)} />
+          <Route path="/"            element={wrap(Index)} />
+          <Route path="/carreras"    element={wrap(RacesSection)} />
           <Route path="/carrera/:id" element={wrap(RaceDetail)} />
-          <Route path="/registro"   element={wrap(RegistrationForm)} />
-          <Route path="/resultados" element={wrap(ResultsSection)} />
+          <Route path="/registro"    element={wrap(RegistrationForm)} />
+          <Route path="/resultados"  element={wrap(ResultsSection)} />
+
+          {/* ✅ [V7.6-1] CONFIRMACIÓN DE INSCRIPCIÓN */}
+          <Route path="/confirmacion" element={wrap(ConfirmationPage)} />
 
           {/* TELEMETRÍA GPS */}
           <Route path="/tracker"      element={wrap(TrackerLanding)} />
@@ -174,13 +188,6 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          {/*
-           * ✅ RaceSignalProvider — envuelve AppContent completo
-           * Escucha INSERT en race_signals (Supabase Realtime)
-           * Muestra RaceCountdown en CUALQUIER pantalla donde el atleta esté
-           * Admin → /admin-dashboard queda dentro pero el overlay
-           * no molesta porque el admin no tiene la app abierta como atleta
-           */}
           <RaceSignalProvider eventName="WE RUN 10K NIGHT FEST">
             <AppContent session={session} loading={loading} />
           </RaceSignalProvider>

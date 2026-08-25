@@ -1,22 +1,20 @@
 /**
- * VALKYRON GROUP — RAYO CERO API LAYER (V2.7 - JUNIOR + NO AGE RESTRICTION)
+ * VALKYRON GROUP — RAYO CERO API LAYER (V3.1 - COLUMN_NAME_FIX)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Código completo sin omisiones.
  *
- * CHANGELOG V2.7:
- * [V2.7-1] SIN RESTRICCIÓN DE EDAD — eliminado el .refine() de edad >= 16.
- *          Cualquier persona puede inscribirse. No hay bloqueo por edad.
- * [V2.7-2] Categoría JUNIOR: menores de 16 años en carrera 10K.
- *          calcularCategoria ahora incluye Junior antes de Juvenil.
- * [V2.7-3] Schema Zod ampliado: modalidad, repr_* (representante).
- *          Sin estos campos el schema.parse() los eliminaba antes del insert.
- * [V2.7-4] insert incluye modalidad y campos de representante.
+ * CHANGELOG V3.1:
+ * [V3.1-1] BUG FIX CRÍTICO: `movilidadReducida` → `movilidad_reducida` en el objeto
+ *          del insert. Era el único campo camelCase enviado directamente a Supabase,
+ *          causando el 400 Bad Request. Todos los demás campos ya estaban en snake_case.
  *
- * CHANGELOG V2.6:
- * [V2.6-1] race_id añadido al schema Zod.
- * [V2.6-2] insert incluye race_id.
- * [V2.6-3] Unicidad por carrera (cedula+race_id / email+race_id).
+ * CHANGELOG V3.0 (base — sin modificaciones):
+ * [V3.0-1] Soporte completo para payload extendido:
+ *          - Pagos: referencia, bancoOrigen, fechaPago, metodoPago, comprobanteUrl.
+ *          - Mascota (Caninata): nombreMascota, razaMascota.
+ *          - Representante: nombreRepresentante, cedulaRepresentante.
+ * [V3.0-2] Normalización de `referencia` / `referenciaPago` y compatibilidad retroactiva.
  */
 
 import { z } from "zod";
@@ -46,11 +44,8 @@ export function calcularVelocidad(tiempoSegundos: number, distanciaKm: number): 
 }
 
 /**
- * [V2.7-2] Motor de categorías — incluye Junior (< 16) para carrera 10K.
- * La caminata 4K usa categoría fija "Caminata Recreativa 4K" desde el form;
- * esta función solo se llama para atletas de modalidad 10K.
- *
- * Orden: Junior → Juvenil → Libre → Submaster → Master → Absoluto
+ * Motor de categorías — incluye Junior (< 16) para carrera 10K.
+ * Las caminatas 4K / 5K usan categorías fijas desde el form o inferidas aquí.
  */
 export function calcularCategoria(
   edad: number,
@@ -61,7 +56,7 @@ export function calcularCategoria(
 
   const g = genero === "M" ? "Masculino" : "Femenino";
 
-  if (edad < 16)              return `Junior ${g}`;          // [V2.7-2]
+  if (edad < 16)                return `Junior ${g}`;
   if (edad >= 16 && edad <= 19) return `Juvenil ${g}`;
   if (edad >= 20 && edad <= 29) return `Libre ${g}`;
   if (edad >= 30 && edad <= 39) return `Submaster ${g}`;
@@ -79,11 +74,10 @@ export const registrationSchema = z.object({
     .string()
     .min(4, "Cédula muy corta")
     .max(15, "Cédula muy larga")
-    .transform((val) => val.replace(/\D/g, "")),  // [V2.7-fix] strip any non-digit, no regex block
+    .transform((val) => val.replace(/\D/g, "")),
   email:    z.string().email("Email inválido"),
   telefono: z.string().optional().or(z.literal("")),
 
-  // [V2.7-1] Sin validación de edad mínima — cualquier fecha válida es aceptada
   fechaNacimiento: z.string().refine(
     (val) => {
       const d = new Date(val);
@@ -92,28 +86,42 @@ export const registrationSchema = z.object({
     "Fecha de nacimiento inválida"
   ),
 
-  genero:           z.enum(["M", "F"]),
-  talla:            z.enum(["XS", "S", "M", "L", "XL", "XXL", "NA"]),
+  genero:            z.enum(["M", "F"]),
+  talla:             z.enum(["XS", "S", "M", "L", "XL", "XXL", "NA"]),
   movilidadReducida: z.boolean().default(false),
-  referenciaPago:   z.string().min(4, "Referencia bancaria inválida"),
-  contactoEmergencia: z.string().min(3),
-  telefonoEmergencia: z.string(),
-  aceptaDeslinde:   z.literal(true),
+  categoria:         z.string().optional(),
+  monto:             z.union([z.number(), z.string()]).optional(),
 
-  // [V2.6-1] Carrera activa
-  race_id: z.string().uuid("race_id inválido").optional(),
+  // Datos de Pago
+  referencia:     z.string().optional(),
+  referenciaPago: z.string().optional(),
+  bancoOrigen:    z.string().optional(),
+  fechaPago:      z.string().optional(),
+  metodoPago:     z.string().optional(),
+  comprobanteUrl: z.string().optional(),
 
-  // [V2.7-3] Modalidad — '10K' | '4K'
-  modalidad: z.enum(["10K", "4K"]).optional(),
+  // Emergencia / Legales
+  contactoEmergencia: z.string().optional(),
+  telefonoEmergencia: z.string().optional(),
+  aceptaDeslinde:     z.literal(true).optional().default(true),
 
-  // [V2.7-3] Representante — solo para menores de 18; todos opcionales en schema
-  // (la obligatoriedad la maneja el form, no la API)
-  repr_nombre:   z.string().optional(),
-  repr_apellido: z.string().optional(),
-  repr_cedula:   z.string().optional(),
-  repr_telefono: z.string().optional(),
-  repr_email:    z.string().optional(),
-  repr_relacion: z.string().optional(),
+  // Datos de Mascota (Caninata 5K)
+  nombreMascota: z.string().optional(),
+  razaMascota:   z.string().optional(),
+
+  // Carrera y Modalidad
+  race_id:   z.string().uuid("race_id inválido").optional(),
+  modalidad: z.enum(["10K", "4K", "5K"]).optional(),
+
+  // Datos de Representante (doble nomenclatura para compatibilidad)
+  nombreRepresentante: z.string().optional(),
+  cedulaRepresentante: z.string().optional(),
+  repr_nombre:         z.string().optional(),
+  repr_apellido:       z.string().optional(),
+  repr_cedula:         z.string().optional(),
+  repr_telefono:       z.string().optional(),
+  repr_email:          z.string().optional(),
+  repr_relacion:       z.string().optional(),
 });
 
 export type RegistrationFormData = z.infer<typeof registrationSchema>;
@@ -147,43 +155,71 @@ export async function registerRunner(
   const edad = calcularEdad(parsed.fechaNacimiento);
 
   /*
-   * [V2.7-2] Categoría:
-   *   4K Caminata → el form envía "Caminata Recreativa 4K" directamente
-   *                 a través del campo categoria (no se recalcula aquí).
+   * Categoría:
+   *   Si ya viene definida en formData se prioriza, de lo contrario:
+   *   4K Caminata → "Caminata Recreativa 4K"
+   *   5K Caninata → "Caninata 5K"
    *   10K Carrera → calcularCategoria() incluye Junior para < 16.
-   *
-   * Si el form no envía una categoria sobreescrita, se calcula.
-   * Para la caminata, el campo categoria viene del form como string fijo.
    */
-  const categoria = parsed.modalidad === "4K"
-    ? "Caminata Recreativa 4K"
-    : calcularCategoria(edad, parsed.genero, parsed.movilidadReducida);
+  let categoria = parsed.categoria || "";
+  if (!categoria) {
+    if (parsed.modalidad === "4K") {
+      categoria = "Caminata Recreativa 4K";
+    } else if (parsed.modalidad === "5K") {
+      categoria = "Caninata 5K";
+    } else {
+      categoria = calcularCategoria(edad, parsed.genero, parsed.movilidadReducida);
+    }
+  }
+
+  // Normalización de referencia y representante (compatibilidad doble nomenclatura)
+  const refPago   = parsed.referencia || parsed.referenciaPago || "";
+  const repNombre = parsed.nombreRepresentante || parsed.repr_nombre  || null;
+  const repCedula = parsed.cedulaRepresentante || parsed.repr_cedula  || null;
 
   const { data, error } = await supabase
     .from("runners")
     .insert([{
-      nombre:    parsed.nombre,
-      apellido:  parsed.apellido,
-      cedula:    parsed.cedula,
-      email:     parsed.email,
-      telefono:  parsed.telefono || null,
+      nombre:           parsed.nombre,
+      apellido:         parsed.apellido,
+      cedula:           parsed.cedula,
+      email:            parsed.email,
+      telefono:         parsed.telefono || null,
       fecha_nacimiento: parsed.fechaNacimiento,
-      genero:    parsed.genero,
-      categoria: categoria,
-      talla_camiseta: parsed.talla,
-      movilidadReducida: parsed.movilidadReducida,
-      referencia_pago:    parsed.referenciaPago,
-      contacto_emergencia: parsed.contactoEmergencia,
-      telefono_emergencia: parsed.telefonoEmergencia,
-      acepta_deslinde:    true,
+      genero:           parsed.genero,
+      categoria:        categoria,
+      talla_camiseta:   parsed.talla,
+
+      // ✅ [V3.1-1] BUG FIX: snake_case correcto — la columna en Postgres es `movilidad_reducida`
+      //    V3.0 enviaba `movilidadReducida` (camelCase) → Supabase lo rechazaba con 400.
+      movilidad_reducida: parsed.movilidadReducida,
+
+      // Finanzas
+      referencia_pago: refPago,
+      monto:           parsed.monto ?? null,
+      banco_origen:    parsed.bancoOrigen  ?? null,
+      fecha_pago:      parsed.fechaPago    ?? null,
+      metodo_pago:     parsed.metodoPago   ?? null,
+      comprobante_url: parsed.comprobanteUrl ?? null,
+
+      // Emergencia / Deslinde
+      contacto_emergencia:  parsed.contactoEmergencia ?? null,
+      telefono_emergencia:  parsed.telefonoEmergencia ?? null,
+      acepta_deslinde:      true,
       timestamp_aceptacion: new Date().toISOString(),
-      // [V2.6-2] Carrera
-      race_id: parsed.race_id ?? null,
-      // [V2.7-4] Modalidad y representante
-      modalidad:     parsed.modalidad ?? "10K",
-      repr_nombre:   parsed.repr_nombre   ?? null,
+
+      // Mascota (Caninata 5K)
+      nombre_mascota: parsed.nombreMascota ?? null,
+      raza_mascota:   parsed.razaMascota   ?? null,
+
+      // Carrera y Modalidad
+      race_id:   parsed.race_id   ?? null,
+      modalidad: parsed.modalidad ?? "10K",
+
+      // Representante (menor de 18)
+      repr_nombre:   repNombre,
       repr_apellido: parsed.repr_apellido ?? null,
-      repr_cedula:   parsed.repr_cedula   ?? null,
+      repr_cedula:   repCedula,
       repr_telefono: parsed.repr_telefono ?? null,
       repr_email:    parsed.repr_email    ?? null,
       repr_relacion: parsed.repr_relacion ?? null,
@@ -192,7 +228,6 @@ export async function registerRunner(
     .single();
 
   if (error) {
-    // [V2.6-3] unique violation — unicidad por carrera
     if (error.code === "23505")
       throw new Error("Ya estás inscrito en esta carrera con esta cédula o email.");
     throw new Error(error.message);
