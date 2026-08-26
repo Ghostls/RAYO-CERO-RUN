@@ -1,11 +1,16 @@
 /**
- * RAYOCERO — REGISTRATION TERMINAL (STABLE BUILD V36.7_PRECIO_DINAMICO)
+ * RAYOCERO — REGISTRATION TERMINAL (STABLE BUILD V36.8_EVENTO_DINAMICO)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Architecture: React / TypeScript / Supabase / React Query / Framer Motion
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V36.7:
+ * CHANGELOG V36.8:
+ * [V36.8-1] BUG FIX: navigate de carrera (10K/4K) incluye `&evento=race.name` para que
+ *            ConfirmationPage muestre el nombre real (499 RUN CORO FALCÓN, etc.)
+ *            en lugar del string hardcodeado "WE RUN 10K NIGHT FEST".
+ *
+ * CHANGELOG V36.7 (base):
  * [V36.7-1] NUEVO HOOK: `usePrecioEvento(raceId, modalidad)` — lee system_config
  *            por race_id (fallback a id=1), calcula costo_usd × tasa_bcv.
  *            Modalidad "10K" → costo_usd; "4K"/"5K" → costo_4k_usd.
@@ -383,7 +388,12 @@ function RegistrationFormActive({
           `&raza=${encodeURIComponent(razaPerro)}`
         );
       } else {
-        navigate(`/confirmacion?bib=${data.bib_number}&categoria=${encodeURIComponent(data.categoria)}`);
+        // [V36.8-1] Nombre real de la carrera incluido en URL para ConfirmationPage
+        navigate(
+          `/confirmacion?bib=${data.bib_number}` +
+          `&categoria=${encodeURIComponent(data.categoria)}` +
+          `&evento=${encodeURIComponent(race.name)}`
+        );
       }
     },
     onError: (err: any) => setFormError(err?.message || "Error al procesar la inscripción."),
