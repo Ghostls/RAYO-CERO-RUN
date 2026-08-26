@@ -1,9 +1,21 @@
 /**
- * RAYOCERO — REGISTRATION TERMINAL (STABLE BUILD V36.8_EVENTO_DINAMICO)
+ * RAYOCERO — REGISTRATION TERMINAL (STABLE BUILD V36.10_CAMPOS_COMPLETOS)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Architecture: React / TypeScript / Supabase / React Query / Framer Motion
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
+ *
+ * CHANGELOG V36.10:
+ * [V36.10-1] RESTAURADOS: campos Género (botones M/F), Talla de Camisa (select XS-XXL-NA),
+ *            Movilidad Reducida (toggle switch), Contacto de Emergencia + Teléfono.
+ * [V36.10-2] Estados contactoEmergencia y telefonoEmergencia añadidos con useState.
+ *            El payload ya no envía "N/A" hardcodeado — usa el valor real del usuario.
+ *
+ * CHANGELOG V36.9:
+ * [V36.9-1] SPLIT: flujo carrera (10K/4K) redirige a /dorsal (DorsalPage.tsx)
+ *            que genera el PNG del dorsal 499 RUN CORO con Canvas 2D API.
+ *            Caninata (5K) sigue en /confirmacion (ConfirmationPage V5 glass).
+ *            Los flujos ahora son 100% independientes sin mezclar lógica.
  *
  * CHANGELOG V36.8:
  * [V36.8-1] BUG FIX: navigate de carrera (10K/4K) incluye `&evento=race.name` para que
@@ -351,6 +363,8 @@ function RegistrationFormActive({
   const [talla, setTalla]                     = useState<RegistrationFormData["talla"]>("M");
   const [movilidadReducida, setMovilidadReducida] = useState(false);
   const [referencia, setReferencia]           = useState("");
+  const [contactoEmergencia, setContactoEmergencia] = useState("");
+  const [telefonoEmergencia, setTelefonoEmergencia] = useState("");
   const [fileComprobante, setFileComprobante] = useState<File | null>(null);
   const [nombrePerro, setNombrePerro]         = useState<string>("");
   const [razaPerro, setRazaPerro]             = useState<string>(RAZAS_COMUNES[0]);
@@ -388,10 +402,13 @@ function RegistrationFormActive({
           `&raza=${encodeURIComponent(razaPerro)}`
         );
       } else {
-        // [V36.8-1] Nombre real de la carrera incluido en URL para ConfirmationPage
+        // [V36.9-1] Carrera → DorsalPage (genera PNG con Canvas 2D)
+        //   Caninata → ConfirmationPage V5 (glass card, flujo independiente)
         navigate(
-          `/confirmacion?bib=${data.bib_number}` +
+          `/dorsal?bib=${data.bib_number}` +
           `&categoria=${encodeURIComponent(data.categoria)}` +
+          `&nombre=${encodeURIComponent(nombre)}` +
+          `&apellido=${encodeURIComponent(apellido)}` +
           `&evento=${encodeURIComponent(race.name)}`
         );
       }
@@ -437,8 +454,8 @@ function RegistrationFormActive({
         monto: precio.montoBs > 0 ? String(precio.montoBs.toFixed(2)) : "0",
         referenciaPago: referencia,
         comprobanteUrl: comprobanteUrl || undefined,
-        contactoEmergencia: "N/A",
-        telefonoEmergencia: "N/A",
+        contactoEmergencia: contactoEmergencia || "N/A",
+        telefonoEmergencia: telefonoEmergencia || "N/A",
         aceptaDeslinde: true,
         race_id: race.id,
         modalidad,
@@ -538,6 +555,90 @@ function RegistrationFormActive({
               <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Fecha de Nacimiento</label>
               <input type="date" value={fechaNacimiento} onChange={e => setFechaNacimiento(e.target.value)} required
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-white/30"/>
+            </div>
+          </div>
+
+          {/* GÉNERO Y TALLA */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Género</label>
+              <div className="grid grid-cols-2 gap-2">
+                {(["M", "F"] as const).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setGenero(g)}
+                    className={`py-3 rounded-xl text-xs font-black uppercase border transition-all ${
+                      genero === g
+                        ? "border-transparent text-black"
+                        : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
+                    }`}
+                    style={genero === g ? { background: accentColor } : undefined}
+                  >
+                    {g === "M" ? "Masculino" : "Femenino"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Talla de Camisa</label>
+              <select
+                value={talla}
+                onChange={e => setTalla(e.target.value as RegistrationFormData["talla"])}
+                className="w-full bg-[#0d1117] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-white/30 appearance-none cursor-pointer"
+              >
+                {(["XS","S","M","L","XL","XXL","NA"] as const).map(t => (
+                  <option key={t} value={t}>{t === "NA" ? "No aplica" : t}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* MOVILIDAD REDUCIDA */}
+          <div
+            className="flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all"
+            style={{
+              background: movilidadReducida ? `${accentColor}10` : "rgba(255,255,255,0.03)",
+              borderColor: movilidadReducida ? `${accentColor}40` : "rgba(255,255,255,0.10)",
+            }}
+            onClick={() => setMovilidadReducida(!movilidadReducida)}
+          >
+            <div>
+              <p className="text-xs font-bold uppercase text-white/80">Movilidad Reducida</p>
+              <p className="text-[10px] text-white/40 mt-0.5">Marca si requieres atención especial durante el evento</p>
+            </div>
+            <div
+              className="h-6 w-11 rounded-full relative transition-all shrink-0"
+              style={{ background: movilidadReducida ? accentColor : "rgba(255,255,255,0.1)" }}
+            >
+              <div
+                className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all"
+                style={{ left: movilidadReducida ? "calc(100% - 1.35rem)" : "0.1rem" }}
+              />
+            </div>
+          </div>
+
+          {/* CONTACTO DE EMERGENCIA */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Contacto de Emergencia</label>
+              <input
+                type="text"
+                value={contactoEmergencia}
+                onChange={e => setContactoEmergencia(e.target.value)}
+                placeholder="Nombre del contacto"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-white/30 placeholder:text-white/20"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Teléfono de Emergencia</label>
+              <input
+                type="text"
+                value={telefonoEmergencia}
+                onChange={e => setTelefonoEmergencia(e.target.value)}
+                placeholder="Ej: 0414-1234567"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-white/30 placeholder:text-white/20"
+              />
             </div>
           </div>
 

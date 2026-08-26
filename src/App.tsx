@@ -1,20 +1,27 @@
 /**
- * RAYO CERO — CORE ROUTER V7.6 (CONFIRMATION_ROUTE)
+ * RAYO CERO — CORE ROUTER V7.7 (DORSAL_ROUTE)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  *
- * CHANGELOG V7.6:
- * [V7.6-1] Ruta `/confirmacion` añadida — ConfirmationPage con flujo dual
- *          (carrera 10K/4K con BIB dorsal / caninata 5K sin BIB).
- * [V7.6-2] `/confirmacion` excluida de isAdminRoute para mostrar Navbar y Footer.
+ * CHANGELOG V7.7:
+ * [V7.7-1] Ruta `/dorsal` añadida → DorsalPage (Canvas 2D, PNG descargable).
+ *          Genera el dorsal oficial 499 RUN CORO FALCÓN con nombre, BIB y categoría.
+ * [V7.7-2] Flujos completamente separados — SIN mezcla:
+ *          - Coro 10K/4K  → /dorsal        → DorsalPage (PNG Canvas)
+ *          - Caninata 5K  → /confirmacion  → ConfirmationPage V5 (glass card)
+ * [V7.7-3] /dorsal excluido de isAdminRoute → muestra Navbar y Footer.
  *
- * CHANGELOG V7.5 (base — sin modificaciones):
+ * CHANGELOG V7.6 (base):
+ * [V7.6-1] Ruta `/confirmacion` añadida — ConfirmationPage Caninata.
+ * [V7.6-2] `/confirmacion` excluida de isAdminRoute.
+ *
+ * CHANGELOG V7.5 (base):
  * [V7.5-1] RaceSignalProvider integrado — countdown pre-carrera en todos los dispositivos.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes, Navigate, useLocation, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { supabase } from "./lib/supabase";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -27,20 +34,21 @@ import Footer from "./components/Footer";
 // ✅ V7.5 — Provider global de señales de carrera
 import RaceSignalProvider from "./components/RaceSignalProvider";
 
-import { lazy, Suspense } from "react";
-
-// Skeleton global de carga
+// ── Skeleton global de carga ─────────────────────────────────────────────────
 const PageLoader = () => (
   <div className="h-screen flex items-center justify-center bg-[#03070b]">
-    <div style={{ textAlign: 'center' }}>
+    <div style={{ textAlign: "center" }}>
       <div style={{
-        width: 36, height: 36, margin: '0 auto 12px',
-        border: '2px solid rgba(0,242,255,0.15)',
-        borderTopColor: '#00f2ff',
-        borderRadius: '50%',
-        animation: 'spin 0.8s linear infinite',
+        width: 36, height: 36, margin: "0 auto 12px",
+        border: "2px solid rgba(0,242,255,0.15)",
+        borderTopColor: "#00f2ff",
+        borderRadius: "50%",
+        animation: "spin 0.8s linear infinite",
       }} />
-      <div style={{ fontSize: 9, letterSpacing: '0.3em', color: 'rgba(0,242,255,0.4)', textTransform: 'uppercase', fontWeight: 700 }}>
+      <div style={{
+        fontSize: 9, letterSpacing: "0.3em",
+        color: "rgba(0,242,255,0.4)", textTransform: "uppercase", fontWeight: 700,
+      }}>
         Cargando...
       </div>
     </div>
@@ -52,46 +60,49 @@ const wrap = (Component: React.ComponentType) => (
   <Suspense fallback={<PageLoader />}><Component /></Suspense>
 );
 
-// PÁGINAS — lazy load
-const Index            = lazy(() => import("./pages/Index"));
-const RaceDetail       = lazy(() => import("./pages/RaceDetail"));
-const NotFound         = lazy(() => import("./pages/NotFound"));
-const AdminLogin       = lazy(() => import("./pages/AdminLogin"));
-const AdminDashboard   = lazy(() => import("./pages/AdminDashboard"));
+// ── PÁGINAS — lazy load ──────────────────────────────────────────────────────
+const Index          = lazy(() => import("./pages/Index"));
+const RaceDetail     = lazy(() => import("./pages/RaceDetail"));
+const NotFound       = lazy(() => import("./pages/NotFound"));
+const AdminLogin     = lazy(() => import("./pages/AdminLogin"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 
-// ✅ [V7.6-1] Página de confirmación — flujo dual carrera / caninata
+// ✅ [V7.6-1] Caninata 5K — glass card brand verde/amarillo
 const ConfirmationPage = lazy(() => import("./pages/ConfirmationPage"));
 
-// MÓDULOS ESPECÍFICOS — lazy load
+// ✅ [V7.7-1] Coro 10K/4K — genera PNG del dorsal con Canvas 2D API
+const DorsalPage = lazy(() => import("./pages/DorsalPage"));
+
+// ── MÓDULOS ESPECÍFICOS — lazy load ─────────────────────────────────────────
 const RegistrationForm = lazy(() => import("./components/RegistrationForm"));
 const ResultsSection   = lazy(() => import("./components/ResultsSection"));
 const RacesSection     = lazy(() => import("./components/RacesSection"));
 const RaceTracker      = lazy(() => import("./components/RaceTracker"));
 const TrackerLanding   = lazy(() => import("./components/TrackerLanding"));
 
-// PORTAL DEL ATLETA — lazy load
+// ── PORTAL DEL ATLETA — lazy load ───────────────────────────────────────────
 const AthleteAuth    = lazy(() => import("./components/AthleteAuth"));
 const AthleteProfile = lazy(() => import("./components/Athleteprofile"));
 
 const queryClient = new QueryClient();
 
-// ── Wrapper para RaceTracker con useParams ────────────────────
+// ── Wrapper para RaceTracker con useParams ───────────────────────────────────
 const TrackerPage = () => {
   const { bib } = useParams<{ bib: string }>();
-  return <RaceTracker bibNumber={parseInt(bib ?? '0')} />;
+  return <RaceTracker bibNumber={parseInt(bib ?? "0")} />;
 };
 
-// ── Lógica de visibilidad de UI Global ──
+// ── Lógica de visibilidad de UI Global ──────────────────────────────────────
 const AppContent = ({ session, loading }: { session: any; loading: boolean }) => {
   const location = useLocation();
 
   const isAdminRoute =
-    location.pathname.startsWith('/admin') ||
-    location.pathname === '/v-access'      ||
-    location.pathname.startsWith('/tracker') ||
-    location.pathname === '/acceso'        ||
-    location.pathname === '/perfil';
-  // NOTA: `/confirmacion` NO está en isAdminRoute → muestra Navbar y Footer
+    location.pathname.startsWith("/admin")   ||
+    location.pathname === "/v-access"        ||
+    location.pathname.startsWith("/tracker") ||
+    location.pathname === "/acceso"          ||
+    location.pathname === "/perfil";
+  // NOTA: /confirmacion y /dorsal NO están aquí → muestran Navbar y Footer
 
   return (
     <div className="min-h-screen bg-[#03070b] text-white flex flex-col selection:bg-cyan-500/30">
@@ -100,25 +111,29 @@ const AppContent = ({ session, loading }: { session: any; loading: boolean }) =>
 
       <main className="flex-grow">
         <Routes>
-          {/* RUTAS PÚBLICAS */}
+
+          {/* ── RUTAS PÚBLICAS ── */}
           <Route path="/"            element={wrap(Index)} />
           <Route path="/carreras"    element={wrap(RacesSection)} />
           <Route path="/carrera/:id" element={wrap(RaceDetail)} />
           <Route path="/registro"    element={wrap(RegistrationForm)} />
           <Route path="/resultados"  element={wrap(ResultsSection)} />
 
-          {/* ✅ [V7.6-1] CONFIRMACIÓN DE INSCRIPCIÓN */}
+          {/* ── [V7.6-1] CONFIRMACIÓN CANINATA 5K — glass card verde/amarillo ── */}
           <Route path="/confirmacion" element={wrap(ConfirmationPage)} />
 
-          {/* TELEMETRÍA GPS */}
+          {/* ── [V7.7-1] DORSAL CORO 10K/4K — PNG generado con Canvas 2D ── */}
+          <Route path="/dorsal" element={wrap(DorsalPage)} />
+
+          {/* ── TELEMETRÍA GPS ── */}
           <Route path="/tracker"      element={wrap(TrackerLanding)} />
           <Route path="/tracker/:bib" element={<TrackerPage />} />
 
-          {/* PORTAL DEL ATLETA */}
+          {/* ── PORTAL DEL ATLETA ── */}
           <Route path="/acceso" element={wrap(AthleteAuth)} />
           <Route path="/perfil" element={wrap(AthleteProfile)} />
 
-          {/* ACCESO ADMINISTRATIVO */}
+          {/* ── ACCESO ADMINISTRATIVO ── */}
           <Route
             path="/v-access"
             element={
@@ -136,7 +151,7 @@ const AppContent = ({ session, loading }: { session: any; loading: boolean }) =>
             }
           />
 
-          {/* DASHBOARD ADMIN */}
+          {/* ── DASHBOARD ADMIN ── */}
           <Route
             path="/admin-dashboard"
             element={
@@ -154,8 +169,9 @@ const AppContent = ({ session, loading }: { session: any; loading: boolean }) =>
             }
           />
 
-          {/* 404 */}
+          {/* ── 404 ── */}
           <Route path="*" element={wrap(NotFound)} />
+
         </Routes>
       </main>
 
@@ -165,6 +181,7 @@ const AppContent = ({ session, loading }: { session: any; loading: boolean }) =>
   );
 };
 
+// ── App root ─────────────────────────────────────────────────────────────────
 const App = () => {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);

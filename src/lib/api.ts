@@ -1,20 +1,25 @@
 /**
- * VALKYRON GROUP — RAYO CERO API LAYER (V3.1 - COLUMN_NAME_FIX)
+ * VALKYRON GROUP — RAYO CERO API LAYER (V3.2 - CATEGORIAS_GRANULARES)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
- * REGLA DE ORO: Código completo sin omisiones.
+ * REGLA DE ORO: Código completo sin omisiones. Copy-paste ready.
  *
- * CHANGELOG V3.1:
- * [V3.1-1] BUG FIX CRÍTICO: `movilidadReducida` → `movilidad_reducida` en el objeto
- *          del insert. Era el único campo camelCase enviado directamente a Supabase,
- *          causando el 400 Bad Request. Todos los demás campos ya estaban en snake_case.
+ * CHANGELOG V3.2:
+ * [V3.2-1] EVOLUCIÓN: calcularCategoria() ahora usa el sistema estándar
+ *          de atletismo venezolano con 9 categorías granulares:
+ *          Junior (<16), Juvenil (16-19), Libre (20-29),
+ *          Sub Master 30-34, Sub Master 35-39,
+ *          Master A (40-49), Master B (50-59), Master C (60-69), Master D (70+)
+ *          Alineado con CATEGORY_ORDER del AdminDashboard V4.0.
+ * [V3.2-2] Modalidad 4K → "Caminata Recreativa 4K" (sin cambios).
+ *          Modalidad 5K → "Caminata Canina / Familiar" (alineado con form V36.10).
  *
- * CHANGELOG V3.0 (base — sin modificaciones):
- * [V3.0-1] Soporte completo para payload extendido:
- *          - Pagos: referencia, bancoOrigen, fechaPago, metodoPago, comprobanteUrl.
- *          - Mascota (Caninata): nombreMascota, razaMascota.
- *          - Representante: nombreRepresentante, cedulaRepresentante.
- * [V3.0-2] Normalización de `referencia` / `referenciaPago` y compatibilidad retroactiva.
+ * CHANGELOG V3.1 (base):
+ * [V3.1-1] BUG FIX: movilidadReducida → movilidad_reducida en el insert.
+ *
+ * CHANGELOG V3.0 (base):
+ * [V3.0-1] Payload extendido: pagos, mascota, representante.
+ * [V3.0-2] Normalización referencia/referenciaPago.
  */
 
 import { z } from "zod";
@@ -44,32 +49,47 @@ export function calcularVelocidad(tiempoSegundos: number, distanciaKm: number): 
 }
 
 /**
- * Motor de categorías — incluye Junior (< 16) para carrera 10K.
- * Las caminatas 4K / 5K usan categorías fijas desde el form o inferidas aquí.
+ * [V3.2-1] Motor de categorías — sistema estándar atletismo venezolano.
+ * 9 categorías granulares por edad + Movilidad Reducida.
+ * Alineado con CATEGORY_ORDER del AdminDashboard V4.0.
+ *
+ * Categoría        | Edad
+ * -----------------|----------
+ * Junior           | < 16
+ * Juvenil          | 16 – 19
+ * Libre            | 20 – 29
+ * Sub Master 30-34 | 30 – 34
+ * Sub Master 35-39 | 35 – 39
+ * Master A         | 40 – 49
+ * Master B         | 50 – 59
+ * Master C         | 60 – 69
+ * Master D         | 70 +
  */
 export function calcularCategoria(
   edad: number,
   genero: "M" | "F",
   movilidadReducida: boolean = false
 ): string {
-  if (movilidadReducida) return "Movilidad Reducida Absoluto";
+  if (movilidadReducida) return "Movilidad Reducida";
 
   const g = genero === "M" ? "Masculino" : "Femenino";
 
   if (edad < 16)                return `Junior ${g}`;
   if (edad >= 16 && edad <= 19) return `Juvenil ${g}`;
   if (edad >= 20 && edad <= 29) return `Libre ${g}`;
-  if (edad >= 30 && edad <= 39) return `Submaster ${g}`;
-  if (edad >= 40)               return `Master ${g}`;
-
-  return `Absoluto ${g}`;
+  if (edad >= 30 && edad <= 34) return `Sub Master (30-34) ${g}`;
+  if (edad >= 35 && edad <= 39) return `Sub Master (35-39) ${g}`;
+  if (edad >= 40 && edad <= 49) return `Master A ${g}`;
+  if (edad >= 50 && edad <= 59) return `Master B ${g}`;
+  if (edad >= 60 && edad <= 69) return `Master C ${g}`;
+  return `Master D ${g}`; // 70+
 }
 
 // ─── SCHEMA ZOD ─────────────────────────────────────────────────────────────
 
 export const registrationSchema = z.object({
-  nombre:    z.string().min(2, "Mínimo 2 caracteres").max(100),
-  apellido:  z.string().min(2, "Mínimo 2 caracteres").max(100),
+  nombre:   z.string().min(2, "Mínimo 2 caracteres").max(100),
+  apellido: z.string().min(2, "Mínimo 2 caracteres").max(100),
   cedula: z
     .string()
     .min(4, "Cédula muy corta")
@@ -105,7 +125,7 @@ export const registrationSchema = z.object({
   telefonoEmergencia: z.string().optional(),
   aceptaDeslinde:     z.literal(true).optional().default(true),
 
-  // Datos de Mascota (Caninata 5K)
+  // Mascota (Caninata 5K)
   nombreMascota: z.string().optional(),
   razaMascota:   z.string().optional(),
 
@@ -113,7 +133,7 @@ export const registrationSchema = z.object({
   race_id:   z.string().uuid("race_id inválido").optional(),
   modalidad: z.enum(["10K", "4K", "5K"]).optional(),
 
-  // Datos de Representante (doble nomenclatura para compatibilidad)
+  // Representante (doble nomenclatura para compatibilidad)
   nombreRepresentante: z.string().optional(),
   cedulaRepresentante: z.string().optional(),
   repr_nombre:         z.string().optional(),
@@ -152,34 +172,35 @@ export async function registerRunner(
   formData: RegistrationFormData
 ): Promise<RegistrationResult> {
   const parsed = registrationSchema.parse(formData);
-  const edad = calcularEdad(parsed.fechaNacimiento);
+  const edad   = calcularEdad(parsed.fechaNacimiento);
 
-  /*
-   * Categoría:
-   *   Si ya viene definida en formData se prioriza, de lo contrario:
-   *   4K Caminata → "Caminata Recreativa 4K"
-   *   5K Caninata → "Caninata 5K"
-   *   10K Carrera → calcularCategoria() incluye Junior para < 16.
+  /**
+   * Resolución de categoría — prioridad:
+   * 1. Si el form ya calculó y envió `categoria` → se respeta
+   * 2. Modalidad 4K  → "Caminata Recreativa 4K"
+   * 3. Modalidad 5K  → "Caminata Canina / Familiar"
+   * 4. Modalidad 10K → calcularCategoria() con 9 rangos granulares
    */
-  let categoria = parsed.categoria || "";
+  let categoria = parsed.categoria?.trim() || "";
   if (!categoria) {
     if (parsed.modalidad === "4K") {
       categoria = "Caminata Recreativa 4K";
     } else if (parsed.modalidad === "5K") {
-      categoria = "Caninata 5K";
+      categoria = "Caminata Canina / Familiar";
     } else {
       categoria = calcularCategoria(edad, parsed.genero, parsed.movilidadReducida);
     }
   }
 
-  // Normalización de referencia y representante (compatibilidad doble nomenclatura)
-  const refPago   = parsed.referencia || parsed.referenciaPago || "";
+  // Normalización doble nomenclatura
+  const refPago   = parsed.referencia    || parsed.referenciaPago     || "";
   const repNombre = parsed.nombreRepresentante || parsed.repr_nombre  || null;
   const repCedula = parsed.cedulaRepresentante || parsed.repr_cedula  || null;
 
   const { data, error } = await supabase
     .from("runners")
     .insert([{
+      // Datos personales
       nombre:           parsed.nombre,
       apellido:         parsed.apellido,
       cedula:           parsed.cedula,
@@ -190,16 +211,15 @@ export async function registerRunner(
       categoria:        categoria,
       talla_camiseta:   parsed.talla,
 
-      // ✅ [V3.1-1] BUG FIX: snake_case correcto — la columna en Postgres es `movilidad_reducida`
-      //    V3.0 enviaba `movilidadReducida` (camelCase) → Supabase lo rechazaba con 400.
+      // [V3.1-1] snake_case correcto
       movilidad_reducida: parsed.movilidadReducida,
 
       // Finanzas
       referencia_pago: refPago,
-      monto:           parsed.monto ?? null,
-      banco_origen:    parsed.bancoOrigen  ?? null,
-      fecha_pago:      parsed.fechaPago    ?? null,
-      metodo_pago:     parsed.metodoPago   ?? null,
+      monto:           parsed.monto          ?? null,
+      banco_origen:    parsed.bancoOrigen    ?? null,
+      fecha_pago:      parsed.fechaPago      ?? null,
+      metodo_pago:     parsed.metodoPago     ?? null,
       comprobante_url: parsed.comprobanteUrl ?? null,
 
       // Emergencia / Deslinde
@@ -278,10 +298,13 @@ export async function getResultsByBib(bib: string): Promise<RunnerResultData> {
 
   if (!raceData) {
     return {
-      bib: runnerData.bib_number.toString(),
-      name: `${runnerData.nombre} ${runnerData.apellido}`,
-      time: null, pace: null, rank: null, categoryRank: null,
-      category: runnerData.categoria,
+      bib:          runnerData.bib_number.toString(),
+      name:         `${runnerData.nombre} ${runnerData.apellido}`,
+      time:         null,
+      pace:         null,
+      rank:         null,
+      categoryRank: null,
+      category:     runnerData.categoria,
       totalRunners: count || 0,
       velocidadKmh: null,
     };
@@ -291,13 +314,13 @@ export async function getResultsByBib(bib: string): Promise<RunnerResultData> {
   const tiempoSeg = hh * 3600 + mm * 60 + ss;
 
   return {
-    bib: runnerData.bib_number.toString(),
-    name: `${runnerData.nombre} ${runnerData.apellido}`,
-    time: raceData.tiempo_chip,
-    pace: calcularPace(tiempoSeg, raceData.distancia_km),
-    rank: raceData.ranking_general,
+    bib:          runnerData.bib_number.toString(),
+    name:         `${runnerData.nombre} ${runnerData.apellido}`,
+    time:         raceData.tiempo_chip,
+    pace:         calcularPace(tiempoSeg, raceData.distancia_km),
+    rank:         raceData.ranking_general,
     categoryRank: raceData.ranking_categoria,
-    category: runnerData.categoria,
+    category:     runnerData.categoria,
     totalRunners: count || 0,
     velocidadKmh: raceData.velocidad_kmh,
   };
