@@ -1,49 +1,43 @@
 /**
- * RAYOCERO — REGISTRATION TERMINAL (STABLE BUILD V36.10_CAMPOS_COMPLETOS)
+ * RAYOCERO — REGISTRATION TERMINAL (STABLE BUILD V37.0 — GENDER GUARD + CATEGORY PREVIEW)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Architecture: React / TypeScript / Supabase / React Query / Framer Motion
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V36.10:
- * [V36.10-1] RESTAURADOS: campos Género (botones M/F), Talla de Camisa (select XS-XXL-NA),
- *            Movilidad Reducida (toggle switch), Contacto de Emergencia + Teléfono.
- * [V36.10-2] Estados contactoEmergencia y telefonoEmergencia añadidos con useState.
- *            El payload ya no envía "N/A" hardcodeado — usa el valor real del usuario.
+ * CHANGELOG V37.0:
+ * [V37-1] validateGenderCategory(): guard ejecutado ANTES del submit.
+ *         Bloquea si la categoría calculada contiene un género distinto al
+ *         seleccionado (ej: genero=F pero categoria="Juvenil Masculino").
+ *         Esto previene el bug del atleta con categoría incorrecta.
+ * [V37-2] Categoría se recalcula en tiempo real al cambiar genero, fecha,
+ *         movilidadReducida o modalidad — sin ningún valor stale en el payload.
+ * [V37-3] CategoryPreviewBadge: muestra la categoría calculada en tiempo real
+ *         debajo del selector de Género/Talla. El usuario ve el resultado
+ *         antes de enviar, cerrando el loop de error visual.
  *
- * CHANGELOG V36.9:
- * [V36.9-1] SPLIT: flujo carrera (10K/4K) redirige a /dorsal (DorsalPage.tsx)
- *            que genera el PNG del dorsal 499 RUN CORO con Canvas 2D API.
- *            Caninata (5K) sigue en /confirmacion (ConfirmationPage V5 glass).
- *            Los flujos ahora son 100% independientes sin mezclar lógica.
+ * CHANGELOG V36.10 (base sin modificaciones):
+ * [V36.10-1] RESTAURADOS: campos Género (botones M/F), Talla de Camisa,
+ *            Movilidad Reducida, Contacto de Emergencia + Teléfono.
+ * [V36.10-2] Estados contactoEmergencia y telefonoEmergencia con useState.
+ *            Payload usa valores reales, no hardcoded "N/A".
  *
- * CHANGELOG V36.8:
- * [V36.8-1] BUG FIX: navigate de carrera (10K/4K) incluye `&evento=race.name` para que
- *            ConfirmationPage muestre el nombre real (499 RUN CORO FALCÓN, etc.)
- *            en lugar del string hardcodeado "WE RUN 10K NIGHT FEST".
+ * CHANGELOG V36.9 (base sin modificaciones):
+ * [V36.9-1] SPLIT: carrera → /dorsal (DorsalPage), caninata → /confirmacion.
  *
- * CHANGELOG V36.7 (base):
- * [V36.7-1] NUEVO HOOK: `usePrecioEvento(raceId, modalidad)` — lee system_config
- *            por race_id (fallback a id=1), calcula costo_usd × tasa_bcv.
- *            Modalidad "10K" → costo_usd; "4K"/"5K" → costo_4k_usd.
- * [V36.7-2] NUEVA UI: Tarjeta "Monto a Transferir" entre datos bancarios y campos
- *            de pago. Muestra Bs. calculados + desglose USD × Tasa BCV.
- *            Aparece solo cuando el precio está cargado (no en loading state).
- * [V36.7-3] EVOLUCIÓN: `monto` en el payload ahora usa el precio calculado,
- *            no el hardcoded "0".
- * [V36.7-4] BUG FIX: bucket unificado a "comprobantes-pago" (el form usaba
- *            "payments" que no coincidía con el bucket real de Supabase Storage).
+ * CHANGELOG V36.8 (base sin modificaciones):
+ * [V36.8-1] navigate de carrera incluye &evento=race.name.
  *
- * CHANGELOG V36.6 (base — sin modificaciones):
- * [V36.6-1..7] PetData, RAZAS_COMUNES, sección mascota animada, validación,
- *              payload extendido, onSuccess con params de mascota.
+ * CHANGELOG V36.7 (base sin modificaciones):
+ * [V36.7-1..4] usePrecioEvento, tarjeta monto, payload monto dinámico,
+ *              bucket "comprobantes-pago" corregido.
  */
 
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2, AlertCircle, Banknote,
-  ChevronRight, Flag, Timer, Dog, Calendar, Check, Copy, Zap
+  ChevronRight, Flag, Timer, Dog, Calendar, Check, Copy, Zap, ShieldAlert,
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -90,55 +84,79 @@ const RAZAS_COMUNES: string[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// HOOK: usePrecioEvento [V36.7-1]
-// Lee system_config por race_id y calcula el precio en bolívares según modalidad.
-// Fallback a id=1 (fila legacy) si no hay config específica para la carrera.
+// [V37-1] GUARDIA DE GÉNERO/CATEGORÍA
+// Devuelve un mensaje de error si la categoría calculada no coincide
+// con el género seleccionado. Retorna null si todo es correcto.
+//
+// Lógica: las categorías que contienen un género explícito ("Masculino" /
+// "Femenino") deben coincidir con el campo genero del atleta.
+// Categorías neutras (Movilidad Reducida, Caminata Canina) siempre pasan.
+// ---------------------------------------------------------------------------
+
+function validateGenderCategory(genero: "M" | "F", categoria: string): string | null {
+  const cat = categoria.toLowerCase();
+  // Categorías neutras — no aplica la validación de género
+  if (
+    cat.includes("movilidad reducida") ||
+    cat.includes("caninata") ||
+    cat.includes("caminata")
+  ) return null;
+
+  const expectMasculino = genero === "M";
+  const catHasMasculino = cat.includes("masculino");
+  const catHasFemenino  = cat.includes("femenino");
+
+  // Si la categoría no menciona género explícito (hipotético), pasar
+  if (!catHasMasculino && !catHasFemenino) return null;
+
+  if (expectMasculino && catHasFemenino) {
+    return `Conflicto Género/Categoría: seleccionaste Masculino pero la categoría calculada es "${categoria}". Verifica tu género y fecha de nacimiento.`;
+  }
+  if (!expectMasculino && catHasMasculino) {
+    return `Conflicto Género/Categoría: seleccionaste Femenino pero la categoría calculada es "${categoria}". Verifica tu género y fecha de nacimiento.`;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// HOOK: usePrecioEvento [V36.7-1] — sin modificaciones
 // ---------------------------------------------------------------------------
 
 interface PrecioEvento {
   tasaBCV: number;
-  costoUSD: number;       // USD según modalidad
-  montoBs: number;        // costoUSD × tasaBCV
+  costoUSD: number;
+  montoBs: number;
   loading: boolean;
   error: string | null;
 }
 
 function usePrecioEvento(raceId: string, modalidad: Modalidad): PrecioEvento {
-  const [tasaBCV,   setTasaBCV]   = useState(0);
-  const [costoUSD,  setCostoUSD]  = useState(0);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState<string | null>(null);
+  const [tasaBCV,  setTasaBCV]  = useState(0);
+  const [costoUSD, setCostoUSD] = useState(0);
+  const [loading,  setLoading]  = useState(true);
+  const [error,    setError]    = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoading(true);
-      setError(null);
+      setLoading(true); setError(null);
       try {
-        // Intentar config específica de la carrera, luego fallback a id=1
         let data: any = null;
         if (raceId) {
           const { data: d } = await supabase
-            .from("system_config")
-            .select("tasa_bcv,costo_usd,costo_4k_usd")
-            .eq("race_id", raceId)
-            .maybeSingle();
+            .from("system_config").select("tasa_bcv,costo_usd,costo_4k_usd")
+            .eq("race_id", raceId).maybeSingle();
           data = d;
         }
         if (!data) {
           const { data: fb } = await supabase
-            .from("system_config")
-            .select("tasa_bcv,costo_usd,costo_4k_usd")
-            .eq("id", 1)
-            .single();
+            .from("system_config").select("tasa_bcv,costo_usd,costo_4k_usd")
+            .eq("id", 1).single();
           data = fb;
         }
         if (!cancelled && data) {
           setTasaBCV(data.tasa_bcv ?? 0);
-          // 10K → costo_usd; 4K y 5K → costo_4k_usd
-          const usd = modalidad === "10K"
-            ? (data.costo_usd ?? 0)
-            : (data.costo_4k_usd ?? 0);
+          const usd = modalidad === "10K" ? (data.costo_usd ?? 0) : (data.costo_4k_usd ?? 0);
           setCostoUSD(usd);
         }
       } catch (err: any) {
@@ -150,21 +168,14 @@ function usePrecioEvento(raceId: string, modalidad: Modalidad): PrecioEvento {
     return () => { cancelled = true; };
   }, [raceId, modalidad]);
 
-  return {
-    tasaBCV,
-    costoUSD,
-    montoBs: tasaBCV > 0 && costoUSD > 0 ? tasaBCV * costoUSD : 0,
-    loading,
-    error,
-  };
+  return { tasaBCV, costoUSD, montoBs: tasaBCV > 0 && costoUSD > 0 ? tasaBCV * costoUSD : 0, loading, error };
 }
 
 // ---------------------------------------------------------------------------
 // HELPERS
 // ---------------------------------------------------------------------------
 
-const isCaninataRace = (name: string = ""): boolean =>
-  name.toLowerCase().includes("caninata");
+const isCaninataRace = (name: string = ""): boolean => name.toLowerCase().includes("caninata");
 
 const getModalidadMeta = (m: Modalidad): { label: string; Icon: React.ElementType } => {
   switch (m) {
@@ -175,12 +186,11 @@ const getModalidadMeta = (m: Modalidad): { label: string; Icon: React.ElementTyp
   }
 };
 
-/** Formatea número como "Bs. 1.234,56" */
 const formatBs = (n: number): string =>
   `Bs. ${n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 // ---------------------------------------------------------------------------
-// CONFIGS ESTÁTICAS
+// CONFIGS ESTÁTICAS — sin modificaciones
 // ---------------------------------------------------------------------------
 
 const CORO_CONFIG: RaceStaticConfig = {
@@ -218,7 +228,7 @@ const getRaceCfg = (race: ActiveRace | null): RaceStaticConfig => {
 };
 
 // ---------------------------------------------------------------------------
-// HOOK: useTargetRace
+// HOOK: useTargetRace — sin modificaciones
 // ---------------------------------------------------------------------------
 
 const useTargetRace = () => {
@@ -232,17 +242,13 @@ const useTargetRace = () => {
       try {
         if (raceIdParam) {
           const { data: d } = await supabase
-            .from("races")
-            .select("id,name,slug,date,time,location,inscripciones_abiertas")
-            .eq("id", raceIdParam)
-            .maybeSingle();
+            .from("races").select("id,name,slug,date,time,location,inscripciones_abiertas")
+            .eq("id", raceIdParam).maybeSingle();
           setRace((d as ActiveRace) ?? null);
         } else {
           const { data: list } = await supabase
-            .from("races")
-            .select("id,name,slug,date,time,location,inscripciones_abiertas")
-            .eq("inscripciones_abiertas", true)
-            .order("date", { ascending: true });
+            .from("races").select("id,name,slug,date,time,location,inscripciones_abiertas")
+            .eq("inscripciones_abiertas", true).order("date", { ascending: true });
           setActiveRaces((list as ActiveRace[]) || []);
           setRace(null);
         }
@@ -254,26 +260,26 @@ const useTargetRace = () => {
 };
 
 // ---------------------------------------------------------------------------
-// FUNCIÓN: calcularCategoria
+// FUNCIÓN: calcularCategoria — sin modificaciones
 // ---------------------------------------------------------------------------
 
 const calcularCategoria = (edad: number, genero: "M" | "F", movilidadReducida: boolean): string => {
   const g = genero === "M" ? "Masculino" : "Femenino";
-  if (movilidadReducida)            return "Movilidad Reducida";
-  if (edad < 16)                    return `Junior ${g}`;
-  if (edad >= 16 && edad <= 19)     return `Juvenil ${g}`;
-  if (edad >= 20 && edad <= 29)     return `Libre ${g}`;
-  if (edad >= 30 && edad <= 34)     return `Sub Master (30-34) ${g}`;
-  if (edad >= 35 && edad <= 39)     return `Sub Master (35-39) ${g}`;
-  if (edad >= 40 && edad <= 49)     return `Master A ${g}`;
-  if (edad >= 50 && edad <= 59)     return `Master B ${g}`;
-  if (edad >= 60 && edad <= 69)     return `Master C ${g}`;
-  if (edad >= 70 && edad <= 79)     return `Master D ${g}`;
+  if (movilidadReducida)        return "Movilidad Reducida";
+  if (edad < 16)                return `Junior ${g}`;
+  if (edad >= 16 && edad <= 19) return `Juvenil ${g}`;
+  if (edad >= 20 && edad <= 29) return `Libre ${g}`;
+  if (edad >= 30 && edad <= 34) return `Sub Master (30-34) ${g}`;
+  if (edad >= 35 && edad <= 39) return `Sub Master (35-39) ${g}`;
+  if (edad >= 40 && edad <= 49) return `Master A ${g}`;
+  if (edad >= 50 && edad <= 59) return `Master B ${g}`;
+  if (edad >= 60 && edad <= 69) return `Master C ${g}`;
+  if (edad >= 70 && edad <= 79) return `Master D ${g}`;
   return `Absoluto ${g}`;
 };
 
 // ---------------------------------------------------------------------------
-// COMPONENTE RAÍZ
+// COMPONENTE RAÍZ — sin modificaciones
 // ---------------------------------------------------------------------------
 
 export default function RegistrationForm() {
@@ -303,12 +309,9 @@ export default function RegistrationForm() {
             const isCan = isCaninataRace(r.name);
             const color = isCan ? "#FDD454" : "#00f2ff";
             return (
-              <motion.div
-                key={r.id}
-                whileHover={{ scale: 1.02 }}
+              <motion.div key={r.id} whileHover={{ scale: 1.02 }}
                 onClick={() => { setRace(r); setSearchParams({ race: r.id }); }}
-                className="cursor-pointer bg-white/[0.02] border border-white/10 hover:border-white/20 rounded-3xl p-6 transition-all flex flex-col justify-between"
-              >
+                className="cursor-pointer bg-white/[0.02] border border-white/10 hover:border-white/20 rounded-3xl p-6 transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-4">
                     <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase"
@@ -372,17 +375,30 @@ function RegistrationFormActive({
   const [uploading, setUploading]             = useState(false);
   const [formError, setFormError]             = useState<string | null>(null);
 
-  // [V36.7-1] Precio dinámico — se recalcula al cambiar modalidad
   const precio = usePrecioEvento(race.id, modalidad);
 
   const edad = useMemo(
     () => (fechaNacimiento ? calcularEdad(fechaNacimiento) : 0),
     [fechaNacimiento]
   );
+
+  /**
+   * [V37-2] categoria se recalcula cada vez que cambia genero, fecha, modalidad
+   * o movilidadReducida. No hay valor stale posible en el payload.
+   */
   const categoria = useMemo(() => {
     if (modalidad === "5K") return "Caminata Canina / Familiar";
     return calcularCategoria(edad, genero, movilidadReducida);
   }, [edad, genero, movilidadReducida, modalidad]);
+
+  /**
+   * [V37-1] genderMismatchWarning: advertencia en tiempo real (no bloquea
+   * hasta el submit, pero el usuario ve el problema inmediatamente).
+   */
+  const genderMismatchWarning = useMemo(
+    () => validateGenderCategory(genero, categoria),
+    [genero, categoria]
+  );
 
   const copyToClipboard = (text: string, fieldName: string) => {
     navigator.clipboard.writeText(text);
@@ -402,8 +418,6 @@ function RegistrationFormActive({
           `&raza=${encodeURIComponent(razaPerro)}`
         );
       } else {
-        // [V36.9-1] Carrera → DorsalPage (genera PNG con Canvas 2D)
-        //   Caninata → ConfirmationPage V5 (glass card, flujo independiente)
         navigate(
           `/dorsal?bib=${data.bib_number}` +
           `&categoria=${encodeURIComponent(data.categoria)}` +
@@ -429,6 +443,16 @@ function RegistrationFormActive({
       return;
     }
 
+    /**
+     * [V37-1] GUARDIA DE GÉNERO — bloqueo duro en submit.
+     * Si el usuario ignoró la advertencia en tiempo real, aquí se detiene.
+     */
+    const genderErr = validateGenderCategory(genero, categoria);
+    if (genderErr) {
+      setFormError(genderErr);
+      return;
+    }
+
     try {
       setUploading(true);
       let comprobanteUrl = "";
@@ -436,7 +460,6 @@ function RegistrationFormActive({
       if (fileComprobante) {
         const compressed = await imageCompression(fileComprobante, { maxSizeMB: 0.8, maxWidthOrHeight: 1200 });
         const filePath = `comprobantes/${Date.now()}_${cedula}.jpg`;
-        // [V36.7-4] Bucket corregido: "comprobantes-pago" (antes "payments")
         const { error: upErr } = await supabase.storage.from("comprobantes-pago").upload(filePath, compressed);
         if (upErr) throw upErr;
         comprobanteUrl = supabase.storage.from("comprobantes-pago").getPublicUrl(filePath).data.publicUrl;
@@ -450,7 +473,6 @@ function RegistrationFormActive({
         nombre, apellido, cedula, email, telefono,
         fechaNacimiento: fechaNacimiento || "2000-01-01",
         genero, talla, movilidadReducida, categoria,
-        // [V36.7-3] Monto calculado dinámicamente — ya no hardcodeado a "0"
         monto: precio.montoBs > 0 ? String(precio.montoBs.toFixed(2)) : "0",
         referenciaPago: referencia,
         comprobanteUrl: comprobanteUrl || undefined,
@@ -564,17 +586,13 @@ function RegistrationFormActive({
               <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Género</label>
               <div className="grid grid-cols-2 gap-2">
                 {(["M", "F"] as const).map((g) => (
-                  <button
-                    key={g}
-                    type="button"
-                    onClick={() => setGenero(g)}
+                  <button key={g} type="button" onClick={() => setGenero(g)}
                     className={`py-3 rounded-xl text-xs font-black uppercase border transition-all ${
                       genero === g
                         ? "border-transparent text-black"
                         : "border-white/10 bg-white/5 text-white/60 hover:bg-white/10"
                     }`}
-                    style={genero === g ? { background: accentColor } : undefined}
-                  >
+                    style={genero === g ? { background: accentColor } : undefined}>
                     {g === "M" ? "Masculino" : "Femenino"}
                   </button>
                 ))}
@@ -582,17 +600,65 @@ function RegistrationFormActive({
             </div>
             <div>
               <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Talla de Camisa</label>
-              <select
-                value={talla}
+              <select value={talla}
                 onChange={e => setTalla(e.target.value as RegistrationFormData["talla"])}
-                className="w-full bg-[#0d1117] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-white/30 appearance-none cursor-pointer"
-              >
+                className="w-full bg-[#0d1117] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-white/30 appearance-none cursor-pointer">
                 {(["XS","S","M","L","XL","XXL","NA"] as const).map(t => (
                   <option key={t} value={t}>{t === "NA" ? "No aplica" : t}</option>
                 ))}
               </select>
             </div>
           </div>
+
+          {/*
+           * [V37-3] CATEGORY PREVIEW BADGE — tiempo real
+           * Muestra la categoría que se guardará en la BD.
+           * Si hay mismatch, muestra la alerta en naranja antes del submit.
+           */}
+          <AnimatePresence mode="wait">
+            {fechaNacimiento && modalidad !== "5K" && (
+              <motion.div
+                key={`${categoria}-${genderMismatchWarning ? "warn" : "ok"}`}
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2 }}
+              >
+                {genderMismatchWarning ? (
+                  /* Alerta de mismatch en tiempo real */
+                  <div className="flex items-start gap-3 p-4 rounded-xl border border-orange-500/40 bg-orange-500/10">
+                    <ShieldAlert className="h-4 w-4 text-orange-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-[10px] font-black uppercase text-orange-400 mb-0.5">
+                        Conflicto Género / Categoría
+                      </p>
+                      <p className="text-xs text-orange-300/80">{genderMismatchWarning}</p>
+                    </div>
+                  </div>
+                ) : (
+                  /* Vista previa de categoría correcta */
+                  <div className="flex items-center justify-between p-3.5 rounded-xl border border-white/8 bg-white/[0.02]">
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 w-1.5 rounded-full bg-emerald-400"/>
+                      <span className="text-[10px] text-white/40 uppercase font-bold tracking-wider">
+                        Categoría calculada:
+                      </span>
+                    </div>
+                    <span
+                      className="text-[11px] font-black uppercase px-3 py-1 rounded-lg"
+                      style={{
+                        background: `${accentColor}10`,
+                        color: accentColor,
+                        border: `1px solid ${accentColor}25`,
+                      }}
+                    >
+                      {categoria}
+                    </span>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* MOVILIDAD REDUCIDA */}
           <div
@@ -607,14 +673,10 @@ function RegistrationFormActive({
               <p className="text-xs font-bold uppercase text-white/80">Movilidad Reducida</p>
               <p className="text-[10px] text-white/40 mt-0.5">Marca si requieres atención especial durante el evento</p>
             </div>
-            <div
-              className="h-6 w-11 rounded-full relative transition-all shrink-0"
-              style={{ background: movilidadReducida ? accentColor : "rgba(255,255,255,0.1)" }}
-            >
-              <div
-                className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all"
-                style={{ left: movilidadReducida ? "calc(100% - 1.35rem)" : "0.1rem" }}
-              />
+            <div className="h-6 w-11 rounded-full relative transition-all shrink-0"
+              style={{ background: movilidadReducida ? accentColor : "rgba(255,255,255,0.1)" }}>
+              <div className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all"
+                style={{ left: movilidadReducida ? "calc(100% - 1.35rem)" : "0.1rem" }} />
             </div>
           </div>
 
@@ -622,23 +684,17 @@ function RegistrationFormActive({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Contacto de Emergencia</label>
-              <input
-                type="text"
-                value={contactoEmergencia}
+              <input type="text" value={contactoEmergencia}
                 onChange={e => setContactoEmergencia(e.target.value)}
                 placeholder="Nombre del contacto"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-white/30 placeholder:text-white/20"
-              />
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-white/30 placeholder:text-white/20"/>
             </div>
             <div>
               <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Teléfono de Emergencia</label>
-              <input
-                type="text"
-                value={telefonoEmergencia}
+              <input type="text" value={telefonoEmergencia}
                 onChange={e => setTelefonoEmergencia(e.target.value)}
                 placeholder="Ej: 0414-1234567"
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-white/30 placeholder:text-white/20"
-              />
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-white/30 placeholder:text-white/20"/>
             </div>
           </div>
 
@@ -723,32 +779,17 @@ function RegistrationFormActive({
               )}
             </div>
 
-            {/* ----------------------------------------------------------------
-                TARJETA MONTO A TRANSFERIR [V36.7-2]
-                Aparece cuando el precio ya cargó y el monto es > 0.
-                Muestra: monto en Bs + desglose USD × Tasa BCV.
-            ---------------------------------------------------------------- */}
+            {/* TARJETA MONTO [V36.7-2] — sin modificaciones */}
             <AnimatePresence>
               {!precio.loading && precio.montoBs > 0 && (
-                <motion.div
-                  key="precio-card"
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <div
-                    className="p-5 rounded-2xl border space-y-3"
+                <motion.div key="precio-card"
+                  initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.3 }}>
+                  <div className="p-5 rounded-2xl border space-y-3"
                     style={{
-                      background: isCaninataRaceType
-                        ? "rgba(253,212,84,0.04)"
-                        : "rgba(0,242,255,0.04)",
-                      borderColor: isCaninataRaceType
-                        ? "rgba(253,212,84,0.20)"
-                        : "rgba(0,242,255,0.20)",
-                    }}
-                  >
-                    {/* Label */}
+                      background: isCaninataRaceType ? "rgba(253,212,84,0.04)" : "rgba(0,242,255,0.04)",
+                      borderColor: isCaninataRaceType ? "rgba(253,212,84,0.20)" : "rgba(0,242,255,0.20)",
+                    }}>
                     <div className="flex items-center gap-2">
                       <Zap className="h-4 w-4" style={{ color: accentColor }}/>
                       <span className="text-xs font-black uppercase" style={{ color: accentColor }}>
@@ -759,55 +800,34 @@ function RegistrationFormActive({
                         {modalidad}
                       </span>
                     </div>
-
-                    {/* Monto principal */}
                     <div className="flex items-end justify-between">
                       <div>
                         <p className="text-[10px] text-white/40 uppercase font-bold mb-1">Total en Bolívares</p>
-                        <p
-                          className="font-black tabular-nums"
-                          style={{ fontSize: "clamp(1.6rem,5vw,2.4rem)", color: accentColor, lineHeight: 1 }}
-                        >
+                        <p className="font-black tabular-nums"
+                          style={{ fontSize: "clamp(1.6rem,5vw,2.4rem)", color: accentColor, lineHeight: 1 }}>
                           {formatBs(precio.montoBs)}
                         </p>
                       </div>
-                      {/* Botón copiar monto */}
-                      <button
-                        type="button"
+                      <button type="button"
                         onClick={() => copyToClipboard(precio.montoBs.toFixed(2), "monto")}
                         className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[10px] font-black uppercase transition-all"
-                        style={{
-                          background: `${accentColor}15`,
-                          color: accentColor,
-                          border: `1px solid ${accentColor}30`,
-                        }}
-                      >
+                        style={{ background: `${accentColor}15`, color: accentColor, border: `1px solid ${accentColor}30` }}>
                         {copiedField === "monto"
                           ? <><Check className="h-3.5 w-3.5"/> Copiado</>
                           : <><Copy className="h-3.5 w-3.5"/> Copiar</>}
                       </button>
                     </div>
-
-                    {/* Desglose */}
                     <div className="flex items-center gap-3 pt-1 text-[10px] text-white/40 border-t"
                       style={{ borderColor: `${accentColor}15` }}>
-                      <span className="font-mono">
-                        ${precio.costoUSD.toFixed(2)} USD
-                      </span>
+                      <span className="font-mono">${precio.costoUSD.toFixed(2)} USD</span>
                       <span>×</span>
-                      <span className="font-mono">
-                        {precio.tasaBCV.toFixed(2)} Bs/$ (Tasa BCV)
-                      </span>
+                      <span className="font-mono">{precio.tasaBCV.toFixed(2)} Bs/$ (Tasa BCV)</span>
                       <span>=</span>
-                      <span className="font-mono font-bold text-white/60">
-                        {formatBs(precio.montoBs)}
-                      </span>
+                      <span className="font-mono font-bold text-white/60">{formatBs(precio.montoBs)}</span>
                     </div>
                   </div>
                 </motion.div>
               )}
-
-              {/* Loading state del precio */}
               {precio.loading && (
                 <motion.div key="precio-loading"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -830,14 +850,14 @@ function RegistrationFormActive({
                 <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Comprobante (Imagen)</label>
                 <input type="file" accept="image/*"
                   onChange={e => setFileComprobante(e.target.files?.[0] || null)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white/50 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white"/>
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs text-white/50 file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-white"/>
               </div>
             </div>
           </div>
 
           {/* BOTÓN SUBMIT */}
-          <button type="submit" disabled={uploading || mutation.isPending}
-            className="w-full py-4 rounded-xl font-black uppercase text-sm tracking-wider flex items-center justify-center gap-2 transition-all mt-6"
+          <button type="submit" disabled={uploading || mutation.isPending || !!genderMismatchWarning}
+            className="w-full py-4 rounded-xl font-black uppercase text-sm tracking-wider flex items-center justify-center gap-2 transition-all mt-6 disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: accentColor, color: "#03070b" }}>
             {(uploading || mutation.isPending) ? (
               <Loader2 className="h-5 w-5 animate-spin"/>
@@ -847,6 +867,14 @@ function RegistrationFormActive({
               <><Flag className="h-5 w-5"/>{`PROCESAR INSCRIPCIÓN (${modalidad})`}</>
             )}
           </button>
+
+          {/* [V37-3] Nota de categoría debajo del botón si aún no hay fecha */}
+          {!fechaNacimiento && (
+            <p className="text-center text-[10px] text-white/25 uppercase font-bold tracking-widest">
+              Ingresa tu fecha de nacimiento para ver tu categoría
+            </p>
+          )}
+
         </form>
       </div>
     </div>

@@ -1,24 +1,42 @@
 /**
- * RAYO CERO — ADMIN DASHBOARD (EVOLUTION V3.0 - MODALIDAD TABS + PRECIOS ADMIN)
+ * RAYO CERO — ADMIN DASHBOARD (EVOLUTION V4.1 — LEGACY RACE FIX)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V3.0:
- * [V3-1] AtletasList: tabs TODOS / 10K CARRERA / 4K CAMINATA — filtro por
- *        runners.modalidad. Contador por tab. Badge de modalidad en cada fila.
- * [V3-2] TasaConfig: agrega campo "Inscripción 4K USD" editable (costo_4k_usd).
- *        Muestra ambos precios activos en la tarjeta derecha.
- * [V3-3] PDFExportModal: agrega filtro de modalidad ('todos'|'10K'|'4K') antes
- *        de generar, para exportar listas segmentadas.
- * [V3-4] Runner interface: agrega modalidad?: '10K'|'4K'.
+ * CHANGELOG V4.1:
+ * [V4.1-1] BUGFIX CRÍTICO: isLegacyRace() corregido — solo 'night fest' es
+ *          legacy (race_id NULL). 'barquisimeto' eliminado del criterio porque
+ *          CANINATA BARQUISIMETO es una carrera nueva con su propio race_id.
+ *          Bug anterior causaba que la caninata usara el filtro IS NULL,
+ *          trayendo runners del Night Fest y precios de system_config id=1.
  *
- * CHANGELOG V2.1:
- * [V2.1-1] EscuadronesList: join manual (FK eliminada al migrar dorsales/carrera).
+ * CHANGELOG V4.0:
+ * [V4-1] Runner interface: campo `genero?: 'M' | 'F'` agregado.
+ * [V4-2] validateGenderCategoryConsistency(): función pura que detecta mismatch
+ *        género↔categoría. Retorna string | null.
+ * [V4-3] GenderMismatchBadge: badge rojo ⚠ GÉNERO/CAT en fila de atleta
+ *        con mismatch en AtletasList. También visible en panel de inspección.
+ * [V4-4] EscuadronesList: recibe `scope: RaceScope` — filtra `teams` por
+ *        race_id o race_id IS NULL (Barquisimeto legacy). Evita mezcla de
+ *        carreras en el módulo de escuadrones.
+ * [V4-5] TelemetryModule.handleFire: race_signals.insert ahora lleva
+ *        race_id: scope.raceId para aislar señales por carrera.
+ * [V4-6] ModuloRepresentantes: elimina `?? '10K'` — badge de modalidad usa
+ *        valor real. null → '—'. Runners legacy no se infieren como 10K.
+ * [V4-7] Panel de inspección de atleta: muestra alerta de mismatch género
+ *        si validateGenderCategoryConsistency() detecta conflicto.
+ * [V4-8] RaceScopeBar: guard `hasAutoSelected` — auto-selección solo ocurre
+ *        en el primer mount. Evita reset del scope al recargar sub-componentes.
  *
- * CHANGELOG V2.0:
- * [V2-1..6] RaceScopeBar, filtros por carrera, TasaConfig por carrera,
- *           entrega de kits/RFID, tarjeta de participación por carrera.
+ * CHANGELOG V3.0 (base sin modificaciones):
+ * [V3-1] AtletasList: tabs TODOS / 10K CARRERA / 4K CAMINATA.
+ * [V3-2] TasaConfig: campo costo_4k_usd editable.
+ * [V3-3] PDFExportModal: filtro de modalidad.
+ * [V3-4] Runner interface: modalidad, repr_* fields.
+ *
+ * CHANGELOG V2.1 (base sin modificaciones):
+ * [V2.1-1] EscuadronesList: join manual (FK eliminada).
  */
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -63,8 +81,9 @@ interface Runner {
   rfid_epc?: string | null;
   kit_entregado?: boolean;
   race_id?: string | null;
-  modalidad?: Modalidad;        // [V3-4]
-  repr_nombre?:   string | null; // [V34] representante
+  modalidad?: Modalidad;
+  genero?: 'M' | 'F';           // [V4-1]
+  repr_nombre?:   string | null;
   repr_apellido?: string | null;
   repr_cedula?:   string | null;
   repr_telefono?: string | null;
@@ -76,7 +95,7 @@ const BUCKET = 'comprobantes-pago';
 
 const CATEGORY_ORDER: string[] = [
   'Movilidad Reducida',
-  'Junior Masculino', 'Junior Femenino',          // [V34] nuevo
+  'Junior Masculino', 'Junior Femenino',
   'Juvenil Masculino', 'Juvenil Femenino',
   'Libre Masculino', 'Libre Femenino',
   'Sub Master (30-34) Masculino', 'Sub Master (30-34) Femenino',
@@ -93,7 +112,7 @@ const getCategoryColor = (categoria: string): [number,number,number] => {
   const c = categoria.toLowerCase();
   if (c.includes('movilidad'))  return [168,85,247];
   if (c.includes('caminata'))   return [251,191,36];
-  if (c.includes('junior'))     return [34,197,94];   // [V34] verde
+  if (c.includes('junior'))     return [34,197,94];
   if (c.includes('juvenil'))    return [34,211,238];
   if (c.includes('libre'))      return [251,191,36];
   if (c.includes('30-34'))      return [52,211,153];
@@ -108,6 +127,58 @@ const getCategoryColor = (categoria: string): [number,number,number] => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
+/* [V4-2] GENDER / CATEGORY CONSISTENCY VALIDATOR                */
+/*                                                                */
+/* Detecta si la categoría almacenada contiene un género que      */
+/* contradice el campo genero del runner.                         */
+/* Retorna un mensaje descriptivo o null si es coherente.         */
+/* ────────────────────────────────────────────────────────────── */
+
+function validateGenderCategoryConsistency(runner: Runner): string | null {
+  const { genero, categoria } = runner;
+  if (!genero || !categoria) return null;
+
+  const cat = categoria.toLowerCase();
+  // Categorías neutras — sin validación de género
+  if (
+    cat.includes('movilidad reducida') ||
+    cat.includes('caminata') ||
+    cat.includes('caninata')
+  ) return null;
+
+  const catHasMasculino = cat.includes('masculino');
+  const catHasFemenino  = cat.includes('femenino');
+  if (!catHasMasculino && !catHasFemenino) return null;
+
+  if (genero === 'M' && catHasFemenino) {
+    return `Género M pero categoría tiene "Femenino" — posible error de registro.`;
+  }
+  if (genero === 'F' && catHasMasculino) {
+    return `Género F pero categoría tiene "Masculino" — posible error de registro.`;
+  }
+  return null;
+}
+
+/* ────────────────────────────────────────────────────────────── */
+/* [V4-3] GENDER MISMATCH BADGE — componente inline reutilizable  */
+/* ────────────────────────────────────────────────────────────── */
+
+const GenderMismatchBadge: React.FC<{ runner: Runner; className?: string }> = ({ runner, className = '' }) => {
+  const msg = validateGenderCategoryConsistency(runner);
+  if (!msg) return null;
+  return (
+    <span
+      title={msg}
+      className={`inline-flex items-center gap-1 text-[8px] font-black uppercase px-2 py-0.5 rounded-full border cursor-help ${className}`}
+      style={{ background: 'rgba(239,68,68,0.12)', borderColor: 'rgba(239,68,68,0.35)', color: '#ef4444' }}
+    >
+      <ShieldAlert size={9} />
+      GÉNERO/CAT
+    </span>
+  );
+};
+
+/* ────────────────────────────────────────────────────────────── */
 /* RACE SCOPE                                                     */
 /* ────────────────────────────────────────────────────────────── */
 
@@ -115,9 +186,15 @@ export interface RaceScope {
   raceId: string | null; legacy: boolean; name: string; isActive: boolean;
 }
 
+/**
+ * [V4.1] isLegacyRace — SOLO el WE RUN 10K NIGHT FEST es legacy (race_id NULL).
+ * La CANINATA BARQUISIMETO y cualquier carrera futura en Barquisimeto tienen
+ * su propio race_id en la tabla races y NO son legacy.
+ * Criterio: únicamente 'night fest' identifica la primera carrera histórica.
+ */
 const isLegacyRace = (name: string) => {
   const n = (name||'').toLowerCase();
-  return n.includes('barquisimeto')||n.includes('night fest');
+  return n.includes('night fest');
 };
 
 const applyScopeFilter = (query: any, scope: RaceScope) => {
@@ -126,16 +203,26 @@ const applyScopeFilter = (query: any, scope: RaceScope) => {
   return query;
 };
 
+/**
+ * [V4-8] RaceScopeBar — guard hasAutoSelected
+ * La auto-selección solo ocurre en el PRIMER mount del componente.
+ * Las re-renders subsiguientes no disparan onChange innecesariamente,
+ * evitando que los sub-componentes pierdan el scope al recargar datos.
+ */
 const RaceScopeBar = ({ scope, onChange }:{ scope:RaceScope|null; onChange:(s:RaceScope)=>void }) => {
   const [races, setRaces] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const hasAutoSelected = useRef(false); // [V4-8]
+
   useEffect(() => {
     (async () => {
       try {
         const { data, error } = await supabase.from('races').select('id,name,date,inscripciones_abiertas').order('date',{ascending:false});
         if (error) throw error;
         setRaces(data||[]);
-        if (!scope && data?.length) {
+        // [V4-8] Auto-selección solo si nunca se ha hecho antes y no hay scope activo
+        if (!hasAutoSelected.current && !scope && data?.length) {
+          hasAutoSelected.current = true;
           const activa = data.find(r=>r.inscripciones_abiertas)||data[0];
           onChange({ raceId:activa.id, legacy:isLegacyRace(activa.name), name:activa.name, isActive:!!activa.inscripciones_abiertas });
         }
@@ -143,6 +230,7 @@ const RaceScopeBar = ({ scope, onChange }:{ scope:RaceScope|null; onChange:(s:Ra
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
   if (loading) return <div className="mb-8 h-16 rounded-2xl bg-white/[0.02] border border-white/5 animate-pulse flex items-center px-6"><span className="text-[9px] text-gray-600 uppercase tracking-widest font-black">Cargando carreras...</span></div>;
   return (
     <div className="mb-8 p-4 rounded-2xl bg-black/40 border border-white/10 flex flex-wrap items-center gap-3">
@@ -191,7 +279,7 @@ const getComprobantePublicUrl = async (cedula:string,referencia_pago?:string,sto
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* PDF EXPORT — [V3-3] filtro de modalidad                        */
+/* PDF EXPORT — [V3-3] sin modificaciones                         */
 /* ────────────────────────────────────────────────────────────── */
 
 type PDFMode = 'segmented'|'specific'|'general';
@@ -260,13 +348,12 @@ const generateCategoryPDF = (atletas:Runner[], selectedCategories:string[], mode
 const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, raceName, onClose }) => {
   const [mode, setMode]             = useState<PDFMode>('segmented');
   const [selectedCategory, setSC]   = useState('');
-  const [modalidadFilter, setMF]    = useState<PDFModalidadFilter>('todos'); // [V3-3]
+  const [modalidadFilter, setMF]    = useState<PDFModalidadFilter>('todos');
   const [isGenerating, setIsGen]    = useState(false);
 
-  /* [V3-3] Filtrar atletas por modalidad antes de calcular categorías */
   const filteredAtletas = useMemo(() => {
     if (modalidadFilter === 'todos') return atletas;
-    return atletas.filter(a => a.modalidad === modalidadFilter); // estricto, null no matchea
+    return atletas.filter(a => a.modalidad === modalidadFilter);
   }, [atletas, modalidadFilter]);
 
   const availableCategories = useMemo(() => {
@@ -274,7 +361,6 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, raceName, onCl
     return CATEGORY_ORDER.filter(c=>cats.has(c));
   }, [filteredAtletas]);
 
-  /* [V3-3] Helper para className del botón de modalidad — evita ternario triple en template literal */
   const getModalidadBtnClass = (val: PDFModalidadFilter): string => {
     const base = 'flex-1 py-2.5 rounded-xl border text-[10px] font-black uppercase transition-all';
     if (modalidadFilter !== val) return `${base} bg-white/[0.02] border-white/5 text-gray-500 hover:border-white/10`;
@@ -311,8 +397,6 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, raceName, onCl
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-white"><X size={20}/></button>
         </div>
-
-        {/* [V3-3] Filtro por modalidad */}
         <div className="mb-5">
           <p className="text-[9px] text-cyan-400 font-black uppercase tracking-widest mb-3">Modalidad</p>
           <div className="flex gap-2">
@@ -328,7 +412,6 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, raceName, onCl
             })}
           </div>
         </div>
-
         <div className="space-y-3 mb-6">
           {pdfModeOptions.map(opt=>(
             <button key={opt.id} onClick={()=>setMode(opt.id)}
@@ -340,7 +423,6 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, raceName, onCl
             </button>
           ))}
         </div>
-
         {mode==='specific'&&(
           <div className="mb-6 animate-in slide-in-from-top-2">
             <label className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-2 block">Categoría</label>
@@ -369,7 +451,7 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, raceName, onCl
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* MÓDULO ENTREGA KITS — igual que V2                             */
+/* MÓDULO ENTREGA KITS — sin modificaciones                       */
 /* ────────────────────────────────────────────────────────────── */
 
 const ModuloEntregaKits = ({ scope }:{ scope:RaceScope }) => {
@@ -425,7 +507,7 @@ const ModuloEntregaKits = ({ scope }:{ scope:RaceScope }) => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* MÓDULO CHEQUEO KITS — igual que V2                             */
+/* MÓDULO CHEQUEO KITS — sin modificaciones                       */
 /* ────────────────────────────────────────────────────────────── */
 
 const ModuloChequeoKits = ({ scope }:{ scope:RaceScope }) => {
@@ -499,7 +581,7 @@ const ModuloChequeoKits = ({ scope }:{ scope:RaceScope }) => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* [V3-2] TASA CONFIG — agrega costo_4k_usd                       */
+/* TASA CONFIG — sin modificaciones                               */
 /* ────────────────────────────────────────────────────────────── */
 
 const TasaConfig = ({ scope }:{ scope:RaceScope }) => {
@@ -507,8 +589,8 @@ const TasaConfig = ({ scope }:{ scope:RaceScope }) => {
   const [nuevaTasa,setNuevaTasa]=useState('');
   const [costoUSDActual,setCostoUSDActual]=useState<number|null>(null);
   const [nuevoCostoUSD,setNuevoCostoUSD]=useState('');
-  const [costo4kActual,setCosto4kActual]=useState<number|null>(null);    // [V3-2]
-  const [nuevoCosto4k,setNuevoCosto4k]=useState('');                      // [V3-2]
+  const [costo4kActual,setCosto4kActual]=useState<number|null>(null);
+  const [nuevoCosto4k,setNuevoCosto4k]=useState('');
   const [ultimaAct,setUltimaAct]=useState<string|null>(null);
   const [isLoading,setIsLoading]=useState(true);
   const [isSaving,setIsSaving]=useState(false);
@@ -524,7 +606,7 @@ const TasaConfig = ({ scope }:{ scope:RaceScope }) => {
       if (data) {
         setConfigRowId(data.id); setTasaActual(data.tasa_bcv); setNuevaTasa(String(data.tasa_bcv));
         setCostoUSDActual(data.costo_usd||40); setNuevoCostoUSD(String(data.costo_usd||40));
-        setCosto4kActual(data.costo_4k_usd||20); setNuevoCosto4k(String(data.costo_4k_usd||20)); // [V3-2]
+        setCosto4kActual(data.costo_4k_usd||20); setNuevoCosto4k(String(data.costo_4k_usd||20));
         setUltimaAct(new Date(data.ultima_actualizacion).toLocaleString('es-VE'));
       }
     } catch(err){console.error(err);} finally{setIsLoading(false);}
@@ -538,7 +620,7 @@ const TasaConfig = ({ scope }:{ scope:RaceScope }) => {
       const{error}=await supabase.from('system_config').update({
         tasa_bcv:parseFloat(nuevaTasa.replace(',','.')),
         costo_usd:parseFloat(nuevoCostoUSD.replace(',','.')),
-        costo_4k_usd:parseFloat(nuevoCosto4k.replace(',','.')),   // [V3-2]
+        costo_4k_usd:parseFloat(nuevoCosto4k.replace(',','.')),
         ultima_actualizacion:new Date().toISOString(),
       }).eq('id',configRowId);
       if(error) throw error;
@@ -559,18 +641,12 @@ const TasaConfig = ({ scope }:{ scope:RaceScope }) => {
               <label className="text-[10px] text-cyan-400 font-black uppercase tracking-widest mb-2 block">Tasa BCV</label>
               <input type="text" value={nuevaTasa} onChange={e=>setNuevaTasa(e.target.value)} className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-cyan-500/50"/>
             </div>
-            {/* [V3-2] Precio 10K */}
             <div>
-              <label className="text-[10px] font-black uppercase tracking-widest mb-2 block items-center gap-1.5" style={{color:"#00d4c8"}}>
-                🏃 Inscripción 10K USD
-              </label>
+              <label className="text-[10px] font-black uppercase tracking-widest mb-2 block items-center gap-1.5" style={{color:"#00d4c8"}}>🏃 Inscripción 10K USD</label>
               <input type="text" value={nuevoCostoUSD} onChange={e=>setNuevoCostoUSD(e.target.value)} className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-cyan-500/50"/>
             </div>
-            {/* [V3-2] Precio 4K */}
             <div>
-              <label className="text-[10px] font-black uppercase tracking-widest mb-2 block items-center gap-1.5" style={{color:"#fbbf24"}}>
-                🚶 Inscripción 4K Caminata USD
-              </label>
+              <label className="text-[10px] font-black uppercase tracking-widest mb-2 block items-center gap-1.5" style={{color:"#fbbf24"}}>🚶 Inscripción 4K Caminata USD</label>
               <input type="text" value={nuevoCosto4k} onChange={e=>setNuevoCosto4k(e.target.value)} className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-yellow-500/50"/>
             </div>
           </div>
@@ -587,7 +663,6 @@ const TasaConfig = ({ scope }:{ scope:RaceScope }) => {
             <div className="flex justify-around items-center">
               <div><p className="text-[8px] text-gray-500 uppercase">Tasa BCV</p><div className="text-3xl font-black italic text-white">{tasaActual?.toFixed(2)}</div></div>
               <div className="h-12 w-[1px] bg-white/10"/>
-              {/* [V3-2] Ambos precios */}
               <div className="flex flex-col gap-2">
                 <div><p className="text-[8px] uppercase" style={{color:"rgba(0,212,200,0.6)"}}>🏃 10K</p><div className="text-2xl font-black italic" style={{color:"#00d4c8"}}>${costoUSDActual}</div></div>
                 <div><p className="text-[8px] uppercase" style={{color:"rgba(251,191,36,0.6)"}}>🚶 4K</p><div className="text-2xl font-black italic" style={{color:"#fbbf24"}}>${costo4kActual}</div></div>
@@ -602,7 +677,7 @@ const TasaConfig = ({ scope }:{ scope:RaceScope }) => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* [V3-1] ATLETAS LIST — tabs TODOS / 10K / 4K                    */
+/* ATLETAS LIST — [V4-3] GenderMismatchBadge integrado            */
 /* ────────────────────────────────────────────────────────────── */
 
 type ModalidadTab = 'todos' | '10K' | '4K';
@@ -611,7 +686,7 @@ const AtletasList = ({ scope, onUpdateCount }:{ scope:RaceScope; onUpdateCount?:
   const [atletas,setAtletas]=useState<Runner[]>([]);
   const [loading,setLoading]=useState(true);
   const [searchTerm,setSearchTerm]=useState('');
-  const [modalidadTab,setModalidadTab]=useState<ModalidadTab>('todos'); // [V3-1]
+  const [modalidadTab,setModalidadTab]=useState<ModalidadTab>('todos');
   const [selectedAtleta,setSelectedAtleta]=useState<Runner|null>(null);
   const [comprobanteUrl,setComprobanteUrl]=useState<string|null>(null);
   const [imgLoading,setImgLoading]=useState(false);
@@ -623,7 +698,12 @@ const AtletasList = ({ scope, onUpdateCount }:{ scope:RaceScope; onUpdateCount?:
   const [showPDFModal,setShowPDFModal]=useState(false);
 
   const fetchAtletas=useCallback(async()=>{ setLoading(true);
-    try { let q=supabase.from('runners').select('*').order('created_at',{ascending:false}); q=applyScopeFilter(q,scope); const{data,error}=await q; if(error)throw error; setAtletas(data||[]); }
+    try {
+      // Incluimos `genero` en el select para poder validar el mismatch [V4-1]
+      let q=supabase.from('runners').select('*,genero').order('created_at',{ascending:false});
+      q=applyScopeFilter(q,scope);
+      const{data,error}=await q; if(error)throw error; setAtletas(data||[]);
+    }
     catch(err){console.error(err);} finally{setLoading(false);}
   },[scope.raceId,scope.legacy]);
 
@@ -667,20 +747,17 @@ const AtletasList = ({ scope, onUpdateCount }:{ scope:RaceScope; onUpdateCount?:
     catch{setStatusMsg('Error de enlace');} finally{setImgLoading(false);}
   };
 
-  /* [V3-1] Conteos por modalidad
-   * IMPORTANTE: nunca usar ?? '10K' para inferir modalidad —
-   * un runner con modalidad NULL es legacy o sin dato, no debe
-   * aparecer en el tab 10K ni en el tab 4K, solo en TODOS. */
   const count10k = atletas.filter(a => a.modalidad === '10K').length;
   const count4k  = atletas.filter(a => a.modalidad === '4K').length;
   const countSinModalidad = atletas.filter(a => !a.modalidad).length;
 
+  // [V4-3] Conteo de mismatches para mostrar en el header
+  const countMismatch = atletas.filter(a => validateGenderCategoryConsistency(a) !== null).length;
+
   const filteredAtletas = useMemo(() => {
     let list = atletas;
-    // [V3-1] Filtro estricto por modalidad — null no matchea ningún tab específico
     if (modalidadTab === '10K') list = list.filter(a => a.modalidad === '10K');
     else if (modalidadTab === '4K') list = list.filter(a => a.modalidad === '4K');
-    // 'todos' muestra todo sin filtrar
     if (searchTerm) list = list.filter(a =>
       `${a.nombre} ${a.apellido} ${a.cedula} ${a.categoria || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -693,7 +770,7 @@ const AtletasList = ({ scope, onUpdateCount }:{ scope:RaceScope; onUpdateCount?:
     <div className="relative text-white">
       <div className="bg-black/40 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
 
-        {/* [V3-1] Tabs de modalidad — filtro estricto, null no cuenta en 10K ni 4K */}
+        {/* Tabs de modalidad */}
         <div className="px-6 pt-6 pb-0 border-b border-white/5">
           <div className="flex flex-wrap gap-1 mb-0">
             {([
@@ -707,11 +784,18 @@ const AtletasList = ({ scope, onUpdateCount }:{ scope:RaceScope; onUpdateCount?:
                 {lbl}
               </button>
             ))}
-            {/* Aviso si hay runners legacy sin modalidad asignada */}
             {countSinModalidad > 0 && (
               <div className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-amber-500/60 flex items-center gap-1.5 border-b-2 border-transparent">
                 <AlertTriangle size={11} />
                 {countSinModalidad} sin modalidad (solo en TODOS)
+              </div>
+            )}
+            {/* [V4-3] Alerta de mismatches género/categoría en el header */}
+            {countMismatch > 0 && (
+              <div className="px-4 py-3 text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 border-b-2 border-transparent"
+                style={{ color: 'rgba(239,68,68,0.7)', borderColor: 'transparent' }}>
+                <ShieldAlert size={11} />
+                {countMismatch} conflicto{countMismatch > 1 ? 's' : ''} género/cat
               </div>
             )}
           </div>
@@ -739,7 +823,7 @@ const AtletasList = ({ scope, onUpdateCount }:{ scope:RaceScope; onUpdateCount?:
             <thead>
               <tr className="bg-white/5">
                 <th className="p-4 text-left text-[9px] uppercase text-gray-400">Atleta / Categoría</th>
-                <th className="p-4 text-left text-[9px] uppercase text-gray-400">Modalidad</th>{/* [V3-1] */}
+                <th className="p-4 text-left text-[9px] uppercase text-gray-400">Modalidad</th>
                 <th className="p-4 text-left text-[9px] uppercase text-gray-400">Comunicación</th>
                 <th className="p-4 text-left text-[9px] uppercase text-gray-400">Talla</th>
                 <th className="p-4 text-left text-[9px] uppercase text-gray-400">Dorsal & RFID</th>
@@ -754,14 +838,15 @@ const AtletasList = ({ scope, onUpdateCount }:{ scope:RaceScope; onUpdateCount?:
                   {searchTerm?'Sin coincidencias':`Sin atletas${modalidadTab!=='todos'?` en ${modalidadTab}`:''} para ${scope.name}`}
                 </td></tr>
               ):filteredAtletas.map(a=>(
-                <tr key={a.id} className="hover:bg-white/[0.02] transition-colors">
+                <tr key={a.id} className={`hover:bg-white/[0.02] transition-colors ${validateGenderCategoryConsistency(a) ? 'bg-red-500/[0.02]' : ''}`}>
                   <td className="p-4">
-                    <div className="font-bold text-xs uppercase flex items-center gap-2">
+                    <div className="font-bold text-xs uppercase flex items-center gap-2 flex-wrap">
                       {a.nombre} {a.apellido}
                       {a.pago_verificado&&<ShieldCheck size={12} className="text-green-500"/>}
                       {a.kit_entregado&&<Gift size={12} className="text-amber-400"/>}
-                      {/* [V34] Badge de menor con representante */}
                       {a.repr_cedula&&<span title="Menor con representante" style={{fontSize:"0.65rem"}}>👨‍👧</span>}
+                      {/* [V4-3] Badge de mismatch género/categoría */}
+                      <GenderMismatchBadge runner={a} />
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-[9px] text-gray-500 font-mono">V-{a.cedula}</span>
@@ -769,25 +854,19 @@ const AtletasList = ({ scope, onUpdateCount }:{ scope:RaceScope; onUpdateCount?:
                       {a.referencia_pago==='NINO_GRATIS'&&<span className="text-[8px] bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 rounded font-black uppercase">GRATIS</span>}
                     </div>
                   </td>
-                  {/* [V3-1] Badge de modalidad — null muestra '—' sin asumir 10K */}
+                  {/* Badge de modalidad — null muestra '—' sin inferir 10K */}
                   <td className="p-4">
                     {a.modalidad === '10K' && (
                       <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full border"
-                        style={{background:'rgba(0,212,200,0.07)',borderColor:'rgba(0,212,200,0.2)',color:'#00d4c8'}}>
-                        🏃 10K
-                      </span>
+                        style={{background:'rgba(0,212,200,0.07)',borderColor:'rgba(0,212,200,0.2)',color:'#00d4c8'}}>🏃 10K</span>
                     )}
                     {a.modalidad === '4K' && (
                       <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full border"
-                        style={{background:'rgba(251,191,36,0.07)',borderColor:'rgba(251,191,36,0.2)',color:'#fbbf24'}}>
-                        🚶 4K
-                      </span>
+                        style={{background:'rgba(251,191,36,0.07)',borderColor:'rgba(251,191,36,0.2)',color:'#fbbf24'}}>🚶 4K</span>
                     )}
                     {!a.modalidad && (
                       <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full border"
-                        style={{background:'rgba(255,255,255,0.03)',borderColor:'rgba(255,255,255,0.08)',color:'rgba(255,255,255,0.25)'}}>
-                        —
-                      </span>
+                        style={{background:'rgba(255,255,255,0.03)',borderColor:'rgba(255,255,255,0.08)',color:'rgba(255,255,255,0.25)'}}>—</span>
                     )}
                   </td>
                   <td className="p-4"><div className="flex items-center gap-2 text-cyan-400 text-[10px] font-mono"><Phone size={12}/>{a.telefono||'SIN_TLF'}</div></td>
@@ -834,13 +913,36 @@ const AtletasList = ({ scope, onUpdateCount }:{ scope:RaceScope; onUpdateCount?:
                 <div><h5 className="text-white font-black text-xl uppercase italic">Inspección</h5><p className="text-cyan-400 text-[9px] uppercase tracking-widest">Hangar Scan</p></div>
                 <button onClick={()=>setSelectedAtleta(null)} className="p-2 bg-white/5 rounded-full hover:bg-white/10"><X size={20}/></button>
               </div>
+
+              {/* [V4-7] Alerta de mismatch en panel de inspección */}
+              {validateGenderCategoryConsistency(selectedAtleta) && (
+                <div className="mb-4 p-3 rounded-xl border flex items-start gap-2"
+                  style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.3)' }}>
+                  <ShieldAlert size={14} className="text-red-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[9px] font-black uppercase text-red-400 mb-0.5">Conflicto Género / Categoría</p>
+                    <p className="text-[9px] text-red-300/70">{validateGenderCategoryConsistency(selectedAtleta)}</p>
+                    <p className="text-[9px] text-red-300/50 mt-1">Corregir en Supabase → tabla runners.</p>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-3">
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5">
                   <p className="text-gray-500 text-[9px] uppercase">Unidad</p>
                   <p className="text-white font-black text-sm uppercase flex justify-between">{selectedAtleta.nombre} {selectedAtleta.apellido}{selectedAtleta.pago_verificado&&<ShieldCheck size={14} className="text-green-500"/>}</p>
                   <p className="text-cyan-400 font-mono text-xs">V-{selectedAtleta.cedula}</p>
                 </div>
-                {/* [V3-1] Modalidad en panel de detalle */}
+                {/* Género registrado */}
+                {selectedAtleta.genero && (
+                  <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5">
+                    <p className="text-gray-500 text-[9px] uppercase">Género registrado</p>
+                    <p className="font-black uppercase text-sm text-white">
+                      {selectedAtleta.genero === 'M' ? '♂ Masculino' : '♀ Femenino'}
+                    </p>
+                  </div>
+                )}
+                {/* Modalidad — sin inferir null como 10K [V4-6] */}
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5">
                   <p className="text-gray-500 text-[9px] uppercase">Modalidad</p>
                   <p className="font-black uppercase text-sm"
@@ -854,7 +956,6 @@ const AtletasList = ({ scope, onUpdateCount }:{ scope:RaceScope; onUpdateCount?:
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Teléfono</p><p className="text-white font-mono">{selectedAtleta.telefono||'SIN REGISTRO'}</p></div>
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Talla</p><p className="text-white font-mono uppercase">{selectedAtleta.talla_camiseta||'N/A'}</p></div>
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5"><p className="text-gray-500 text-[9px] uppercase">Referencia</p><p className="text-green-400 font-mono break-all">{selectedAtleta.referencia_pago||'PENDIENTE'}</p></div>
-                {/* [V34] Representante — solo si existe */}
                 {selectedAtleta.repr_cedula && (
                   <div className="p-4 rounded-xl border" style={{background:"rgba(251,191,36,0.05)",borderColor:"rgba(251,191,36,0.2)"}}>
                     <p className="text-[9px] uppercase font-black mb-2" style={{color:"rgba(251,191,36,0.6)"}}>👨‍👧 Representante</p>
@@ -900,7 +1001,7 @@ const AtletasList = ({ scope, onUpdateCount }:{ scope:RaceScope; onUpdateCount?:
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* [V3.1] MÓDULO REPRESENTANTES — menores inscritos con tutor     */
+/* MÓDULO REPRESENTANTES — [V4-6] sin inferencia de modalidad     */
 /* ────────────────────────────────────────────────────────────── */
 
 const ModuloRepresentantes = ({ scope }: { scope: RaceScope }) => {
@@ -914,7 +1015,7 @@ const ModuloRepresentantes = ({ scope }: { scope: RaceScope }) => {
     try {
       let q = supabase
         .from('runners')
-        .select('id,nombre,apellido,cedula,categoria,modalidad,bib_number,repr_nombre,repr_apellido,repr_cedula,repr_telefono,repr_email,repr_relacion,created_at')
+        .select('id,nombre,apellido,cedula,categoria,modalidad,genero,bib_number,repr_nombre,repr_apellido,repr_cedula,repr_telefono,repr_email,repr_relacion,created_at')
         .not('repr_cedula', 'is', null)
         .order('created_at', { ascending: false });
       q = applyScopeFilter(q, scope);
@@ -937,8 +1038,6 @@ const ModuloRepresentantes = ({ scope }: { scope: RaceScope }) => {
 
   return (
     <div className="space-y-6 animate-in fade-in">
-
-      {/* Header + buscador */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black italic uppercase text-white tracking-widest" style={{fontFamily:'Barlow Condensed,sans-serif'}}>
@@ -950,15 +1049,12 @@ const ModuloRepresentantes = ({ scope }: { scope: RaceScope }) => {
         </div>
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-          <input
-            type="text" placeholder="Buscar atleta o representante..."
+          <input type="text" placeholder="Buscar atleta o representante..."
             value={searchTerm} onChange={e => setSearch(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-10 pr-4 text-[10px] uppercase font-bold outline-none focus:border-yellow-500/30 transition-all text-white"
-          />
+            className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-10 pr-4 text-[10px] uppercase font-bold outline-none focus:border-yellow-500/30 transition-all text-white"/>
         </div>
       </div>
 
-      {/* Empty state */}
       {!loading && menores.length === 0 && (
         <div className="py-20 text-center bg-white/[0.02] rounded-2xl border border-white/5">
           <Baby size={40} className="mx-auto mb-4 text-yellow-400/30" />
@@ -968,7 +1064,6 @@ const ModuloRepresentantes = ({ scope }: { scope: RaceScope }) => {
         </div>
       )}
 
-      {/* Tabla */}
       {(loading || filtered.length > 0) && (
         <div className="bg-black/40 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
           <div className="overflow-x-auto">
@@ -988,22 +1083,25 @@ const ModuloRepresentantes = ({ scope }: { scope: RaceScope }) => {
                   <tr><td colSpan={6} className="p-20 text-center text-yellow-400 font-black animate-pulse uppercase text-[10px]">Cargando menores...</td></tr>
                 ) : filtered.map(r => (
                   <tr key={r.id} className="hover:bg-white/[0.02] transition-colors">
-                    {/* Atleta */}
                     <td className="p-4">
                       <p className="font-bold text-xs uppercase text-white">{r.nombre} {r.apellido}</p>
                       <p className="text-[9px] text-gray-500 font-mono mt-0.5">V-{r.cedula}</p>
                     </td>
-                    {/* Dorsal / modalidad */}
                     <td className="p-4">
                       <p className="font-black text-white text-sm">{r.bib_number ? `#${r.bib_number}` : '—'}</p>
-                      <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full border mt-1 inline-block"
-                        style={(r.modalidad ?? '10K') === '10K'
-                          ? {background:'rgba(0,212,200,0.07)',borderColor:'rgba(0,212,200,0.2)',color:'#00d4c8'}
-                          : {background:'rgba(251,191,36,0.07)',borderColor:'rgba(251,191,36,0.2)',color:'#fbbf24'}}>
-                        {(r.modalidad ?? '10K') === '10K' ? '🏃 10K' : '🚶 4K'}
-                      </span>
+                      {/* [V4-6] Sin ?? '10K' — null muestra '—' */}
+                      {r.modalidad ? (
+                        <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full border mt-1 inline-block"
+                          style={r.modalidad === '10K'
+                            ? {background:'rgba(0,212,200,0.07)',borderColor:'rgba(0,212,200,0.2)',color:'#00d4c8'}
+                            : {background:'rgba(251,191,36,0.07)',borderColor:'rgba(251,191,36,0.2)',color:'#fbbf24'}}>
+                          {r.modalidad === '10K' ? '🏃 10K' : '🚶 4K'}
+                        </span>
+                      ) : (
+                        <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full border mt-1 inline-block"
+                          style={{background:'rgba(255,255,255,0.03)',borderColor:'rgba(255,255,255,0.08)',color:'rgba(255,255,255,0.25)'}}>—</span>
+                      )}
                     </td>
-                    {/* Representante nombre */}
                     <td className="p-4">
                       {r.repr_nombre ? (
                         <>
@@ -1014,7 +1112,6 @@ const ModuloRepresentantes = ({ scope }: { scope: RaceScope }) => {
                         <span className="text-[9px] text-gray-600 uppercase font-black">Sin datos</span>
                       )}
                     </td>
-                    {/* Teléfono */}
                     <td className="p-4">
                       <div className="flex items-center gap-2 text-[10px] font-mono text-cyan-400">
                         <Phone size={11} />{r.repr_telefono || '—'}
@@ -1023,14 +1120,12 @@ const ModuloRepresentantes = ({ scope }: { scope: RaceScope }) => {
                         <p className="text-[9px] text-white/30 mt-0.5 font-mono truncate max-w-[160px]">{r.repr_email}</p>
                       )}
                     </td>
-                    {/* Relación */}
                     <td className="p-4">
                       <span className="text-[9px] font-black uppercase px-2 py-1 rounded-lg"
                         style={{background:'rgba(251,191,36,0.07)',border:'1px solid rgba(251,191,36,0.2)',color:'#fbbf24'}}>
                         {r.repr_relacion || '—'}
                       </span>
                     </td>
-                    {/* Detalle */}
                     <td className="p-4 text-center">
                       <button onClick={() => setSelected(r)}
                         className="p-2 rounded-lg bg-white/5 hover:bg-yellow-500/20 hover:text-yellow-300 text-gray-400 transition-all">
@@ -1045,14 +1140,11 @@ const ModuloRepresentantes = ({ scope }: { scope: RaceScope }) => {
         </div>
       )}
 
-      {/* Modal de detalle */}
       {selected && createPortal(
         <div onClick={() => setSelected(null)}
           className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
           <div onClick={e => e.stopPropagation()}
             className="bg-[#0a0f14] border border-yellow-400/20 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl animate-in zoom-in-95">
-
-            {/* Header */}
             <div className="flex items-center justify-between px-8 pt-7 pb-5 border-b border-white/5">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl flex items-center justify-center"
@@ -1068,7 +1160,6 @@ const ModuloRepresentantes = ({ scope }: { scope: RaceScope }) => {
             </div>
 
             <div className="p-8 grid grid-cols-1 sm:grid-cols-2 gap-5">
-              {/* Columna atleta */}
               <div className="space-y-4">
                 <p className="text-[9px] font-black uppercase tracking-widest mb-3" style={{color:'rgba(0,212,200,0.6)'}}>👤 Atleta</p>
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5">
@@ -1087,18 +1178,25 @@ const ModuloRepresentantes = ({ scope }: { scope: RaceScope }) => {
                   <p className="text-gray-400 text-[9px] uppercase mb-1">Categoría</p>
                   <p className="text-cyan-400 font-black uppercase tracking-wide">{selected.categoria || '—'}</p>
                 </div>
+                {/* [V4-6] Modalidad sin inferencia */}
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5">
                   <p className="text-gray-400 text-[9px] uppercase mb-1">Modalidad</p>
-                  <span className="font-black uppercase text-sm px-3 py-1 rounded-full"
-                    style={(selected.modalidad ?? '10K') === '10K'
-                      ? {background:'rgba(0,212,200,0.08)',border:'1px solid rgba(0,212,200,0.2)',color:'#00d4c8'}
-                      : {background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.2)',color:'#fbbf24'}}>
-                    {(selected.modalidad ?? '10K') === '10K' ? '🏃 10K Carrera' : '🚶 4K Caminata'}
-                  </span>
+                  {selected.modalidad ? (
+                    <span className="font-black uppercase text-sm px-3 py-1 rounded-full"
+                      style={selected.modalidad === '10K'
+                        ? {background:'rgba(0,212,200,0.08)',border:'1px solid rgba(0,212,200,0.2)',color:'#00d4c8'}
+                        : {background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.2)',color:'#fbbf24'}}>
+                      {selected.modalidad === '10K' ? '🏃 10K Carrera' : '🚶 4K Caminata'}
+                    </span>
+                  ) : (
+                    <span className="font-black uppercase text-sm px-3 py-1 rounded-full"
+                      style={{background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.08)',color:'rgba(255,255,255,0.25)'}}>
+                      — Sin modalidad
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* Columna representante */}
               <div className="space-y-4">
                 <p className="text-[9px] font-black uppercase tracking-widest mb-3" style={{color:'rgba(251,191,36,0.6)'}}>👨‍👧 Representante</p>
                 <div className="p-4 rounded-xl border" style={{background:'rgba(251,191,36,0.04)',borderColor:'rgba(251,191,36,0.15)'}}>
@@ -1141,16 +1239,28 @@ const ModuloRepresentantes = ({ scope }: { scope: RaceScope }) => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* ESCUADRONES — V2.1 (sin cambios)                               */
+/* [V4-4] ESCUADRONES — scoped por carrera                        */
+/*                                                                */
+/* Recibe `scope: RaceScope` y filtra los teams por race_id       */
+/* (o race_id IS NULL para carreras legacy de Barquisimeto).      */
+/* Evita que los escuadrones de Coro y Barquisimeto se mezclen.   */
 /* ────────────────────────────────────────────────────────────── */
 
-const EscuadronesList = () => {
+const EscuadronesList = ({ scope }: { scope: RaceScope }) => {
   const [equipos,setEquipos]=useState<any[]>([]);
   const [loading,setLoading]=useState(true);
+
   useEffect(()=>{
     (async()=>{ setLoading(true);
       try {
-        const{data:td,error:te}=await supabase.from('teams').select('*'); if(te)throw te;
+        // [V4-4] Filtrar teams por race_id del scope
+        let tq = supabase.from('teams').select('*');
+        if (scope.legacy) {
+          tq = tq.is('race_id', null);
+        } else if (scope.raceId) {
+          tq = tq.eq('race_id', scope.raceId);
+        }
+        const{data:td,error:te}=await tq; if(te)throw te;
         if(!td?.length){setEquipos([]);return;}
         const ids=[...new Set(td.flatMap(t=>[t.runner_m1_id,t.runner_m2_id,t.runner_f1_id,t.runner_f2_id]).filter(Boolean))];
         const{data:rd,error:re}=await supabase.from('runners').select('id,nombre,apellido,bib_number,telefono,talla_camiseta,categoria').in('id',ids); if(re)throw re;
@@ -1168,12 +1278,15 @@ const EscuadronesList = () => {
         setEquipos(proc);
       }catch(err){console.error(err);} finally{setLoading(false);}
     })();
-  },[]);
+  },[scope.raceId,scope.legacy]); // [V4-4] re-ejecuta al cambiar scope
+
   if(loading) return <div className="py-20 text-center bg-white/[0.02] rounded-2xl border border-white/5 animate-pulse"><Users className="h-10 w-10 text-cyan-500 mx-auto mb-4"/><p className="text-[10px] font-black tracking-[0.4em] text-cyan-500 uppercase">Enlazando Escuadrones...</p></div>;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in">
       {equipos.length===0?(
-        <div className="col-span-full py-20 text-center bg-white/[0.02] rounded-2xl border border-white/5"><p className="text-[10px] font-black tracking-[0.4em] text-gray-500 uppercase">No hay escuadrones activos</p></div>
+        <div className="col-span-full py-20 text-center bg-white/[0.02] rounded-2xl border border-white/5">
+          <p className="text-[10px] font-black tracking-[0.4em] text-gray-500 uppercase">No hay escuadrones activos en {scope.name}</p>
+        </div>
       ):equipos.map((eq,i)=>(
         <div key={eq.id} className="bg-black/40 border border-white/10 rounded-2xl p-6 shadow-2xl relative overflow-hidden hover:border-cyan-500/30 transition-all">
           <div className="absolute top-0 right-0 bg-cyan-500 text-black font-black text-xs px-4 py-1 rounded-bl-xl">RANGO #{i+1}</div>
@@ -1196,7 +1309,7 @@ const EscuadronesList = () => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* PRE-RACE OVERLAY                                               */
+/* PRE-RACE OVERLAY — sin modificaciones                          */
 /* ────────────────────────────────────────────────────────────── */
 
 const PreRaceOverlay: React.FC<{onClose:()=>void}> = ({ onClose }) => {
@@ -1240,7 +1353,7 @@ const PreRaceOverlay: React.FC<{onClose:()=>void}> = ({ onClose }) => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* TELEMETRY MODULE — igual que V2 (sin cambios)                  */
+/* TELEMETRY MODULE — [V4-5] race_signals con race_id             */
 /* ────────────────────────────────────────────────────────────── */
 
 type RaceState='idle'|'running'|'paused'|'finished';
@@ -1262,8 +1375,15 @@ const TelemetryModule = ({ scope }:{ scope:RaceScope }) => {
   const fmt=(ms:number)=>{ const cs=Math.floor(ms/10)%100; const ts=Math.floor(ms/1000); const s=ts%60; const m=Math.floor(ts/60)%60; const h=Math.floor(ts/3600); if(h>0)return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`; };
 
   const handleFire=async()=>{ const now=Date.now(); const iso=new Date(now).toISOString(); setGunFlash(true); setTimeout(()=>setGunFlash(false),600); setStartTs(now);setPausedMs(0);setElapsedMs(0);setRaceState('running');setOfficialStart(iso);setSavingStart(true);setSaveMsg(null);
-    try { let q=supabase.from('runners').update({start_time:iso,race_status:'in_progress'}).is('start_time',null); q=applyScopeFilter(q,scope); const{error}=await q; if(error)throw error;
-      await supabase.from('race_signals').insert({type:'race_start',message:iso,created_by:'admin'});
+    try {
+      let q=supabase.from('runners').update({start_time:iso,race_status:'in_progress'}).is('start_time',null); q=applyScopeFilter(q,scope); const{error}=await q; if(error)throw error;
+      // [V4-5] race_signals ahora lleva race_id para aislar señales por carrera
+      await supabase.from('race_signals').insert({
+        type: 'race_start',
+        message: iso,
+        created_by: 'admin',
+        race_id: scope.raceId,   // [V4-5] aislamiento
+      });
       setSaveMsg({text:`✅ Pistola disparada · ${scope.name}`,ok:true});
     }catch(err:any){setSaveMsg({text:`⚠️ ${err.message}`,ok:false});} finally{setSavingStart(false);setTimeout(()=>setSaveMsg(null),5000);}
   };
@@ -1324,7 +1444,7 @@ const TelemetryModule = ({ scope }:{ scope:RaceScope }) => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* MAIN DASHBOARD                                                 */
+/* MAIN DASHBOARD — [V4-4] EscuadronesList recibe scope           */
 /* ────────────────────────────────────────────────────────────── */
 
 export default function AdminDashboard() {
@@ -1390,7 +1510,8 @@ export default function AdminDashboard() {
             {activeTab==='telemetry'   &&<TelemetryModule scope={raceScope}/>}
             {activeTab==='inscripcion' &&<ModuloInscripcionAdmin/>}
             {activeTab==='menores'     &&<ModuloRepresentantes scope={raceScope}/>}
-            {activeTab==='teams'       &&<EscuadronesList/>}
+            {/* [V4-4] EscuadronesList ahora recibe scope para filtrar por carrera */}
+            {activeTab==='teams'       &&<EscuadronesList scope={raceScope}/>}
             {activeTab==='race_config' &&<div className="grid grid-cols-1 lg:grid-cols-2 gap-12"><RaceForm/><RouteConfig/></div>}
             {activeTab==='results'     &&<div className="animate-in fade-in"><ResultsTable/></div>}
           </>
