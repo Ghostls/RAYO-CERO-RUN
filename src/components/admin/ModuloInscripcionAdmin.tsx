@@ -1,25 +1,24 @@
 /**
  * RAYOCERO — MÓDULO INSCRIPCIÓN ADMIN
- * Build: V2.0 — VALKYRON HQ (EVOLUTION — CORO 499 SCOPE FIX)
+ * Build: V2.1 — VALKYRON HQ (FIX EMAIL DUPLICADO)
  * CEO: Lualdo Sciscioli | Valkyron Group
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V2.0:
+ * CHANGELOG V2.1:
+ * [V2.1-1] Se agrega validación de email duplicado (misma carrera) antes
+ *          del insert. Evita el error 23505 de clave única 'uniq_email_por_carrera'.
+ * [V2.1-2] Manejo específico del error 23505 en el catch: muestra mensaje
+ *          claro "El email ya está registrado para esta carrera".
+ * 
+ * Base V2.0:
  * [V2-1] Recibe `scope: RaceScope` como prop — la inscripción admin queda
  *        vinculada a la carrera activa seleccionada en el AdminDashboard.
- *        El runner se guarda con race_id = scope.raceId (o NULL si legacy).
  * [V2-2] Campo `modalidad` agregado al formulario — selector 10K / 4K.
- *        Es obligatorio para que el runner aparezca en los tabs correctos.
  * [V2-3] Bib number calculado POR CARRERA, no global.
- *        Query filtra por race_id para no contaminar dorsales entre eventos.
- * [V2-4] Check de cédula duplicada SCOPED POR RACE_ID — un runner de Lara
- *        puede inscribirse en Coro sin bloqueo.
- * [V2-5] Categorías completadas: Junior (13-15), Caminata Recreativa 4K
- *        cuando modalidad = 4K. Movilidad Reducida sigue siendo global.
- * [V2-6] Badge de carrera activa en el header — siempre visible.
- * [V2-7] Sin comprobante de pago — inscripción admin = pago_verificado TRUE,
- *        referencia_pago = 'INSCRIPCION_ADMIN' para que el panel de
- *        inspección lo identifique y no busque en storage.
+ * [V2-4] Check de cédula duplicada SCOPED POR RACE_ID.
+ * [V2-5] Categorías completadas: Junior (13-15), Caminata Recreativa 4K.
+ * [V2-6] Badge de carrera activa en el header.
+ * [V2-7] Sin comprobante de pago — referencia_pago = 'INSCRIPCION_ADMIN'.
  */
 
 import { useState, useCallback, useEffect } from 'react';
@@ -146,25 +145,49 @@ export default function ModuloInscripcionAdmin({ scope }: Props) {
 
     try {
       const cedulaClean = form.cedula.replace(/\D/g, '');
+      const emailClean  = form.email.toLowerCase().trim(); // [V2.1]
 
-      // [V2-4] Verificar duplicado SOLO dentro de la carrera activa
-      let dupQuery = supabase
+      // [V2-4] Verificar duplicado de cédula SOLO dentro de la carrera activa
+      let cedulaDupQuery = supabase
         .from('runners')
         .select('id, cedula')
         .eq('cedula', cedulaClean);
 
       if (scope.legacy) {
-        dupQuery = dupQuery.is('race_id', null);
+        cedulaDupQuery = cedulaDupQuery.is('race_id', null);
       } else if (scope.raceId) {
-        dupQuery = dupQuery.eq('race_id', scope.raceId);
+        cedulaDupQuery = cedulaDupQuery.eq('race_id', scope.raceId);
       }
 
-      const { data: existing } = await dupQuery.maybeSingle();
+      const { data: existingCedula } = await cedulaDupQuery.maybeSingle();
 
-      if (existing) {
+      if (existingCedula) {
         setError(
           `La cédula ${cedulaClean} ya está inscrita en ${raceLabel}. ` +
           `Puede estar en otra carrera — cambia el scope.`
+        );
+        setIsSub(false);
+        return;
+      }
+
+      // [V2.1-1] Verificar duplicado de email SOLO dentro de la carrera activa
+      let emailDupQuery = supabase
+        .from('runners')
+        .select('id, email')
+        .eq('email', emailClean);
+
+      if (scope.legacy) {
+        emailDupQuery = emailDupQuery.is('race_id', null);
+      } else if (scope.raceId) {
+        emailDupQuery = emailDupQuery.eq('race_id', scope.raceId);
+      }
+
+      const { data: existingEmail } = await emailDupQuery.maybeSingle();
+
+      if (existingEmail) {
+        setError(
+          `El email ${emailClean} ya está registrado para ${raceLabel}. ` +
+          `Usa otro correo o revisa la inscripción existente.`
         );
         setIsSub(false);
         return;
@@ -193,7 +216,7 @@ export default function ModuloInscripcionAdmin({ scope }: Props) {
           nombre:               form.nombre.trim(),
           apellido:             form.apellido.trim(),
           cedula:               cedulaClean,
-          email:                form.email.toLowerCase().trim(),
+          email:                emailClean,
           telefono:             form.telefono,
           fecha_nacimiento:     form.fechaNacimiento,
           genero:               form.genero,
@@ -215,7 +238,13 @@ export default function ModuloInscripcionAdmin({ scope }: Props) {
         .select()
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        // [V2.1-2] Manejo específico del error 23505
+        if (insertError.code === '23505') {
+          throw new Error('El email ya está registrado para esta carrera. Verifica los datos.');
+        }
+        throw insertError;
+      }
 
       setSuccess({
         bib:       nextBib,
