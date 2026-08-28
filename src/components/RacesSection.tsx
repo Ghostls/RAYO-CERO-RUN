@@ -1,20 +1,27 @@
 /**
- * RAYO CERO — RACE CALENDAR (EVOLUTION V10.3 - CANINATA 10K $25 OVERRIDE)
+ * RAYO CERO — RACE CALENDAR (EVOLUTION V10.4 — CORO CERRADA / CANINATA ABIERTA)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V10.3:
- * [V10.3-1] Actualizada la ruta y lógica de selección para Caninata 10K con precio de $25.
- * [V10.3-2] getStatusConfig(): Mantiene override activo en estado "inscripciones_abiertas".
- * [V10.3-3] Botón CTA de Caninata pasa parámetros de query explícitos `tipo=caninata&distancia=10k&precio=25`.
+ * CHANGELOG V10.4:
+ * [V10.4-1] getStatusConfig(): nuevo estado 'inscripciones_cerradas_definitivo'
+ *           para carreras no-caninata con INSCRIPCIONES_ABIERTAS=false.
+ *           Badge rojo "Inscripciones Cerradas" en vez de "PROXIMAMENTE".
+ * [V10.4-2] Botón CTA para Coro con INSCRIPCIONES_ABIERTAS=false:
+ *           muestra "INSCRIPCIONES CERRADAS" en rojo, sin Lock fake de cupo.
+ * [V10.4-3] Caninata mantiene override siempre abierta (V10.3 intacto).
+ * [V10.4-4] CardImageSlider: badge usa el nuevo status key correctamente.
+ *
+ * CHANGELOG V10.3 (base intacta):
+ * [V10.3-1..3] Caninata 10K $25 override, query params.
  */
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   MapPin, Calendar, Clock, Info, Zap, Loader2,
-  Lock, Trophy, CheckCircle2, Compass, Dog, Tag
+  Lock, Trophy, CheckCircle2, Compass, Dog, Tag, XCircle
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
@@ -28,18 +35,22 @@ import flyerCaninataBanner       from "@/assets/flyer-caninata.png";
 const DEFAULT_IMAGE = flyerCaninataBanner;
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* HELPER — detección de carrera tipo Caninata                                */
+/* HELPER — detección de tipo de carrera                                       */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const isCaninataRace = (name: string = ""): boolean =>
   name.toLowerCase().includes("caninata");
 
+const isCoroRace = (name: string = ""): boolean => {
+  const n = name.toLowerCase();
+  return n.includes("coro") || n.includes("499") || n.includes("falcón") || n.includes("falcon");
+};
+
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* IMAGEN — matching por nombre; caninata evaluada PRIMERO                     */
+/* IMAGEN — matching por nombre                                                */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const getRaceImage = (name: string = "", fallbackUrl?: string): string => {
   const n = name.toLowerCase();
-  if (n.includes("caninata"))
-    return flyerCaninataBanner || fallbackUrl || DEFAULT_IMAGE;
+  if (n.includes("caninata"))  return flyerCaninataBanner || fallbackUrl || DEFAULT_IMAGE;
   if (n.includes("499") || n.includes("agosto")) return portada499Agosto;
   if (n.includes("coro") || n.includes("falcón") || n.includes("falcon") || n.includes("octubre"))
     return flyerOctubreInscripciones;
@@ -47,7 +58,7 @@ const getRaceImage = (name: string = "", fallbackUrl?: string): string => {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* REGIÓN — firma extendida con name para detectar Caninata                    */
+/* REGIÓN TAG                                                                  */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const getRegionTag = (
   location: string = "",
@@ -55,10 +66,8 @@ const getRegionTag = (
 ): { label: string; color: string; icon?: "dog" } | null => {
   const l = location.toLowerCase();
   const n = name.toLowerCase();
-
   if (n.includes("caninata"))
     return { label: "CANINATA 10K", color: "#FDD454", icon: "dog" };
-
   if (l.includes("barquisimeto") || l.includes("lara"))
     return { label: "LARA", color: "#00f2ff" };
   if (l.includes("coro") || l.includes("falcón") || l.includes("falcon"))
@@ -67,7 +76,7 @@ const getRegionTag = (
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* COUNTDOWN                                                                  */
+/* COUNTDOWN                                                                   */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const useCountdown = (targetDate: string) => {
   const [remaining, setRemaining] = useState<{ days: number; hours: number } | null>(null);
@@ -75,7 +84,6 @@ const useCountdown = (targetDate: string) => {
   useEffect(() => {
     if (!targetDate) return;
     const target = new Date(targetDate + "T00:00:00").getTime();
-
     const tick = () => {
       const diff = target - Date.now();
       if (diff <= 0) { setRemaining(null); return; }
@@ -83,7 +91,6 @@ const useCountdown = (targetDate: string) => {
       const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       setRemaining({ days, hours });
     };
-
     tick();
     const interval = setInterval(tick, 60 * 1000);
     return () => clearInterval(interval);
@@ -93,7 +100,15 @@ const useCountdown = (targetDate: string) => {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* STATUS CONFIG — Con override para Caninata [V10.2-1]                        */
+/* STATUS CONFIG — [V10.4-1]                                                   */
+/*                                                                             */
+/* Prioridad de evaluación:                                                    */
+/*  1. Caninata → siempre "inscripciones_abiertas" (override)                 */
+/*  2. completada / completed → "completada"                                   */
+/*  3. próximamente → "proximamente"                                           */
+/*  4. INSCRIPCIONES_ABIERTAS=false, carrera no-caninata → "cerradas"        */
+/*     Diferencia CORO (tiene ruta, ya pasó) de próximas futuras.            */
+/*  5. INSCRIPCIONES_ABIERTAS=true → "abiertas"                              */
 /* ─────────────────────────────────────────────────────────────────────────── */
 type StatusKey =
   | "completada"
@@ -105,17 +120,19 @@ type StatusKey =
 const getStatusConfig = (
   rawStatus: string,
   inscripcionesAbiertas: boolean,
-  isCaninata: boolean = false
+  isCaninata: boolean = false,
+  raceName: string = "",
 ) => {
   const s = rawStatus?.toLowerCase().trim() ?? "";
 
+  // [V10.4-3] Override Caninata — siempre abierta
   if (isCaninata && s !== "completada" && s !== "completed") {
     return {
       key: "inscripciones_abiertas" as StatusKey,
       label: "Inscripciones Abiertas",
       badgeClass: "bg-[#FDD454]/10 border-[#FDD454]/30 text-[#FDD454] shadow-[0_0_15px_rgba(253,212,84,0.2)]",
       dotColor: "bg-[#FDD454]",
-      isCompleted: false, isClosed: false, isComingSoon: false,
+      isCompleted: false, isClosed: false, isComingSoon: false, isDefinitivelyClosed: false,
     };
   }
 
@@ -125,7 +142,7 @@ const getStatusConfig = (
       label: "Completada",
       badgeClass: "bg-amber-500/10 border-amber-400/30 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.15)]",
       dotColor: "bg-amber-400",
-      isCompleted: true, isClosed: false, isComingSoon: false,
+      isCompleted: true, isClosed: false, isComingSoon: false, isDefinitivelyClosed: false,
     };
   }
 
@@ -135,17 +152,19 @@ const getStatusConfig = (
       label: "Próximamente",
       badgeClass: "bg-white/5 border-white/10 text-white/50",
       dotColor: null,
-      isCompleted: false, isClosed: false, isComingSoon: true,
+      isCompleted: false, isClosed: false, isComingSoon: true, isDefinitivelyClosed: false,
     };
   }
 
+  // [V10.4-1] Cerrada definitivamente — Coro u otras carreras conocidas con inscripciones cerradas
   if (!inscripcionesAbiertas) {
+    const isCoro = isCoroRace(raceName);
     return {
       key: "inscripciones_cerradas" as StatusKey,
-      label: "Inscripciones Cerradas",
+      label: isCoro ? "Inscripciones Cerradas" : "Inscripciones Cerradas",
       badgeClass: "bg-red-500/10 border-red-500/25 text-red-400 shadow-[0_0_12px_rgba(255,60,60,0.15)]",
       dotColor: "bg-red-400",
-      isCompleted: false, isClosed: true, isComingSoon: false,
+      isCompleted: false, isClosed: true, isComingSoon: false, isDefinitivelyClosed: isCoro,
     };
   }
 
@@ -154,7 +173,7 @@ const getStatusConfig = (
     label: "Inscripciones Abiertas",
     badgeClass: "bg-cyan-500/10 border-cyan-400/30 text-cyan-400 shadow-[0_0_15px_rgba(0,242,255,0.2)]",
     dotColor: "bg-cyan-400",
-    isCompleted: false, isClosed: false, isComingSoon: false,
+    isCompleted: false, isClosed: false, isComingSoon: false, isDefinitivelyClosed: false,
   };
 };
 
@@ -162,15 +181,16 @@ const getStatusConfig = (
 /* CARD IMAGE SLIDER                                                           */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const CardImageSlider = ({
-  image, alt, status, region, isCaninata,
+  image, alt, status, region, isCaninata, raceName,
 }: {
   image: string;
   alt: string;
   status: string;
   region: { label: string; color: string; icon?: "dog" } | null;
   isCaninata: boolean;
+  raceName: string;
 }) => {
-  const cfg = getStatusConfig(status, INSCRIPCIONES_ABIERTAS, isCaninata);
+  const cfg = getStatusConfig(status, INSCRIPCIONES_ABIERTAS, isCaninata, raceName);
 
   return (
     <div className="relative h-72 w-full overflow-hidden bg-[#03070b] rounded-t-[2.5rem]">
@@ -192,16 +212,18 @@ const CardImageSlider = ({
           : "from-[#03070b] via-[#03070b]/40 to-transparent"
       }`} />
 
+      {/* [V10.4-4] Badge de estado */}
       <div className="absolute top-6 left-6 z-20">
         <span className={`text-[8px] font-black uppercase tracking-[0.3em] px-4 py-2 rounded-full border backdrop-blur-md shadow-lg flex items-center gap-1.5 ${cfg.badgeClass}`}>
-          {cfg.dotColor && (
+          {cfg.dotColor && !cfg.isCompleted && !cfg.isClosed && (
             <motion.span
               className={`w-1.5 h-1.5 rounded-full ${cfg.dotColor} inline-block`}
-              animate={cfg.isCompleted ? { opacity: 1 } : { opacity: [1, 0.2, 1] }}
-              transition={{ duration: 2, repeat: cfg.isCompleted ? 0 : Infinity, ease: "easeInOut" }}
+              animate={{ opacity: [1, 0.2, 1] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
             />
           )}
           {cfg.isCompleted && <CheckCircle2 className="h-3 w-3" />}
+          {cfg.isClosed && !cfg.isCompleted && <XCircle className="h-3 w-3" />}
           {cfg.label}
         </span>
       </div>
@@ -211,9 +233,9 @@ const CardImageSlider = ({
           <span
             className="text-[8px] font-black uppercase tracking-[0.3em] px-3 py-2 rounded-full border backdrop-blur-md flex items-center gap-1.5"
             style={{
-              background: `${region.color}14`,
-              borderColor: `${region.color}40`,
-              color: region.color,
+              background:   `${region.color}14`,
+              borderColor:  `${region.color}40`,
+              color:        region.color,
             }}
           >
             {region.icon === "dog"
@@ -242,15 +264,12 @@ const CountdownChip = ({ date, isCaninata }: { date: string; isCaninata: boolean
   if (!remaining) return null;
 
   return (
-    <div className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl mb-4 ${
-      isCaninata
-        ? "border"
-        : "bg-cyan-500/[0.06] border border-cyan-400/15"
-    }`}
-      style={isCaninata ? {
-        background: "rgba(253,212,84,0.05)",
-        borderColor: "rgba(253,212,84,0.15)",
-      } : {}}>
+    <div
+      className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl mb-4 ${
+        isCaninata ? "border" : "bg-cyan-500/[0.06] border border-cyan-400/15"
+      }`}
+      style={isCaninata ? { background: "rgba(253,212,84,0.05)", borderColor: "rgba(253,212,84,0.15)" } : {}}
+    >
       <Zap className="h-3.5 w-3.5 shrink-0" style={{ color: isCaninata ? "#FDD454" : "#22d3ee" }} />
       <span className="text-[10px] font-black tracking-widest uppercase"
         style={{ color: isCaninata ? "#FDD454" : "#67e8f9" }}>
@@ -265,7 +284,7 @@ const CountdownChip = ({ date, isCaninata }: { date: string; isCaninata: boolean
 /* ─────────────────────────────────────────────────────────────────────────── */
 const RacesSection = () => {
   const navigate = useNavigate();
-  const [races, setRaces] = useState<any[]>([]);
+  const [races, setRaces]   = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -339,8 +358,14 @@ const RacesSection = () => {
           {races.length > 0 ? (
             races.map((race, idx) => {
               const caninata = isCaninataRace(race.name ?? "");
-              const cfg      = getStatusConfig(race.status ?? "", INSCRIPCIONES_ABIERTAS, caninata);
-              const region   = getRegionTag(race.location ?? "", race.name ?? "");
+              const coro     = isCoroRace(race.name ?? "");
+              const cfg      = getStatusConfig(
+                race.status ?? "",
+                caninata ? true : INSCRIPCIONES_ABIERTAS,   // [V10.4-3] caninata siempre true aquí
+                caninata,
+                race.name ?? "",
+              );
+              const region = getRegionTag(race.location ?? "", race.name ?? "");
 
               return (
                 <motion.div
@@ -354,6 +379,8 @@ const RacesSection = () => {
                       ? "bg-white/[0.015] border-white/[0.04] hover:border-amber-400/10"
                       : caninata
                       ? "bg-white/[0.02] border-white/5 hover:border-[#FDD454]/20 hover:-translate-y-2"
+                      : cfg.isClosed
+                      ? "bg-white/[0.015] border-white/[0.04] hover:border-red-500/10"
                       : "bg-white/[0.02] border-white/5 hover:border-white/10 hover:-translate-y-2"
                   }`}
                 >
@@ -363,6 +390,7 @@ const RacesSection = () => {
                     status={race.status ?? ""}
                     region={region}
                     isCaninata={caninata}
+                    raceName={race.name ?? ""}
                   />
 
                   <div className="p-8 flex flex-col flex-grow relative z-20">
@@ -372,14 +400,28 @@ const RacesSection = () => {
                           ? "text-white/50 group-hover:text-amber-400/70"
                           : caninata
                           ? "text-white group-hover:text-[#FDD454]"
+                          : cfg.isClosed
+                          ? "text-white/60 group-hover:text-red-400/70"
                           : "text-white group-hover:text-cyan-400"
                       }`}
                     >
                       {race.name}
                     </h3>
 
-                    {!cfg.isCompleted && race.date && (
+                    {/* Countdown solo si no está cerrada ni completada */}
+                    {!cfg.isCompleted && !cfg.isClosed && race.date && (
                       <CountdownChip date={race.date} isCaninata={caninata} />
+                    )}
+
+                    {/* [V10.4-1] Info de cierre para Coro */}
+                    {cfg.isClosed && !cfg.isCompleted && (
+                      <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl mb-4 border"
+                        style={{ background: "rgba(255,60,60,0.05)", borderColor: "rgba(255,60,60,0.15)" }}>
+                        <XCircle className="h-3.5 w-3.5 shrink-0 text-red-400" />
+                        <span className="text-[10px] font-black tracking-widest uppercase text-red-400/80">
+                          Inscripciones cerradas
+                        </span>
+                      </div>
                     )}
 
                     <div className="space-y-4 mb-10 flex-grow">
@@ -399,7 +441,12 @@ const RacesSection = () => {
                         <div key={i} className="flex items-center gap-4 text-white/40 group-hover:text-white/80 transition-colors">
                           <item.icon
                             className="h-4 w-4"
-                            style={{ color: cfg.isCompleted ? "rgba(245,158,11,0.5)" : caninata ? "#FDD454" : "#06b6d4" }}
+                            style={{
+                              color: cfg.isCompleted ? "rgba(245,158,11,0.5)"
+                                : cfg.isClosed ? "rgba(248,113,113,0.5)"
+                                : caninata ? "#FDD454"
+                                : "#06b6d4",
+                            }}
                           />
                           <span className={`text-[10px] font-bold tracking-[0.2em] uppercase ${caninata && i === 3 ? "text-[#FDD454] font-black" : ""}`}>
                             {item.val}
@@ -408,8 +455,10 @@ const RacesSection = () => {
                       ))}
                     </div>
 
+                    {/* ── CTAs ── */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-auto">
                       {cfg.isCompleted ? (
+                        /* Completada */
                         <>
                           <Link to={`/carrera/${race.id}`} className="w-full">
                             <button className="w-full py-5 bg-white/[0.03] hover:bg-white/[0.06] border border-white/8 rounded-2xl text-[9px] font-black text-white/50 italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase backdrop-blur-md active:scale-95">
@@ -424,12 +473,30 @@ const RacesSection = () => {
                           </Link>
                         </>
                       ) : cfg.isComingSoon ? (
+                        /* Próximamente (sin datos) */
                         <Link to={`/carrera/${race.id}`} className="w-full sm:col-span-2">
                           <button className="w-full h-full py-5 bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 rounded-2xl text-[9px] font-black text-white italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase backdrop-blur-md active:scale-95">
                             <Info className="h-3 w-3 text-cyan-400" /> VER DETALLES OPERATIVOS
                           </button>
                         </Link>
+                      ) : cfg.isClosed ? (
+                        /* [V10.4-2] Cerrada — Coro: detalles + botón cerrado */
+                        <>
+                          <Link to={`/carrera/${race.id}`} className="w-full">
+                            <button className="w-full h-full py-5 bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 rounded-2xl text-[9px] font-black text-white italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase backdrop-blur-md active:scale-95">
+                              <Info className="h-3 w-3 text-red-400" /> VER RUTA
+                            </button>
+                          </Link>
+                          <button
+                            disabled
+                            className="w-full h-full py-5 rounded-2xl text-[9px] font-black italic tracking-[0.2em] flex items-center justify-center gap-2 uppercase cursor-not-allowed"
+                            style={{ background: "rgba(255,40,40,0.06)", border: "1px solid rgba(255,60,60,0.2)", color: "rgba(248,113,113,0.5)" }}
+                          >
+                            <XCircle className="h-3 w-3" /> INSCRIPCIONES CERRADAS
+                          </button>
+                        </>
                       ) : (
+                        /* Abiertas */
                         <>
                           <Link to={`/carrera/${race.id}`} className="w-full">
                             <button className="w-full h-full py-5 bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 rounded-2xl text-[9px] font-black text-white italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase backdrop-blur-md active:scale-95 text-center">
@@ -448,20 +515,12 @@ const RacesSection = () => {
                             >
                               INSCRIBIRME $25 <Dog className="h-3 w-3 transition-transform group-hover/btn:scale-110" />
                             </button>
-                          ) : INSCRIPCIONES_ABIERTAS ? (
+                          ) : (
                             <button
                               onClick={(e) => handleRegistrationClick(e, race)}
                               className="w-full h-full py-5 bg-cyan-500 hover:bg-cyan-400 rounded-2xl text-[9px] font-black text-black italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase active:scale-95 shadow-[0_0_20px_rgba(0,242,255,0.15)] group/btn text-center"
                             >
                               INSCRIBIRME <Zap className="h-3 w-3 fill-current transition-transform group-hover/btn:scale-110" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={(e) => handleRegistrationClick(e, race)}
-                              className="w-full h-full py-5 rounded-2xl text-[9px] font-black italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase active:scale-95 text-center"
-                              style={{ background: "rgba(255,40,40,0.08)", border: "1px solid rgba(255,60,60,0.25)", color: "#F87171" }}
-                            >
-                              <Lock className="h-3 w-3" /> PROXIMAMENTE
                             </button>
                           )}
                         </>

@@ -1,27 +1,28 @@
 /**
- * RAYO CERO — RACE OPERATIVE DETAIL (EVOLUTION V15.1 - CANINATA ROUTE FIX)
+ * RAYO CERO — RACE OPERATIVE DETAIL (EVOLUTION V15.2 — CORO CERRADA / CANINATA ABIERTA)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V15.1:
- * [V15.1-1] caninataRoute5K CORREGIDA: loop norte desde Lidotel → Hotel →
- *           Troncal 4 → Av Venezuela → AEB → ANP → Av Libertador → Av Los Leones
- *           → Av Venezuela → Lidotel. Termina en 10.070519,-69.291850.
- * [V15.1-2] caninataRoute10K CORREGIDA: misma base 5K + extensión sur
- *           Troncal 4 sur → Calle 6 → Calle B → Altamira → Calle 14 →
- *           regreso Caroní → París → APP → JGI → JGL → Troncal → Lidotel.
- * [V15.1-3] CANINATA_WAYPOINTS_10K CORREGIDOS: marcadores sobre el trazado real.
- * [V15.1-4] CANINATA_WAYPOINTS_5K CORREGIDOS: reflejan el loop norte real.
+ * CHANGELOG V15.2:
+ * [V15.2-1] CoroDetail: botón de inscripción reemplazado por panel
+ *           "INSCRIPCIONES CERRADAS" con mensaje explicativo cuando
+ *           inscripciones_abiertas=false. Inscripción solo desde Admin.
+ *           El mapa, ruta y leyenda permanecen intactos.
+ * [V15.2-2] ComingSoonPanel: distingue entre carrera CERRADA con datos reales
+ *           (tiene location y date) vs PRÓXIMA SIN DATOS.
+ *           — Cerrada con datos: "INSCRIPCIONES CERRADAS — 499 RUN CORO"
+ *             muestra banner, fecha, ubicación y mensaje de cierre en rojo.
+ *           — Próxima sin datos: mantiene el "PRÓXIMA MISIÓN" original.
+ * [V15.2-3] CaninataDetail: inscAbiertas siempre true — caninata permanece
+ *           abierta independientemente de INSCRIPCIONES_ABIERTAS global.
+ * [V15.2-4] BarquisimetoDetail: sin cambios (completada, mantiene CUPO COMPLETO).
  *
- * CHANGELOG V15.0 (preservado):
- * [V15-1] CANINATA ROUTES dual (naranja 10K, verde 5K).
- * [V15-2] Waypoints diferenciados con POIs 🐾 y 🩺.
- * [V15-3] CaninataDetail: toggle 10K/5K, paleta verde forestal + ámbar.
- * [V15-4] isCaninataRace(), RACE_CONFIGS, hasMapConfig actualizados.
- * [V15-5] Router: Caninata → CaninataDetail (evaluado primero).
- * [V15-6] handleRegister: /registro?race=id&tipo=caninata para Caninata.
- * [V15-7] Count por race_id para Caninata (no legacy NULL).
+ * CHANGELOG V15.1 (base preservada):
+ * [V15.1-1..4] caninataRoute5K/10K corregidas, waypoints corregidos.
+ *
+ * CHANGELOG V15.0 (base preservada):
+ * [V15-1..7] Rutas duales, CaninataDetail toggle, router dinámico.
  */
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -30,6 +31,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   MapPin, Clock, Zap, Users, ArrowLeft, Trophy,
   Lock, Calendar, Shield, Dog, Heart, ChevronRight,
+  XCircle, AlertCircle,
 } from "lucide-react";
 import { MapContainer, TileLayer, Polyline, Marker, useMap, Circle } from "react-leaflet";
 import L from "leaflet";
@@ -86,16 +88,15 @@ const isCoroRace = (name: string): boolean => {
   return n.includes("coro") || n.includes("falcón") || n.includes("falcon") || n.includes("499");
 };
 
-const isCaninataRace = (name: string): boolean => {
-  return (name?.toLowerCase() ?? "").includes("caninata");
-};
+const isCaninataRace = (name: string): boolean =>
+  (name?.toLowerCase() ?? "").includes("caninata");
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 /* RACE BANNERS                                                                */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const getRaceBanner = (name: string = ""): string | null => {
   const n = name.toLowerCase();
-  if (n.includes("caninata")) return flyerCaninataBanner;
+  if (n.includes("caninata"))  return flyerCaninataBanner;
   if (n.includes("499") || n.includes("agosto")) return portada499Agosto;
   if (n.includes("coro") || n.includes("falcón") || n.includes("falcon") || n.includes("octubre"))
     return flyerOctubreInscripciones;
@@ -163,38 +164,22 @@ const MapController = ({ bounds }: { bounds: L.LatLngBoundsExpression }) => {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* RUTA — 499 RUN CORO FALCÓN (V14 — sin cambios)                            */
+/* RUTA — 499 RUN CORO FALCÓN                                                 */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const coroRoute: [number, number][] = [
-  [11.409922, -69.675254],
-  [11.408140, -69.674525],
-  [11.405352, -69.673543],
-  [11.401830, -69.672276],
-  [11.402671, -69.669663],
-  [11.404142, -69.665417],
-  [11.404920, -69.662972],
-  [11.406875, -69.663787],
-  [11.409608, -69.664795],
-  [11.410785, -69.659327],
-  [11.411626, -69.655788],
-  [11.412109, -69.653579],
-  [11.414632, -69.654480],
-  [11.418016, -69.655681],
-  [11.416061, -69.658941],
-  [11.414127, -69.662265],
-  [11.412362, -69.665781],
-  [11.418158, -69.668000],
-  [11.422750, -69.669504],
-  [11.418158, -69.668000],
-  [11.416152, -69.667408],
-  [11.414895, -69.672463],
-  [11.413179, -69.679237],
-  [11.409250, -69.678246],
+  [11.409922, -69.675254], [11.408140, -69.674525], [11.405352, -69.673543],
+  [11.401830, -69.672276], [11.402671, -69.669663], [11.404142, -69.665417],
+  [11.404920, -69.662972], [11.406875, -69.663787], [11.409608, -69.664795],
+  [11.410785, -69.659327], [11.411626, -69.655788], [11.412109, -69.653579],
+  [11.414632, -69.654480], [11.418016, -69.655681], [11.416061, -69.658941],
+  [11.414127, -69.662265], [11.412362, -69.665781], [11.418158, -69.668000],
+  [11.422750, -69.669504], [11.418158, -69.668000], [11.416152, -69.667408],
+  [11.414895, -69.672463], [11.413179, -69.679237], [11.409250, -69.678246],
   [11.409938, -69.675271],
 ];
 
 const CORO_WAYPOINTS = [
-  { pos: [11.409922, -69.675254], isMeta: true, label: "META", pois: [{ icon: "♪", color: "#a855f7" }, { icon: "B", color: "#94a3b8" }, { icon: "+", color: "#22c55e" }, { icon: "C", color: "#eab308" }] },
+  { pos: [11.409922, -69.675254], isMeta: true,  label: "META", pois: [{ icon: "♪", color: "#a855f7" }, { icon: "B", color: "#94a3b8" }, { icon: "+", color: "#22c55e" }, { icon: "C", color: "#eab308" }] },
   { pos: [11.408140, -69.674525], label: "1K",  pois: [{ icon: "♪", color: "#a855f7" }] },
   { pos: [11.405352, -69.673543], label: "2K",  pois: [] },
   { pos: [11.402671, -69.669663], label: "3K",  pois: [{ icon: "P", color: "#3b82f6" }] },
@@ -207,110 +192,56 @@ const CORO_WAYPOINTS = [
 ];
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* [V15.1-1] RUTA CANINATA 5K — Loop norte, termina en Lidotel               */
+/* RUTAS CANINATA — V15.1 intactas                                            */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const caninataRoute5K: [number, number][] = [
-  [10.070519, -69.291850], // Lidotel — SALIDA
-  [10.070007, -69.292075], // Hotel
-  [10.072938, -69.290581], // Troncal 4
-  [10.073323, -69.290469], // Av Venezuela
-  [10.077091, -69.289493], // Troncal 4
-  [10.079665, -69.288816], // Av Libertador
-  [10.082015, -69.288985], // Av La Feria
-  [10.083088, -69.289061], // Transversal
-  [10.083088, -69.290000], // Calle Guri
-  [10.082921, -69.290733], // Paso
-  [10.081922, -69.290996], // Av AEB
-  [10.081941, -69.291861], // Av AEB
-  [10.080257, -69.292086], // ANP
-  [10.078907, -69.285302], // Av Libertador
-  [10.078037, -69.284137], // Av Los Leones
-  [10.075447, -69.283329], // ""
-  [10.072467, -69.283936], // Av Venezuela
-  [10.073282, -69.290226], // Av
-  [10.070519, -69.291850], // Lidotel — META 5K
+  [10.070519, -69.291850], [10.070007, -69.292075], [10.072938, -69.290581],
+  [10.073323, -69.290469], [10.077091, -69.289493], [10.079665, -69.288816],
+  [10.082015, -69.288985], [10.083088, -69.289061], [10.083088, -69.290000],
+  [10.082921, -69.290733], [10.081922, -69.290996], [10.081941, -69.291861],
+  [10.080257, -69.292086], [10.078907, -69.285302], [10.078037, -69.284137],
+  [10.075447, -69.283329], [10.072467, -69.283936], [10.073282, -69.290226],
+  [10.070519, -69.291850],
 ];
 
-/* ─────────────────────────────────────────────────────────────────────────── */
-/* [V15.1-2] RUTA CANINATA 10K — base 5K + extensión sur + regreso Caroní   */
-/* ─────────────────────────────────────────────────────────────────────────── */
 const caninataRoute10K: [number, number][] = [
-  [10.070519, -69.291850], // Lidotel — SALIDA
-  [10.070007, -69.292075], // Hotel
-  [10.072938, -69.290581], // Troncal 4
-  [10.073323, -69.290469], // Av Venezuela
-  [10.077091, -69.289493], // Troncal 4
-  [10.079665, -69.288816], // Av Libertador
-  [10.082015, -69.288985], // Av La Feria
-  [10.083088, -69.289061], // Transversal
-  [10.083088, -69.290000], // Calle Guri
-  [10.082921, -69.290733], // Paso
-  [10.081922, -69.290996], // Av AEB
-  [10.081941, -69.291861], // Av AEB
-  [10.080257, -69.292086], // ANP
-  [10.079522, -69.288849],
-  [10.073282, -69.290226], // Av
-  // ── Extensión sur 10K ───────────────────────────────────────────────────
-  [10.070932, -69.291616], // Troncal 4 sur
-  [10.065053, -69.292257], // ""
-  [10.060223, -69.293289], // Calle 6
-  [10.057109, -69.289339], // Calle B
-  [10.052219, -69.286893], // Altamira / Terepaima
-  [10.053100, -69.284387], // ""
-  [10.063093, -69.283825], // "" Lara
-  [10.062017, -69.277521], // Tiuna
-  [10.066864, -69.276653], // Calle 14
-  // ── Regreso Caroní ──────────────────────────────────────────────────────
-  [10.067928, -69.282669], // Av Caroní
-  [10.068452, -69.284482], // El París
-  [10.069459, -69.288448], // APP
-  [10.069281, -69.289687], // JGI
-  [10.071134, -69.290295], // JGL
-  [10.071478, -69.291331], // Troncal
-  [10.070519, -69.291850], // Lidotel — META 10K
+  [10.070519, -69.291850], [10.070007, -69.292075], [10.072938, -69.290581],
+  [10.073323, -69.290469], [10.077091, -69.289493], [10.079665, -69.288816],
+  [10.082015, -69.288985], [10.083088, -69.289061], [10.083088, -69.290000],
+  [10.082921, -69.290733], [10.081922, -69.290996], [10.081941, -69.291861],
+  [10.080257, -69.292086], [10.079522, -69.288849], [10.073282, -69.290226],
+  [10.070932, -69.291616], [10.065053, -69.292257], [10.060223, -69.293289],
+  [10.057109, -69.289339], [10.052219, -69.286893], [10.053100, -69.284387],
+  [10.063093, -69.283825], [10.062017, -69.277521], [10.066864, -69.276653],
+  [10.067928, -69.282669], [10.068452, -69.284482], [10.069459, -69.288448],
+  [10.069281, -69.289687], [10.071134, -69.290295], [10.071478, -69.291331],
+  [10.070519, -69.291850],
 ];
 
-/* ─────────────────────────────────────────────────────────────────────────── */
-/* [V15.1-3] WAYPOINTS CANINATA 10K — sobre el trazado real corregido        */
-/* ─────────────────────────────────────────────────────────────────────────── */
 const CANINATA_WAYPOINTS_10K = [
-  {
-    pos: [10.070519, -69.291850], isMeta: true, isCaninata: true, label: "META",
-    pois: [
-      { icon: "🐾", color: "#FDD454" },
-      { icon: "🩺", color: "#22c55e" },
-      { icon: "B",  color: "#94a3b8" },
-      { icon: "C",  color: "#D09644" },
-    ],
-  },
-  { pos: [10.079665, -69.288816], isCaninata: true, label: "1K", },
-  { pos: [10.083088, -69.290000], isCaninata: true, label: "2K", },
-  { pos: [10.073323, -69.290469], isCaninata: true, label: "3K", },
-  { pos: [10.069596, -69.292092], isCaninata: true, label: "4K", },
-  { pos: [10.060223, -69.293289], isCaninata: true, label: "5K", },
-  { pos: [10.052219, -69.286893], isCaninata: true, label: "6K",  },
-  { pos: [10.062017, -69.277521], isCaninata: true, label: "7K", },
-  { pos: [10.067928, -69.282669], isCaninata: true, label: "8K", },
-  { pos: [10.069459, -69.288448], isCaninata: true, label: "9K", },
+  { pos: [10.070519, -69.291850], isMeta: true, isCaninata: true, label: "META", pois: [{ icon: "🐾", color: "#FDD454" }, { icon: "🩺", color: "#22c55e" }, { icon: "B", color: "#94a3b8" }, { icon: "C", color: "#D09644" }] },
+  { pos: [10.079665, -69.288816], isCaninata: true, label: "1K" },
+  { pos: [10.083088, -69.290000], isCaninata: true, label: "2K" },
+  { pos: [10.073323, -69.290469], isCaninata: true, label: "3K" },
+  { pos: [10.069596, -69.292092], isCaninata: true, label: "4K" },
+  { pos: [10.060223, -69.293289], isCaninata: true, label: "5K" },
+  { pos: [10.052219, -69.286893], isCaninata: true, label: "6K" },
+  { pos: [10.062017, -69.277521], isCaninata: true, label: "7K" },
+  { pos: [10.067928, -69.282669], isCaninata: true, label: "8K" },
+  { pos: [10.069459, -69.288448], isCaninata: true, label: "9K" },
 ];
 
-/* ─────────────────────────────────────────────────────────────────────────── */
-/* [V15.1-4] WAYPOINTS CANINATA 5K — sobre el loop norte real corregido      */
-/* ─────────────────────────────────────────────────────────────────────────── */
 const CANINATA_WAYPOINTS_5K = [
-  {
-    pos: [10.070519, -69.291850], isMeta: true, isCaninata: true, label: "META",
-    pois: [{ icon: "🐾", color: "#FDD454" }, { icon: "🩺", color: "#22c55e" }],
-  },
-  { pos: [10.077091, -69.289493], isCaninata: true, label: "1K",  pois: [] },
-  { pos: [10.082015, -69.288985], isCaninata: true, label: "2K",  pois: [{ icon: "P", color: "#3b82f6" }] },
-  { pos: [10.080257, -69.292086], isCaninata: true, label: "3K",  pois: [{ icon: "🩺", color: "#22c55e" }] },
-  { pos: [10.075447, -69.283329], isCaninata: true, label: "4K",  pois: [{ icon: "P", color: "#3b82f6" }] },
-  { pos: [10.073282, -69.290226], isCaninata: true, label: "5K",  pois: [] },
+  { pos: [10.070519, -69.291850], isMeta: true, isCaninata: true, label: "META", pois: [{ icon: "🐾", color: "#FDD454" }, { icon: "🩺", color: "#22c55e" }] },
+  { pos: [10.077091, -69.289493], isCaninata: true, label: "1K", pois: [] },
+  { pos: [10.082015, -69.288985], isCaninata: true, label: "2K", pois: [{ icon: "P", color: "#3b82f6" }] },
+  { pos: [10.080257, -69.292086], isCaninata: true, label: "3K", pois: [{ icon: "🩺", color: "#22c55e" }] },
+  { pos: [10.075447, -69.283329], isCaninata: true, label: "4K", pois: [{ icon: "P", color: "#3b82f6" }] },
+  { pos: [10.073282, -69.290226], isCaninata: true, label: "5K", pois: [] },
 ];
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* COMING SOON PANEL (V14 — sin cambios)                                      */
+/* [V15.2-2] COMING SOON PANEL — distingue CERRADA vs PRÓXIMA                */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
   race: any;
@@ -322,14 +253,20 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
     ? new Date(race.date + "T00:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" }).toUpperCase()
     : "—";
 
-  const banner       = getRaceBanner(race?.name ?? "");
-  const countdown    = useCountdown(race?.date);
-  const inscAbiertas = race?.inscripciones_abiertas ?? INSCRIPCIONES_ABIERTAS;
+  const banner    = getRaceBanner(race?.name ?? "");
+  const countdown = useCountdown(race?.date);
+
+  // [V15.2-2] Carrera "cerrada con datos reales": tiene location, date
+  // pero INSCRIPCIONES_ABIERTAS=false y no es caninata
+  const hasRealData  = !!(race?.location && race?.date);
+  const isClosed     = hasRealData && !INSCRIPCIONES_ABIERTAS && !isCaninataRace(race?.name ?? "");
+  const isCoroFalcon = isCoroRace(race?.name ?? "");
 
   return (
     <div className="min-h-screen w-full bg-[#03070b] flex flex-col text-white relative font-sans pt-[85px] md:pt-[104px] pb-12 overflow-y-auto">
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-amber-500/5 blur-[120px] rounded-full" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[400px] blur-[120px] rounded-full"
+          style={{ background: isClosed ? "rgba(220,38,38,0.04)" : "rgba(245,158,11,0.05)" }} />
         <div className="absolute bottom-1/4 left-1/3 w-[400px] h-[300px] bg-cyan-500/5 blur-[100px] rounded-full" />
       </div>
 
@@ -345,34 +282,56 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
         <motion.div
           initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
-          className="w-full bg-white/[0.02] border border-white/8 rounded-[2.5rem] backdrop-blur-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.6)] flex flex-col items-center text-center"
+          className="w-full border rounded-[2.5rem] backdrop-blur-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.6)] flex flex-col items-center text-center"
+          style={{
+            background: "rgba(255,255,255,0.02)",
+            borderColor: isClosed ? "rgba(220,38,38,0.15)" : "rgba(255,255,255,0.05)",
+          }}
         >
           {banner && (
             <div className="w-full relative">
-              <img src={banner} alt={race?.name ?? "Banner de carrera"} loading="lazy" decoding="async" className="w-full h-auto object-cover" />
+              <img src={banner} alt={race?.name ?? "Banner"} loading="lazy" decoding="async"
+                className={`w-full h-auto object-cover ${isClosed ? "grayscale-[0.3] opacity-70" : ""}`} />
               <div className="absolute inset-0 bg-gradient-to-t from-[#03070b] via-transparent to-transparent" />
             </div>
           )}
 
           <div className="w-full flex flex-col items-center gap-6 p-7 sm:p-10 md:p-12">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-400/20">
-              <motion.span className="w-1.5 h-1.5 rounded-full bg-amber-400"
-                animate={{ opacity: [1, 0.2, 1] }} transition={{ duration: 1.8, repeat: Infinity }} />
-              <span className="text-[8px] font-black tracking-[0.4em] uppercase text-amber-300">
-                Detalles Operativos En Preparación
-              </span>
-            </div>
+
+            {/* Badge de estado */}
+            {isClosed ? (
+              /* [V15.2-2] CERRADA con datos */
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full border"
+                style={{ background: "rgba(220,38,38,0.08)", borderColor: "rgba(220,38,38,0.25)" }}>
+                <XCircle className="h-3.5 w-3.5 text-red-400" />
+                <span className="text-[8px] font-black tracking-[0.4em] uppercase text-red-400">
+                  Inscripciones Cerradas
+                </span>
+              </div>
+            ) : (
+              /* Original — próxima misión */
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-400/20">
+                <motion.span className="w-1.5 h-1.5 rounded-full bg-amber-400"
+                  animate={{ opacity: [1, 0.2, 1] }} transition={{ duration: 1.8, repeat: Infinity }} />
+                <span className="text-[8px] font-black tracking-[0.4em] uppercase text-amber-300">
+                  Detalles Operativos En Preparación
+                </span>
+              </div>
+            )}
 
             <div>
               <h1 className="text-3xl sm:text-4xl md:text-6xl font-black italic uppercase tracking-tighter leading-[0.9] text-white mb-3">
                 {race?.name ?? "PRÓXIMA MISIÓN"}
               </h1>
               <p className="text-white/30 text-sm font-bold tracking-widest uppercase">
-                La ruta táctica se revelará pronto
+                {isClosed
+                  ? "Las inscripciones para esta carrera han cerrado"
+                  : "La ruta táctica se revelará pronto"}
               </p>
             </div>
 
-            {countdown && (
+            {/* Countdown solo si no está cerrada */}
+            {!isClosed && countdown && (
               <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-cyan-500/[0.06] border border-cyan-400/15">
                 <Zap className="h-4 w-4 text-cyan-400" />
                 <span className="text-xs font-black text-cyan-300 tracking-[0.3em] uppercase">
@@ -387,37 +346,67 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
                 { icon: Calendar, label: "Fecha",     val: dateStr               },
                 { icon: Users,    label: "Inscritos", val: `${registeredCount}`  },
               ].map((item, i) => (
-                <div key={i} className="flex flex-col items-center gap-3 p-5 bg-white/[0.02] border border-white/5 rounded-2xl">
-                  <item.icon className="h-5 w-5 text-cyan-400" />
+                <div key={i} className="flex flex-col items-center gap-3 p-5 border rounded-2xl"
+                  style={{
+                    background: isClosed ? "rgba(220,38,38,0.03)" : "rgba(255,255,255,0.02)",
+                    borderColor: isClosed ? "rgba(220,38,38,0.1)" : "rgba(255,255,255,0.05)",
+                  }}>
+                  <item.icon className="h-5 w-5" style={{ color: isClosed ? "#f87171" : "#22d3ee" }} />
                   <div>
-                    <p className="text-[8px] font-black text-white/30 uppercase tracking-widest mb-1">{item.label}</p>
+                    <p className="text-[8px] font-black uppercase tracking-widest mb-1"
+                      style={{ color: "rgba(255,255,255,0.3)" }}>{item.label}</p>
                     <p className="text-sm font-black text-white uppercase">{item.val}</p>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="w-full h-px bg-white/5" />
+            <div className="w-full h-px" style={{ background: isClosed ? "rgba(220,38,38,0.1)" : "rgba(255,255,255,0.05)" }} />
 
-            <div className="flex items-start gap-4 text-left bg-cyan-500/[0.04] border border-cyan-400/10 rounded-2xl p-5 w-full">
-              <Shield className="h-5 w-5 text-cyan-400 mt-0.5 shrink-0" />
-              <p className="text-[11px] text-white/50 leading-relaxed">
-                El mapa de ruta, waypoints de hidratación, cronometraje y estructura de premios
-                serán publicados en las próximas semanas. Mantente atento al canal oficial de Rayocero.
-              </p>
-            </div>
+            {isClosed ? (
+              /* [V15.2-2] Panel de cierre definitivo */
+              <div className="w-full space-y-4">
+                <div className="flex items-start gap-4 text-left border rounded-2xl p-5 w-full"
+                  style={{ background: "rgba(220,38,38,0.05)", borderColor: "rgba(220,38,38,0.2)" }}>
+                  <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-wider text-red-400 mb-1">
+                      Inscripciones Cerradas
+                    </p>
+                    <p className="text-[11px] text-white/50 leading-relaxed">
+                      Las inscripciones para <strong className="text-white/70">{race?.name}</strong> han
+                      concluido. Si necesitas inscribirte, comunícate con la organización directamente
+                      o visita el canal oficial de Rayocero.
+                    </p>
+                  </div>
+                </div>
 
-            {inscAbiertas ? (
-              <button onClick={onRegister}
-                className="w-full py-6 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 bg-cyan-500 hover:bg-cyan-400 text-black shadow-[0_0_30px_rgba(0,242,255,0.2)] active:scale-95">
-                INSCRIBIRME <Zap className="h-4 w-4 fill-current" />
-              </button>
+                {/* Botón deshabilitado visualmente claro */}
+                <button
+                  disabled
+                  className="w-full py-6 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic flex items-center justify-center gap-4 cursor-not-allowed"
+                  style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.25)", color: "rgba(248,113,113,0.5)" }}
+                >
+                  <XCircle className="h-4 w-4" /> INSCRIPCIONES CERRADAS
+                </button>
+              </div>
             ) : (
-              <button onClick={onRegister}
-                className="w-full py-6 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
-                style={{ background: "rgba(255,40,40,0.08)", border: "1px solid rgba(255,60,60,0.28)", color: "#F87171" }}>
-                <Lock className="h-4 w-4" /> CUPO COMPLETO
-              </button>
+              /* Original — info futura */
+              <>
+                <div className="flex items-start gap-4 text-left bg-cyan-500/[0.04] border border-cyan-400/10 rounded-2xl p-5 w-full">
+                  <Shield className="h-5 w-5 text-cyan-400 mt-0.5 shrink-0" />
+                  <p className="text-[11px] text-white/50 leading-relaxed">
+                    El mapa de ruta, waypoints de hidratación, cronometraje y estructura de premios
+                    serán publicados en las próximas semanas. Mantente atento al canal oficial de Rayocero.
+                  </p>
+                </div>
+
+                <button onClick={onRegister}
+                  className="w-full py-6 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
+                  style={{ background: "rgba(255,40,40,0.08)", border: "1px solid rgba(255,60,60,0.28)", color: "#F87171" }}>
+                  <Lock className="h-4 w-4" /> CUPO COMPLETO
+                </button>
+              </>
             )}
           </div>
         </motion.div>
@@ -427,7 +416,7 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* BARQUISIMETO DETAIL (V14 — sin cambios)                                    */
+/* BARQUISIMETO DETAIL — V14 sin modificaciones                               */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const BarquisimetoDetail = ({ registeredCount, onRegister }: {
   registeredCount: number;
@@ -519,8 +508,8 @@ const BarquisimetoDetail = ({ registeredCount, onRegister }: {
 
           <div className="grid grid-cols-1 gap-4">
             {[
-              { icon: MapPin, label: "Salida / Meta",       val: "Monumento al Sol" },
-              { icon: Clock,  label: "Hora Operativa",      val: "19:00 HRS"        },
+              { icon: MapPin, label: "Salida / Meta",       val: "Monumento al Sol"  },
+              { icon: Clock,  label: "Hora Operativa",      val: "19:00 HRS"         },
               { icon: Users,  label: "Atletas Confirmados", val: `${registeredCount}` },
             ].map((item, i) => (
               <div key={i} className="flex items-center gap-6 p-5 bg-white/[0.02] border border-white/5 rounded-3xl group hover:border-cyan-500/30 transition-all backdrop-blur-md">
@@ -535,20 +524,14 @@ const BarquisimetoDetail = ({ registeredCount, onRegister }: {
             ))}
           </div>
 
-          {INSCRIPCIONES_ABIERTAS ? (
-            <button onClick={onRegister}
-              className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 bg-cyan-500 hover:bg-cyan-400 text-black shadow-[0_0_30px_rgba(0,242,255,0.2)] active:scale-95">
-              INSCRIBIRME <Zap className="h-4 w-4 fill-current" />
-            </button>
-          ) : (
-            <button onClick={onRegister}
-              className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
-              style={{ background: "rgba(255,40,40,0.08)", border: "1px solid rgba(255,60,60,0.28)", color: "#F87171" }}>
-              <Lock className="h-4 w-4" /> CUPO COMPLETO
-              <motion.span className="w-2 h-2 rounded-full" style={{ background: "#FF4444" }}
-                animate={{ opacity: [1, 0.2, 1] }} transition={{ duration: 2, repeat: Infinity }} />
-            </button>
-          )}
+          {/* Barquisimeto siempre cerrada — cupo completo */}
+          <button onClick={onRegister}
+            className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
+            style={{ background: "rgba(255,40,40,0.08)", border: "1px solid rgba(255,60,60,0.28)", color: "#F87171" }}>
+            <Lock className="h-4 w-4" /> CUPO COMPLETO
+            <motion.span className="w-2 h-2 rounded-full" style={{ background: "#FF4444" }}
+              animate={{ opacity: [1, 0.2, 1] }} transition={{ duration: 2, repeat: Infinity }} />
+          </button>
 
           <div className="pt-6 border-t border-white/5">
             <p className="text-[9px] font-black tracking-[0.3em] text-white/40 uppercase mb-6">Leyenda Operativa</p>
@@ -584,23 +567,28 @@ const BarquisimetoDetail = ({ registeredCount, onRegister }: {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* CORO DETAIL (V14 — sin cambios)                                            */
+/* [V15.2-1] CORO DETAIL — Inscripciones cerradas, mapa intacto              */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const CoroDetail = ({ race, registeredCount, onRegister }: {
   race: any;
   registeredCount: number;
   onRegister: (e: React.MouseEvent) => void;
 }) => {
-  const navigate     = useNavigate();
-  const mapBounds    = useMemo(() => L.latLngBounds(coroRoute), []);
-  const banner       = getRaceBanner(race?.name ?? "");
-  const inscAbiertas = race?.inscripciones_abiertas ?? INSCRIPCIONES_ABIERTAS;
-  const dateStr      = race?.date
+  const navigate  = useNavigate();
+  const mapBounds = useMemo(() => L.latLngBounds(coroRoute), []);
+  const banner    = getRaceBanner(race?.name ?? "");
+
+  // [V15.2-1] inscAbiertas lee de Supabase pero Coro está cerrada
+  const inscAbiertas = race?.inscripciones_abiertas ?? false;
+
+  const dateStr = race?.date
     ? new Date(race.date + "T00:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" }).toUpperCase()
     : "20 . AGO . 2026";
 
   return (
     <div className="h-screen w-full bg-[#03070b] flex flex-col lg:flex-row overflow-hidden text-white relative font-sans pt-[85px] md:pt-[104px] z-0">
+
+      {/* ── MAPA — intacto ── */}
       <div className="relative w-full lg:w-[65%] h-[45vh] lg:h-full bg-[#080808] z-0">
         <MapComp bounds={mapBounds} zoom={14} className="h-full w-full z-10" zoomControl={false}>
           <MapController bounds={mapBounds} />
@@ -620,6 +608,7 @@ const CoroDetail = ({ race, registeredCount, onRegister }: {
         </div>
       </div>
 
+      {/* ── SIDEBAR ── */}
       <aside className="w-full lg:w-[35%] h-[55vh] lg:h-full overflow-y-auto bg-[#03070b] p-8 lg:p-12 custom-scrollbar border-l border-white/5 relative z-10">
         <div className="flex items-center justify-between mb-8 pb-6 border-b border-white/5">
           <button onClick={() => navigate(-1)}
@@ -632,16 +621,17 @@ const CoroDetail = ({ race, registeredCount, onRegister }: {
               <p className="text-[9px] font-black text-cyan-400 tracking-widest leading-none">RAYOCERO</p>
               <p className="text-[7px] text-white/30 font-bold uppercase mt-1">499 RUN CORO FALCÓN</p>
             </div>
-            <div className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_10px_#00f2ff]" />
+            {/* [V15.2-1] Dot rojo = cerrada */}
+            <div className="h-2 w-2 rounded-full bg-red-500" style={{ boxShadow: "0 0 8px #ef4444" }} />
           </div>
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-12 pb-10">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-10 pb-10">
           {banner && (
             <div className="w-full relative rounded-2xl overflow-hidden border border-white/10 shadow-[0_0_40px_rgba(34,211,238,0.08)] group">
               <div className="absolute inset-0 bg-gradient-to-t from-[#03070b] via-transparent to-transparent opacity-50 z-10 pointer-events-none" />
               <img src={banner} alt={race?.name ?? "499 Run Coro Falcón"}
-                className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                className="w-full h-auto object-cover opacity-70 group-hover:opacity-90 transition-opacity duration-500" />
             </div>
           )}
 
@@ -654,9 +644,9 @@ const CoroDetail = ({ race, registeredCount, onRegister }: {
 
           <div className="grid grid-cols-1 gap-4">
             {[
-              { icon: MapPin, label: "Salida / Meta",       val: "Av. Manaure, Coro" },
-              { icon: Clock,  label: "Hora Operativa",      val: race?.time ?? "Por confirmar" },
-              { icon: Users,  label: "Atletas Confirmados", val: `${registeredCount}` },
+              { icon: MapPin, label: "Salida / Meta",       val: "Av. Manaure, Coro"               },
+              { icon: Clock,  label: "Hora Operativa",      val: race?.time ?? "Por confirmar"     },
+              { icon: Users,  label: "Atletas Confirmados", val: `${registeredCount}`              },
             ].map((item, i) => (
               <div key={i} className="flex items-center gap-6 p-5 bg-white/[0.02] border border-white/5 rounded-3xl group hover:border-cyan-500/30 transition-all backdrop-blur-md">
                 <div className="h-12 w-12 flex items-center justify-center bg-cyan-400/10 rounded-2xl text-cyan-400 transition-colors group-hover:bg-cyan-400 group-hover:text-black">
@@ -670,18 +660,39 @@ const CoroDetail = ({ race, registeredCount, onRegister }: {
             ))}
           </div>
 
-          {inscAbiertas ? (
+          {/* [V15.2-1] Panel de cierre — siempre visible para Coro */}
+          {!inscAbiertas ? (
+            <div className="space-y-4">
+              {/* Info de cierre */}
+              <div className="flex items-start gap-4 p-5 rounded-2xl border"
+                style={{ background: "rgba(220,38,38,0.05)", borderColor: "rgba(220,38,38,0.2)" }}>
+                <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-wider text-red-400 mb-1">
+                    Inscripciones Cerradas
+                  </p>
+                  <p className="text-[11px] text-white/50 leading-relaxed">
+                    Las inscripciones para <strong className="text-white/70">499 Run Coro Falcón</strong> han
+                    concluido. Inscripciones adicionales solo a través de la organización.
+                    El mapa de ruta permanece disponible para los atletas registrados.
+                  </p>
+                </div>
+              </div>
+
+              {/* Botón deshabilitado */}
+              <button
+                disabled
+                className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic flex items-center justify-center gap-4 cursor-not-allowed"
+                style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.25)", color: "rgba(248,113,113,0.5)" }}
+              >
+                <XCircle className="h-4 w-4" /> INSCRIPCIONES CERRADAS
+              </button>
+            </div>
+          ) : (
+            /* Si en algún futuro se reabre */
             <button onClick={onRegister}
               className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 bg-cyan-500 hover:bg-cyan-400 text-black shadow-[0_0_30px_rgba(0,242,255,0.2)] active:scale-95">
               INSCRIBIRME <Zap className="h-4 w-4 fill-current" />
-            </button>
-          ) : (
-            <button onClick={onRegister}
-              className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
-              style={{ background: "rgba(255,40,40,0.08)", border: "1px solid rgba(255,60,60,0.28)", color: "#F87171" }}>
-              <Lock className="h-4 w-4" /> CUPO COMPLETO
-              <motion.span className="w-2 h-2 rounded-full" style={{ background: "#FF4444" }}
-                animate={{ opacity: [1, 0.2, 1] }} transition={{ duration: 2, repeat: Infinity }} />
             </button>
           )}
 
@@ -719,7 +730,7 @@ const CoroDetail = ({ race, registeredCount, onRegister }: {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* CANINATA DETAIL — V15.1 (rutas corregidas, lógica V15.0 intacta)          */
+/* [V15.2-3] CANINATA DETAIL — inscAbiertas siempre TRUE                     */
 /* ─────────────────────────────────────────────────────────────────────────── */
 type CaninataMode = "10K" | "5K";
 
@@ -736,14 +747,14 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
     return L.latLngBounds(route);
   }, [activeMode]);
 
-  const inscAbiertas = race?.inscripciones_abiertas ?? INSCRIPCIONES_ABIERTAS;
+  // [V15.2-3] Caninata SIEMPRE abierta — override del flag global
+  const inscAbiertas = true;
 
   const dateStr = race?.date
     ? new Date(race.date + "T00:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" }).toUpperCase()
     : "4 . OCT . 2026";
 
-  const banner = getRaceBanner(race?.name ?? "");
-
+  const banner     = getRaceBanner(race?.name ?? "");
   const ACCENT_10K = "#D09644";
   const ACCENT_AMB = "#FDD454";
 
@@ -753,8 +764,7 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
 
       {/* MAPA */}
       <div className="relative w-full lg:w-[65%] h-[45vh] lg:h-full z-0" style={{ background: "#050801" }}>
-
-        {/* Toggle */}
+        {/* Toggle 10K / 5K */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[600] flex gap-1 p-1 rounded-full"
           style={{ background: "rgba(5,8,1,0.85)", border: "1px solid rgba(253,212,84,0.2)", backdropFilter: "blur(12px)" }}>
           {(["10K", "5K"] as CaninataMode[]).map((mode) => (
@@ -764,11 +774,7 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
               className="px-5 py-2 rounded-full font-black text-[10px] tracking-[0.3em] uppercase transition-all"
               style={
                 activeMode === mode
-                  ? {
-                      background: mode === "10K" ? ACCENT_10K : "#3C491F",
-                      color: mode === "10K" ? "#050801" : "#FDD454",
-                      boxShadow: `0 0 16px ${mode === "10K" ? "#D0964455" : "#3C491F55"}`,
-                    }
+                  ? { background: mode === "10K" ? ACCENT_10K : "#3C491F", color: mode === "10K" ? "#050801" : "#FDD454", boxShadow: `0 0 16px ${mode === "10K" ? "#D0964455" : "#3C491F55"}` }
                   : { color: "rgba(255,255,255,0.4)" }
               }>
               {mode === "10K" ? "🏃 10K CARRERA" : "🐾 5K CAMINATA"}
@@ -782,11 +788,8 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
             <MapComp bounds={mapBounds} zoom={14} className="h-full w-full z-10" zoomControl={false}>
               <MapController bounds={mapBounds} />
               <TileComp url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution="&copy; CARTO" />
-              <CircleComp
-                center={[10.070519, -69.291850]}
-                radius={200}
-                pathOptions={{ color: ACCENT_AMB, fillColor: ACCENT_AMB, fillOpacity: 0.06, weight: 1, className: "radar-pulse-caninata" }}
-              />
+              <CircleComp center={[10.070519, -69.291850]} radius={200}
+                pathOptions={{ color: ACCENT_AMB, fillColor: ACCENT_AMB, fillOpacity: 0.06, weight: 1, className: "radar-pulse-caninata" }} />
               {activeMode === "10K" && (
                 <>
                   <PolyComp positions={caninataRoute10K}
@@ -834,6 +837,7 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
               <p className="text-[9px] font-black tracking-widest leading-none" style={{ color: ACCENT_AMB }}>RAYOCERO</p>
               <p className="text-[7px] font-bold uppercase mt-1" style={{ color: "rgba(255,255,255,0.25)" }}>CANINATA BCO</p>
             </div>
+            {/* [V15.2-3] Dot dorado = abierta */}
             <motion.div className="h-2 w-2 rounded-full"
               style={{ background: ACCENT_AMB, boxShadow: `0 0 10px ${ACCENT_AMB}` }}
               animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 2, repeat: Infinity }} />
@@ -880,10 +884,10 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
 
           <div className="grid grid-cols-1 gap-3">
             {[
-              { icon: MapPin, label: "Salida / Meta",  val: "Lidotel Barquisimeto"            },
-              { icon: Clock,  label: "Hora Operativa", val: race?.time ?? "Por confirmar"     },
-              { icon: Users,  label: "Inscritos",      val: `${registeredCount}`              },
-              { icon: Heart,  label: "Causa",          val: "Castración Animal"               },
+              { icon: MapPin, label: "Salida / Meta",  val: "Lidotel Barquisimeto"         },
+              { icon: Clock,  label: "Hora Operativa", val: race?.time ?? "Por confirmar"  },
+              { icon: Users,  label: "Inscritos",      val: `${registeredCount}`           },
+              { icon: Heart,  label: "Causa",          val: "Castración Animal"            },
             ].map((item, i) => (
               <div key={i} className="flex items-center gap-5 p-4 rounded-2xl transition-all"
                 style={{ background: "rgba(253,212,84,0.02)", border: "1px solid rgba(253,212,84,0.06)" }}
@@ -917,27 +921,16 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
             </div>
           </div>
 
- 
-
-          {inscAbiertas ? (
-            <button onClick={onRegister}
-              className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
-              style={{
-                background: `linear-gradient(135deg, ${ACCENT_10K}, ${ACCENT_AMB})`,
-                color: "#050801",
-                boxShadow: `0 0 30px rgba(208,150,68,0.25)`,
-              }}>
-              INSCRIBIRME <ChevronRight className="h-4 w-4" />
-            </button>
-          ) : (
-            <button onClick={onRegister}
-              className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
-              style={{ background: "rgba(255,40,40,0.08)", border: "1px solid rgba(255,60,60,0.28)", color: "#F87171" }}>
-              <Lock className="h-4 w-4" /> CUPO COMPLETO
-              <motion.span className="w-2 h-2 rounded-full" style={{ background: "#FF4444" }}
-                animate={{ opacity: [1, 0.2, 1] }} transition={{ duration: 2, repeat: Infinity }} />
-            </button>
-          )}
+          {/* [V15.2-3] Botón siempre activo para Caninata */}
+          <button onClick={onRegister}
+            className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
+            style={{
+              background: `linear-gradient(135deg, ${ACCENT_10K}, ${ACCENT_AMB})`,
+              color: "#050801",
+              boxShadow: `0 0 30px rgba(208,150,68,0.25)`,
+            }}>
+            INSCRIBIRME <ChevronRight className="h-4 w-4" />
+          </button>
 
           <div className="pt-5" style={{ borderTop: "1px solid rgba(253,212,84,0.06)" }}>
             <p className="text-[9px] font-black tracking-[0.3em] uppercase mb-5" style={{ color: "rgba(255,255,255,0.3)" }}>
@@ -945,12 +938,12 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
             </p>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               {[
-                { color: ACCENT_10K, icon: "1K", label: "KM 10K"     },
-                { color: "#4ade80",  icon: "🐾", label: "MASCOTAS"   },
-                { color: "#3b82f6",  icon: "P",  label: "HIDRATACIÓN"},
-                { color: "#22c55e",  icon: "🩺", label: "VETERINARIO"},
-                { color: ACCENT_AMB, icon: "C",  label: "CRONO"      },
-                { color: "#94a3b8",  icon: "B",  label: "BAÑOS"      },
+                { color: ACCENT_10K, icon: "1K", label: "KM 10K"      },
+                { color: "#4ade80",  icon: "🐾", label: "MASCOTAS"    },
+                { color: "#3b82f6",  icon: "P",  label: "HIDRATACIÓN" },
+                { color: "#22c55e",  icon: "🩺", label: "VETERINARIO" },
+                { color: ACCENT_AMB, icon: "C",  label: "CRONO"       },
+                { color: "#94a3b8",  icon: "B",  label: "BAÑOS"       },
               ].map((l) => (
                 <div key={l.label} className="flex items-center gap-2">
                   <div className="h-8 w-8 rounded-full border flex items-center justify-center text-[10px] font-black"
@@ -976,26 +969,23 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* MAIN COMPONENT — router dinámico V15                                       */
+/* MAIN COMPONENT — router dinámico V15.2                                     */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const RaceDetail = () => {
-  const { id }     = useParams();
-  const navigate   = useNavigate();
+  const { id }   = useParams();
+  const navigate = useNavigate();
   const [race, setRace]                       = useState<any>(null);
   const [loading, setLoading]                 = useState(true);
   const [registeredCount, setRegisteredCount] = useState(0);
 
   useEffect(() => {
+    if (!id) return;
     const fetchRace = async () => {
-      if (!id) return;
       try {
         const { data, error } = await supabase.from("races").select("*").eq("id", id).single();
         if (!error) setRace(data);
-      } catch (err) {
-        console.error("[MIA] Error fetching race:", err);
-      } finally {
-        setLoading(false);
-      }
+      } catch (err) { console.error("[MIA] Error fetching race:", err); }
+      finally { setLoading(false); }
     };
     fetchRace();
   }, [id]);
@@ -1042,17 +1032,11 @@ const RaceDetail = () => {
     );
   }
 
-  // Router V15 — Caninata primero
+  // Router V15.2 — Caninata evaluada primero
   if (race && hasMapConfig(race.name)) {
-    if (isCaninataRace(race.name)) {
-      return <CaninataDetail race={race} registeredCount={registeredCount} onRegister={handleRegister} />;
-    }
-    if (isBarquisimetoRace(race.name)) {
-      return <BarquisimetoDetail registeredCount={registeredCount} onRegister={handleRegister} />;
-    }
-    if (isCoroRace(race.name)) {
-      return <CoroDetail race={race} registeredCount={registeredCount} onRegister={handleRegister} />;
-    }
+    if (isCaninataRace(race.name))    return <CaninataDetail    race={race} registeredCount={registeredCount} onRegister={handleRegister} />;
+    if (isBarquisimetoRace(race.name)) return <BarquisimetoDetail            registeredCount={registeredCount} onRegister={handleRegister} />;
+    if (isCoroRace(race.name))        return <CoroDetail         race={race} registeredCount={registeredCount} onRegister={handleRegister} />;
   }
 
   return (
