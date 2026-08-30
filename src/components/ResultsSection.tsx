@@ -1,14 +1,26 @@
 /**
- * RAYOCERO — RESULTS SECTION V3.1 · TACTICAL CERTIFICATE ENGINE
+ * RAYOCERO — RESULTS SECTION V4.0 · 499 RUN CORO · TACTICAL CERTIFICATE ENGINE
  * CEO: Lualdo Sciscioli | Valkyron Group
  *
- * CHANGELOG V3.1 (sobre V2.7 funcional):
- * ─ RESTAURADO: diseño portrait 1080×1920 con fondo mapa original
- * ─ Posición categoría formato X/Total — CATEGORY_COUNTS dinámico
- * ─ Posición general ELIMINADA del certificado PNG
- * ─ Off-screen: rs-cert-offscreen-wrapper absolute -9999px
- * ─ html-to-image: await document.fonts.ready + warm-up pass + pixelRatio:2 + backgroundColor:#03070b
- * ─ Todo lo demás del V2.7 preservado intacto
+ * CHANGELOG V4.0 (sobre V3.1 funcional — base preservada íntegra):
+ * ─ EVENTO: 499 RUN CORO, FALCÓN 2026 (RACE_ID_CORO). Búsqueda scoped por race_id:
+ *   un dorsal de Lara/Barquisimeto NO resuelve en esta consulta.
+ * ─ SPONSORS ELIMINADOS de la consulta web (bloque .rs-sponsors-center, imports 15/22/12,
+ *   SPONSORS_WEB) y del certificado PNG. Header del cert: logo + tag del evento.
+ *   Footer: "POWERED BY VALKYRON GROUP" en tipografía, sin dependencia de assets.
+ * ─ DATA POST-CARRERA: se lee de src/data/resultados_499_coro_2026.json.
+ *   El archivo puede existir vacío ([]) antes de la carrera: RESULTS_PUBLISHED conmuta
+ *   el estado "resultados en procesamiento" sin romper el render ni el fallback a Supabase.
+ * ─ MODALIDAD DUAL 10K / 4K: distancia dinámica (DIST_KM) alimentando ritmo y velocidad.
+ *   TOTAL_FINISHERS y CATEGORY_COUNTS se calculan POR MODALIDAD (no globales).
+ * ─ Tabla general con segmentación 10K · 4K y contadores independientes.
+ * ─ Dorsales a 4 dígitos (reinicio por carrera, 0001…).
+ * ─ Todo el resto del V3.1 (engine html-to-image warm-up, cert 1080×1920, mapa GPS,
+ *   scroll infinito, responsive ≤380px) preservado intacto.
+ *
+ * ASSETS REQUERIDOS (ya presentes en el repo, sustituibles por los de Coro):
+ *   CERT_BG_IMG  → @/assets/IMG_4003.jpg   (cambiar por mapa aéreo de Coro cuando esté)
+ *   CERT_LOGO_IMG→ @/assets/logo.png       (cambiar por logo-499.png cuando esté)
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
@@ -17,14 +29,39 @@ import { supabase } from '@/lib/supabase';
 import { toPng } from 'html-to-image';
 import type { GeoPoint } from '@/components/RouteMapStrava';
 
-import sponsor15  from '@/assets/15.png';
-import sponsor12  from '@/assets/12.png';
-import sponsor22  from '@/assets/22.png';
-import mapImg     from '@/assets/IMG_4003.jpg';
-import logoImg    from '@/assets/logo.png';
-import RESULTADOS_JSON from '@/data/resultados_werun10k_2026.json';
+import mapImg  from '@/assets/IMG_4003.jpg';
+import logoImg from '@/assets/logo.png';
+import RESULTADOS_JSON from '@/data/resultados_499_coro_2026.json';
 
 const RouteMapStrava = lazy(() => import('@/components/RouteMapStrava'));
+
+/* ────────────────────────────────────────────────────────────── */
+/* CONFIGURACIÓN DE CARRERA — 499 RUN CORO                        */
+/* ────────────────────────────────────────────────────────────── */
+
+/** UUID de la carrera en la tabla `races`. Sustituir por el valor real de Supabase. */
+const RACE_ID_CORO = import.meta.env.VITE_RACE_ID_CORO ?? '499-coro-2026';
+
+const RACE_NAME_LONG  = '499 RUN · CORO, FALCÓN';
+const RACE_NAME_SHORT = '499 RUN CORO';
+const RACE_DATE       = '2026';
+const RACE_CITY       = 'CORO, FALCÓN';
+
+/** Assets del certificado — punto único de cambio. */
+const CERT_BG_IMG   = mapImg;
+const CERT_LOGO_IMG = logoImg;
+
+type Modalidad = '10K' | '4K';
+
+/** Distancia oficial por modalidad [km]. Alimenta ritmo y velocidad media. */
+const DIST_KM: Record<Modalidad, number> = { '10K': 10, '4K': 4 };
+
+const MODALIDADES: Modalidad[] = ['10K', '4K'];
+
+const MODALIDAD_LABEL: Record<Modalidad, string> = {
+  '10K': '10K COMPETITIVA',
+  '4K':  '4K CAMINATA RECREATIVA',
+};
 
 /* ────────────────────────────────────────────────────────────── */
 /* TYPES                                                          */
@@ -36,6 +73,7 @@ interface RunnerResult {
   apellido: string;
   categoria: string;
   genero: string;
+  modalidad: Modalidad;
   race_status: string;
   finish_time_seconds: number | null;
   start_time: string | null;
@@ -55,36 +93,66 @@ interface JsonAtleta {
   nombre_completo: string;
   categoria: string;
   genero: string;
+  modalidad: Modalidad;          // V4.0 — segmentación 10K / 4K
   tiempo_oficial: string;
   tiempo_chip: string;
   tiempo_bruto: string;
   tiempo_neto: string;
-  posicion_general: number;
+  posicion_general: number;      // ranking dentro de su modalidad
   posicion_genero: number;
   posicion_categoria: number;
   pace: string;
   velocidad_kmh: number;
   sin_tiempo: boolean;
-  total_categoria: number;  // total inscritos en la categoría
+  total_categoria: number;       // total inscritos en la categoría (misma modalidad)
 }
 
 /* ────────────────────────────────────────────────────────────── */
-/* ÍNDICE Y CONTEOS                                               */
+/* ÍNDICE Y CONTEOS — POR MODALIDAD                               */
 /* ────────────────────────────────────────────────────────────── */
 
-const RESULTADOS = RESULTADOS_JSON as JsonAtleta[];
+/** Normaliza modalidad ausente en JSON legacy → '10K'. */
+const normModalidad = (m: unknown): Modalidad => (m === '4K' ? '4K' : '10K');
+
+const RESULTADOS: JsonAtleta[] = (RESULTADOS_JSON as JsonAtleta[]).map(r => ({
+  ...r,
+  modalidad: normModalidad(r.modalidad),
+}));
+
+/** true cuando el JSON post-carrera ya fue publicado en el repo. */
+const RESULTS_PUBLISHED = RESULTADOS.length > 0;
 
 const RESULTADOS_INDEX = new Map<number, JsonAtleta>(
   RESULTADOS.map(r => [r.dorsal, r])
 );
 
-const TOTAL_FINISHERS = RESULTADOS.filter(r => !r.sin_tiempo).length;
+/** Finishers por modalidad — denominador de "POS. GENERAL". */
+const TOTAL_FINISHERS: Record<Modalidad, number> = {
+  '10K': RESULTADOS.filter(r => r.modalidad === '10K' && !r.sin_tiempo).length,
+  '4K':  RESULTADOS.filter(r => r.modalidad === '4K'  && !r.sin_tiempo).length,
+};
 
-// CATEGORY_COUNTS = total inscritos por categoría (con Y sin tiempo), leído del JSON
-const CATEGORY_COUNTS: Record<string, number> = RESULTADOS.reduce((acc, r) => {
-  if (!acc[r.categoria]) acc[r.categoria] = r.total_categoria ?? 0;
-  return acc;
-}, {} as Record<string, number>);
+const catKey = (mod: Modalidad, cat: string) => `${mod}::${cat}`;
+
+/**
+ * CATEGORY_COUNTS = total inscritos por (modalidad, categoría).
+ * Prioriza `total_categoria` del JSON; si viene en 0/ausente, cae al conteo real.
+ */
+const CATEGORY_COUNTS: Record<string, number> = (() => {
+  const declared: Record<string, number> = {};
+  const counted:  Record<string, number> = {};
+  for (const r of RESULTADOS) {
+    const k = catKey(r.modalidad, r.categoria);
+    counted[k] = (counted[k] ?? 0) + 1;
+    if (!declared[k] && r.total_categoria) declared[k] = r.total_categoria;
+  }
+  const out: Record<string, number> = {};
+  for (const k of Object.keys(counted)) out[k] = declared[k] || counted[k];
+  return out;
+})();
+
+const getCatTotal = (mod: Modalidad, cat: string): number =>
+  CATEGORY_COUNTS[catKey(mod, cat)] ?? 0;
 
 /* ────────────────────────────────────────────────────────────── */
 /* HELPERS                                                        */
@@ -99,7 +167,8 @@ const formatTime = (secs: number): string => {
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
 };
 
-const formatPace = (secs: number, distKm = 10): string => {
+/** Ritmo medio = t / d. distKm ahora es obligatorio y depende de la modalidad. */
+const formatPace = (secs: number, distKm: number): string => {
   const paceSecPerKm = secs / distKm;
   const m = Math.floor(paceSecPerKm / 60);
   const s = Math.floor(paceSecPerKm % 60);
@@ -112,6 +181,26 @@ const normalizePace = (p: string | null): string | null => {
   const m = p.match(/^(\d+):(\d{2})$/);
   if (m) return `${m[1]}'${m[2]}"`;
   return p;
+};
+
+/** v [km/h] = 3600 · d / t */
+const speedKmh = (secs: number, distKm: number): number => (3600 * distKm) / secs;
+
+/** "HH:MM:SS" | "MM:SS.cc" → segundos. Null si no parsea. */
+const parseTimeToSeconds = (t: string | null | undefined): number | null => {
+  if (!t) return null;
+  const p = t.split(':');
+  if (p.length === 3) {
+    const [h, m, s] = p;
+    const v = parseInt(h) * 3600 + parseInt(m) * 60 + parseFloat(s);
+    return isNaN(v) ? null : v;
+  }
+  if (p.length === 2) {
+    const [m, s] = p;
+    const v = parseInt(m) * 60 + parseFloat(s);
+    return isNaN(v) ? null : v;
+  }
+  return null;
 };
 
 const statusLabel = (status: string) => {
@@ -144,19 +233,17 @@ const catColor = (cat: string): string => {
   if (c.includes('master d'))  return '#c084fc';
   if (c.includes('absoluto'))  return '#fbbf24';
   if (c.includes('movilidad')) return '#a78bfa';
+  if (c.includes('caminata'))  return '#facc15';
   return '#00f2ff';
 };
 
 const medalEmoji = (pos: number) =>
   pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : null;
 
-const SPONSORS_WEB = [
-  { src: sponsor15, alt: 'Sponsor 15' },
-  { src: sponsor22, alt: 'Sponsor 22' },
-];
+const bib4 = (n: number) => String(n).padStart(4, '0');
 
 /* ────────────────────────────────────────────────────────────── */
-/* CSS — preservado de V2.7 + mejoras mínimas                    */
+/* CSS — base V3.1 preservada · bloque sponsors retirado          */
 /* ────────────────────────────────────────────────────────────── */
 
 const CSS = `
@@ -190,20 +277,22 @@ const CSS = `
   .rs-search-btn:active:not(:disabled) { transform: scaleX(0.98); }
   .rs-search-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+  .rs-notice { max-width: 700px; margin: 0 auto 2.5rem; padding: 14px 20px; border: 1px solid rgba(0,242,255,0.14); background: rgba(0,242,255,0.03); border-radius: 4px; display: flex; align-items: center; gap: 12px; }
+  .rs-notice-text { font-size: 9px; font-weight: 700; letter-spacing: 0.22em; color: rgba(0,242,255,0.65); text-transform: uppercase; line-height: 1.7; }
+
   .rs-card { max-width: 1100px; margin: 0 auto; padding: 0 2rem 6rem; }
   .rs-card-inner { position: relative; border-top: 1px solid rgba(255,255,255,0.08); border-bottom: 1px solid rgba(255,255,255,0.08); padding: 4rem 0; }
   .rs-bib-watermark { position: absolute; top: 50%; right: -2rem; transform: translateY(-50%); font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: clamp(160px, 25vw, 300px); color: transparent; -webkit-text-stroke: 1px rgba(0,242,255,0.06); line-height: 1; pointer-events: none; user-select: none; letter-spacing: -0.04em; }
 
-  .rs-athlete-row { display: grid; grid-template-columns: auto auto 1fr; gap: 2.5rem; align-items: center; margin-bottom: 3rem; position: relative; }
-  .rs-sponsors-center { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 8px; align-self: stretch; }
-  .rs-sponsor-pill-sm { display: flex; align-items: center; justify-content: center; padding: 12px 22px; background: rgba(255,255,255,0.055); border: 1px solid rgba(255,255,255,0.09); border-radius: 6px; backdrop-filter: blur(10px); transition: border-color 0.2s, background 0.2s, transform 0.2s; flex: 1; }
-  .rs-sponsor-pill-sm:hover { border-color: rgba(0,242,255,0.2); background: rgba(255,255,255,0.09); transform: translateY(-2px); }
-  .rs-sponsor-pill-sm img { height: 60px; width: auto; max-width: 180px; object-fit: contain; filter: brightness(1.1) contrast(1.05); display: block; }
+  /* V4.0 — 2 columnas: atleta | estado. La columna central de sponsors fue retirada. */
+  .rs-athlete-row { display: grid; grid-template-columns: 1fr auto; gap: 2.5rem; align-items: center; margin-bottom: 3rem; position: relative; }
 
-  .rs-athlete-meta { font-size: 9px; font-weight: 700; letter-spacing: 0.35em; color: rgba(0,242,255,0.5); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
+  .rs-athlete-meta { font-size: 9px; font-weight: 700; letter-spacing: 0.35em; color: rgba(0,242,255,0.5); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .rs-athlete-meta-dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(0,242,255,0.3); }
   .rs-athlete-name-first { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: clamp(3rem, 8vw, 6rem); line-height: 0.85; text-transform: uppercase; color: #fff; letter-spacing: -0.02em; }
   .rs-athlete-name-last { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 300; font-size: clamp(3rem, 8vw, 6rem); line-height: 0.85; text-transform: uppercase; color: rgba(255,255,255,0.4); letter-spacing: -0.02em; }
+
+  .rs-mod-chip { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 2px; font-size: 8px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; border: 1px solid; }
 
   .rs-status-col { display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; padding-top: 1rem; }
   .rs-status-badge { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 3px; font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-size: 10px; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; white-space: nowrap; }
@@ -224,7 +313,7 @@ const CSS = `
   .rs-time-value { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: clamp(4rem, 12vw, 8rem); line-height: 1; color: #fff; letter-spacing: -0.02em; }
   .rs-time-value.has-time { color: #00f2ff; }
 
-  .rs-stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-bottom: 3rem; }
+  .rs-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0; margin-bottom: 3rem; }
   .rs-stat { padding: 1.5rem 0; border-right: 1px solid rgba(255,255,255,0.05); padding-right: 1.5rem; margin-right: 1.5rem; }
   .rs-stat:last-child { border-right: none; padding-right: 0; margin-right: 0; }
   .rs-stat-label { font-size: 7px; font-weight: 700; letter-spacing: 0.3em; color: rgba(255,255,255,0.2); text-transform: uppercase; margin-bottom: 0.5rem; }
@@ -252,7 +341,6 @@ const CSS = `
     z-index: -1;
   }
 
-  /* Canvas portrait 1080×1920 — igual que V2.7 */
   .rs-cert-canvas {
     width: 1080px;
     height: 1920px;
@@ -283,15 +371,17 @@ const CSS = `
 
   .rs-cert-header { display: flex; justify-content: space-between; align-items: flex-start; }
   .rs-cert-logo img { width: 350px; height: auto; object-fit: contain; }
-  .rs-cert-sponsors { display: flex; gap: 30px; align-items: center; }
-  .rs-cert-sponsors img { height: 70px; object-fit: contain; filter: brightness(1.2); }
+
+  /* V4.0 — el bloque de sponsors del header fue sustituido por el tag del evento */
+  .rs-cert-eventtag { text-align: right; padding-top: 10px; }
+  .rs-cert-eventtag-line1 { font-style: italic; font-weight: 900; font-size: 46px; letter-spacing: -0.01em; color: #00f2ff; line-height: 1; }
+  .rs-cert-eventtag-line2 { font-size: 20px; font-weight: 700; letter-spacing: 0.32em; color: rgba(255,255,255,0.35); text-transform: uppercase; margin-top: 12px; }
 
   .rs-cert-athlete { margin-top: auto; margin-bottom: 60px; }
   .rs-cert-athlete-meta { font-size: 24px; font-weight: 700; letter-spacing: 0.4em; color: #00f2ff; text-transform: uppercase; margin-bottom: 20px; display: flex; align-items: center; gap: 15px; }
   .rs-cert-name { font-style: italic; font-weight: 900; font-size: 110px; line-height: 0.85; text-transform: uppercase; letter-spacing: -0.02em; }
   .rs-cert-surname { font-style: italic; font-weight: 300; font-size: 110px; line-height: 0.85; text-transform: uppercase; color: rgba(255,255,255,0.5); letter-spacing: -0.02em; margin-top: 10px; }
 
-  /* Grid 2×3 — V2.7 corregido: 3 métricas en cert (sin pos general) */
   .rs-cert-metrics {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -330,8 +420,16 @@ const CSS = `
     letter-spacing: 0.5em; color: rgba(255,255,255,0.2); text-transform: uppercase;
   }
 
+  .rs-cert-powered { display: flex; align-items: baseline; gap: 12px; }
+  .rs-cert-powered-lbl { font-size: 16px; font-weight: 700; letter-spacing: 0.25em; color: rgba(255,255,255,0.18); text-transform: uppercase; }
+  .rs-cert-powered-val { font-style: italic; font-weight: 900; font-size: 24px; letter-spacing: 0.06em; color: rgba(255,255,255,0.45); text-transform: uppercase; }
+
   /* ── TABLA GENERAL ── */
   .rs-tabla-section { max-width: 1100px; margin: 0 auto; padding: 0 2rem 6rem; }
+  .rs-mod-tabs { display: flex; gap: 6px; margin-bottom: 1.25rem; }
+  .rs-mod-tab { padding: 9px 18px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 3px; color: rgba(255,255,255,0.3); font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 0.78rem; letter-spacing: 0.16em; text-transform: uppercase; cursor: pointer; transition: all 0.18s; }
+  .rs-mod-tab.active { background: rgba(0,242,255,0.07); border-color: rgba(0,242,255,0.28); color: #00f2ff; }
+  .rs-mod-tab:hover:not(.active) { color: rgba(255,255,255,0.55); }
   .rs-tabla-search-wrap { margin-bottom: 1.5rem; }
   .rs-tabla-search-box { display: flex; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
   .rs-tabla-search-box:focus-within { border-color: rgba(0,242,255,0.3); box-shadow: 0 0 0 1px rgba(0,242,255,0.1); }
@@ -372,38 +470,29 @@ const CSS = `
     .rs-title { font-size: clamp(52px, 16vw, 90px); }
     .rs-tabs-wrap { padding: 0 1.25rem 2rem; }
     .rs-search-wrap { padding: 0 1.25rem 3rem; }
+    .rs-notice { margin: 0 1.25rem 2rem; }
     .rs-card { padding: 0 1.25rem 4rem; }
     .rs-tabla-section { padding: 0 1.25rem 4rem; }
 
-    /* Stats — 2 columnas en mobile */
     .rs-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0; }
     .rs-stat { padding: 1rem 0; padding-right: 1rem; margin-right: 1rem; }
 
-    /* Atleta row — stack vertical */
     .rs-athlete-row { grid-template-columns: 1fr; gap: 1.25rem; }
-    .rs-sponsors-center { flex-direction: row; align-items: center; justify-content: flex-start; gap: 0.75rem; align-self: auto; }
-    .rs-sponsor-pill-sm { flex: unset; padding: 8px 14px; }
-    .rs-sponsor-pill-sm img { height: 28px; }
 
-    /* Status + botones — stack izquierda */
     .rs-status-col { align-items: flex-start; flex-direction: column; gap: 0.6rem; padding-top: 0; }
     .rs-action-btns { justify-content: flex-start; flex-wrap: wrap; gap: 6px; }
     .rs-share-btn { padding: 9px 14px; font-size: 8px; letter-spacing: 0.12em; }
 
-    /* Tiempos */
     .rs-time-hero { grid-template-columns: 1fr; gap: 1.25rem; }
     .rs-time-value { font-size: clamp(3rem, 15vw, 6rem); }
     .rs-bib-watermark { display: none; }
     .rs-card-inner { padding: 2rem 0; }
 
-    /* Nombre atleta */
     .rs-athlete-name-first, .rs-athlete-name-last { font-size: clamp(2.2rem, 10vw, 3.5rem); }
 
-    /* Search */
     .rs-search-input { font-size: 1.8rem; padding: 14px 16px; }
     .rs-search-btn { padding: 14px 18px; font-size: 0.72rem; }
 
-    /* Tabla */
     .rs-tbl-head { display: none; }
     .rs-tbl-row { grid-template-columns: 40px 1fr; grid-template-rows: auto auto; gap: 0.3rem 0.6rem; padding: 0.85rem 1rem; border-radius: 0; }
     .rs-tbl-cat-col, .rs-tbl-pace, .rs-tbl-catpos { display: none; }
@@ -412,7 +501,6 @@ const CSS = `
     .rs-tabla-stats { gap: 1rem; }
   }
 
-  /* Pantallas muy pequeñas (≤ 380px) */
   @media (max-width: 380px) {
     .rs-title { font-size: clamp(44px, 15vw, 72px); }
     .rs-search-input { font-size: 1.5rem; padding: 12px 14px; }
@@ -431,9 +519,9 @@ const CSS = `
 /* ────────────────────────────────────────────────────────────── */
 
 const TablaRow = ({ r }: { r: JsonAtleta }) => {
-  const accent = catColor(r.categoria);
-  const medal  = medalEmoji(r.posicion_general);
-  const totalCat = CATEGORY_COUNTS[r.categoria] ?? '?';
+  const accent   = catColor(r.categoria);
+  const medal    = medalEmoji(r.posicion_general);
+  const totalCat = getCatTotal(r.modalidad, r.categoria) || '?';
   return (
     <div className={`rs-tbl-row ${r.posicion_general <= 3 ? 'podio' : ''}`}>
       <div className="rs-tbl-pos">
@@ -441,7 +529,7 @@ const TablaRow = ({ r }: { r: JsonAtleta }) => {
       </div>
       <div className="rs-tbl-atleta">
         <div className="rs-tbl-nombre">{r.nombre_completo}</div>
-        <div className="rs-tbl-dorsal-lbl">#{String(r.dorsal).padStart(3,'0')}</div>
+        <div className="rs-tbl-dorsal-lbl">#{bib4(r.dorsal)} · {r.modalidad}</div>
       </div>
       <div className="rs-tbl-cat-col" style={{ display:'flex', alignItems:'center' }}>
         <span className="rs-tbl-cat-badge" style={{ color:accent, borderColor:`${accent}30`, background:`${accent}0d` }}>
@@ -449,7 +537,7 @@ const TablaRow = ({ r }: { r: JsonAtleta }) => {
         </span>
       </div>
       <div className="rs-tbl-time">{r.sin_tiempo ? 'Sin tiempo' : (r.tiempo_chip || r.tiempo_neto || r.tiempo_bruto)}</div>
-      <div className="rs-tbl-pace">{r.pace || '—'}</div>
+      <div className="rs-tbl-pace">{normalizePace(r.pace) || '—'}</div>
       <div className="rs-tbl-catpos">
         {r.posicion_categoria ? `${r.posicion_categoria}/${totalCat}` : '—'}
       </div>
@@ -458,13 +546,14 @@ const TablaRow = ({ r }: { r: JsonAtleta }) => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* TABLA GENERAL                                                  */
+/* TABLA GENERAL — segmentada por modalidad                       */
 /* ────────────────────────────────────────────────────────────── */
 
 const TablaGeneral = () => {
-  const [query, setQuery]     = useState('');
-  const [visible, setVisible] = useState(80);
-  const loaderRef             = useRef<HTMLDivElement>(null);
+  const [modalidad, setModalidad] = useState<Modalidad>('10K');
+  const [query, setQuery]         = useState('');
+  const [visible, setVisible]     = useState(80);
+  const loaderRef                 = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const obs = new IntersectionObserver(entries => {
@@ -474,29 +563,54 @@ const TablaGeneral = () => {
     return () => obs.disconnect();
   }, []);
 
-  useEffect(() => { setVisible(80); }, [query]);
+  useEffect(() => { setVisible(80); }, [query, modalidad]);
+
+  const base = useMemo(
+    () => RESULTADOS.filter(r => r.modalidad === modalidad),
+    [modalidad]
+  );
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return RESULTADOS;
-    return RESULTADOS.filter(r =>
+    if (!q) return base;
+    return base.filter(r =>
       String(r.dorsal).includes(q) ||
       r.nombre_completo.toLowerCase().includes(q) ||
       r.categoria.toLowerCase().includes(q)
     );
-  }, [query]);
+  }, [query, base]);
 
-  const shown  = useMemo(() => filtered.slice(0, visible), [filtered, visible]);
+  const shown = useMemo(() => filtered.slice(0, visible), [filtered, visible]);
 
-  const stats  = useMemo(() => ({
-    total: TOTAL_FINISHERS,
-    masc:  RESULTADOS.filter(r => r.genero === 'M' && !r.sin_tiempo).length,
-    fem:   RESULTADOS.filter(r => r.genero === 'F' && !r.sin_tiempo).length,
-    cats:  [...new Set(RESULTADOS.map(r => r.categoria))].length,
-  }), []);
+  const stats = useMemo(() => ({
+    total: base.filter(r => !r.sin_tiempo).length,
+    masc:  base.filter(r => r.genero === 'M' && !r.sin_tiempo).length,
+    fem:   base.filter(r => r.genero === 'F' && !r.sin_tiempo).length,
+    cats:  [...new Set(base.map(r => r.categoria))].length,
+  }), [base]);
+
+  if (!RESULTS_PUBLISHED) {
+    return (
+      <div className="rs-tabla-empty">
+        Resultados en procesamiento — la tabla se publica al cierre de la carrera
+      </div>
+    );
+  }
 
   return (
     <>
+      <div className="rs-mod-tabs">
+        {MODALIDADES.map(m => (
+          <button
+            key={m}
+            className={`rs-mod-tab ${modalidad === m ? 'active' : ''}`}
+            onClick={() => setModalidad(m)}
+          >
+            {MODALIDAD_LABEL[m]}
+          </button>
+        ))}
+      </div>
+
       <div className="rs-tabla-search-wrap">
         <div className="rs-tabla-search-box">
           <div className="rs-tabla-search-icon">
@@ -528,8 +642,8 @@ const TablaGeneral = () => {
 
       <div className="rs-tabla-count">
         {query
-          ? `${filtered.length} resultado${filtered.length !== 1 ? 's' : ''} para "${query}"`
-          : `${filtered.length} corredores · WE RUN RAYOCERO 10K · 06 JUN 2026`
+          ? `${filtered.length} resultado${filtered.length !== 1 ? 's' : ''} para "${query}" · ${modalidad}`
+          : `${filtered.length} atletas · ${RACE_NAME_SHORT} · ${MODALIDAD_LABEL[modalidad]} · ${RACE_DATE}`
         }
       </div>
 
@@ -544,7 +658,7 @@ const TablaGeneral = () => {
 
       {shown.length === 0
         ? <div className="rs-tabla-empty">Sin resultados para "{query}"</div>
-        : shown.map(r => <TablaRow key={r.dorsal} r={r}/>)
+        : shown.map(r => <TablaRow key={`${r.modalidad}-${r.dorsal}`} r={r}/>)
       }
 
       {shown.length < filtered.length && (
@@ -560,7 +674,7 @@ const TablaGeneral = () => {
 /* MAIN                                                           */
 /* ────────────────────────────────────────────────────────────── */
 
-export default function ResultsSection() {
+export default function ResultsSectionCoro() {
   const [tab, setTab]               = useState<'individual' | 'tabla'>('individual');
   const [bib, setBib]               = useState('');
   const [loading, setLoading]       = useState(false);
@@ -573,6 +687,11 @@ export default function ResultsSection() {
   const [isExporting, setIsExporting] = useState(false);
   const certRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Búsqueda de dorsal — SCOPED A CORO.
+   * 1) JSON publicado (fuente oficial post-carrera).
+   * 2) Fallback Supabase con .eq('race_id', RACE_ID_CORO) → un dorsal de Lara nunca resuelve.
+   */
   const handleSearch = useCallback(async () => {
     const bibNum = parseInt(bib.trim());
     if (!bibNum || isNaN(bibNum)) return;
@@ -585,43 +704,67 @@ export default function ResultsSection() {
     try {
       const { data: runnerData, error: runnerErr } = await supabase
         .from('runners')
-        .select('bib_number, nombre, apellido, categoria, genero, race_status, finish_time_seconds, start_time, finish_time, split_time_seconds, gps_track')
-        .eq('bib_number', bibNum).single();
+        .select('bib_number, nombre, apellido, categoria, genero, modalidad, race_status, finish_time_seconds, start_time, finish_time, split_time_seconds, gps_track')
+        .eq('bib_number', bibNum)
+        .eq('race_id', RACE_ID_CORO)
+        .maybeSingle();
 
       if (runnerErr || !runnerData) {
+        // Sin registro vivo en Supabase → se reconstruye el atleta desde el JSON oficial.
         if (jsonData) {
-          const parts = jsonData.nombre_completo.split(' ');
-          let finish_time_seconds: number | null = null;
-          const tRef = jsonData.tiempo_chip || jsonData.tiempo_neto || jsonData.tiempo_oficial;
-          if (tRef && !jsonData.sin_tiempo) {
-            const tp = tRef.split(':');
-            if (tp.length === 3) finish_time_seconds = parseInt(tp[0])*3600 + parseInt(tp[1])*60 + parseFloat(tp[2]);
-            else if (tp.length === 2) finish_time_seconds = parseInt(tp[0])*60 + parseFloat(tp[1]);
-          }
+          const parts = jsonData.nombre_completo.trim().split(/\s+/);
+          const tRef  = jsonData.tiempo_chip || jsonData.tiempo_neto || jsonData.tiempo_oficial;
+          const finish_time_seconds = jsonData.sin_tiempo ? null : parseTimeToSeconds(tRef);
+
           setRunner({
-            bib_number: bibNum, nombre: parts[0], apellido: parts.slice(1).join(' '),
-            categoria: jsonData.categoria, genero: jsonData.genero,
+            bib_number: bibNum,
+            nombre: parts[0] ?? '',
+            apellido: parts.slice(1).join(' '),
+            categoria: jsonData.categoria,
+            genero: jsonData.genero,
+            modalidad: jsonData.modalidad,
             race_status: jsonData.sin_tiempo ? 'waiting' : 'completed',
-            finish_time_seconds, start_time: null, finish_time: null,
+            finish_time_seconds,
+            start_time: null, finish_time: null,
             split_time_seconds: null, gps_track: null,
           });
-          setRaceResult({ ranking_general: jsonData.posicion_general || null, ranking_categoria: jsonData.posicion_categoria || null, velocidad_kmh: jsonData.velocidad_kmh || null });
+          setRaceResult({
+            ranking_general: jsonData.posicion_general || null,
+            ranking_categoria: jsonData.posicion_categoria || null,
+            velocidad_kmh: jsonData.velocidad_kmh || null,
+          });
           setLoading(false); return;
         }
-        setError(`DORSAL #${bibNum} NO ENCONTRADO`);
+        setError(`DORSAL #${bib4(bibNum)} NO ENCONTRADO EN ${RACE_NAME_SHORT}`);
         setLoading(false); return;
       }
 
-      setRunner(runnerData as RunnerResult);
+      const rd = runnerData as Record<string, unknown>;
+      setRunner({
+        ...(rd as unknown as RunnerResult),
+        modalidad: normModalidad(rd.modalidad),
+      });
+
       if (jsonData) {
-        setRaceResult({ ranking_general: jsonData.posicion_general || null, ranking_categoria: jsonData.posicion_categoria || null, velocidad_kmh: jsonData.velocidad_kmh || null });
+        setRaceResult({
+          ranking_general: jsonData.posicion_general || null,
+          ranking_categoria: jsonData.posicion_categoria || null,
+          velocidad_kmh: jsonData.velocidad_kmh || null,
+        });
       } else {
-        const { data: raceData } = await supabase.from('race_results')
-          .select('ranking_general, ranking_categoria, velocidad_kmh').eq('bib_number', bibNum).single();
+        const { data: raceData } = await supabase
+          .from('race_results')
+          .select('ranking_general, ranking_categoria, velocidad_kmh')
+          .eq('bib_number', bibNum)
+          .eq('race_id', RACE_ID_CORO)
+          .maybeSingle();
         if (raceData) setRaceResult(raceData as RaceResult);
       }
-    } catch { setError('ERROR DE CONEXIÓN — INTENTA NUEVAMENTE');
-    } finally { setLoading(false); }
+    } catch {
+      setError('ERROR DE CONEXIÓN — INTENTA NUEVAMENTE');
+    } finally {
+      setLoading(false);
+    }
   }, [bib]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') handleSearch(); };
@@ -631,7 +774,7 @@ export default function ResultsSection() {
     navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   };
 
-  /* ── Engine certificado — grado militar ── */
+  /* ── Engine certificado — grado militar (preservado de V3.1) ── */
   const renderCert = useCallback(async (): Promise<string | null> => {
     if (!certRef.current) return null;
     try {
@@ -659,7 +802,7 @@ export default function ResultsSection() {
       const dataUrl = await renderCert();
       if (dataUrl) {
         const a = document.createElement('a');
-        a.download = `RAYOCERO_${String(runner.bib_number).padStart(4,'0')}_${runner.apellido.replace(/\s/g,'_').toUpperCase()}.png`;
+        a.download = `499CORO_${bib4(runner.bib_number)}_${runner.apellido.replace(/\s/g,'_').toUpperCase()}.png`;
         a.href = dataUrl; a.click();
       }
     } finally { setIsExporting(false); }
@@ -673,7 +816,7 @@ export default function ResultsSection() {
       if (dataUrl) {
         const pw = window.open('', '_blank');
         if (pw) {
-          pw.document.write(`<!DOCTYPE html><html><head><title>CERTIFICADO RAYOCERO #${runner.bib_number}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh}img{max-width:100%;max-height:100vh;object-fit:contain}@media print{@page{margin:0;size:portrait}body{background:#fff}img{width:100%;height:100vh;object-fit:contain}}</style></head><body><img src="${dataUrl}" onload="window.print();window.close();"/></body></html>`);
+          pw.document.write(`<!DOCTYPE html><html><head><title>CERTIFICADO ${RACE_NAME_SHORT} #${bib4(runner.bib_number)}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh}img{max-width:100%;max-height:100vh;object-fit:contain}@media print{@page{margin:0;size:portrait}body{background:#fff}img{width:100%;height:100vh;object-fit:contain}}</style></head><body><img src="${dataUrl}" onload="window.print();window.close();"/></body></html>`);
           pw.document.close();
         }
       }
@@ -681,9 +824,13 @@ export default function ResultsSection() {
   }, [runner, renderCert]);
 
   /* ── Derivados ── */
+  const modalidad = runner?.modalidad ?? jsonAtleta?.modalidad ?? '10K';
+  const distKm    = DIST_KM[modalidad];
+  const modColor  = modalidad === '4K' ? '#facc15' : '#00f2ff';
+
   const status    = runner ? statusLabel(runner.race_status) : null;
   const hasTime   = runner?.finish_time_seconds != null;
-  const pace      = hasTime ? formatPace(runner!.finish_time_seconds!) : null;
+  const pace      = hasTime ? formatPace(runner!.finish_time_seconds!, distKm) : null;
   const gpsPoints = runner ? parseGpsTrack(runner.gps_track) : [];
   const paceDisplay = pace ? normalizePace(pace) : normalizePace(jsonAtleta?.pace ?? null);
 
@@ -697,8 +844,15 @@ export default function ResultsSection() {
       ? formatTime(runner.split_time_seconds)
       : '--:--:--';
 
-  const totalCat = jsonAtleta?.total_categoria || (runner ? (CATEGORY_COUNTS[runner.categoria] ?? 0) : 0);
+  const totalCat = jsonAtleta?.total_categoria
+    || (runner ? getCatTotal(modalidad, runner.categoria) : 0);
   const posCat   = raceResult?.ranking_categoria ?? jsonAtleta?.posicion_categoria ?? null;
+
+  const velocidad = raceResult?.velocidad_kmh
+    ? raceResult.velocidad_kmh.toFixed(1)
+    : hasTime ? speedKmh(runner!.finish_time_seconds!, distKm).toFixed(1)
+    : jsonAtleta?.velocidad_kmh ? jsonAtleta.velocidad_kmh.toFixed(1)
+    : null;
 
   return (
     <>
@@ -708,7 +862,10 @@ export default function ResultsSection() {
 
         {/* Header */}
         <div className="rs-header">
-          <div className="rs-eyebrow"><span className="rs-eyebrow-dot"/><span className="rs-eyebrow-text">WE RUN RAYOCERO · 10K NIGHT FEST · 2026</span></div>
+          <div className="rs-eyebrow">
+            <span className="rs-eyebrow-dot"/>
+            <span className="rs-eyebrow-text">{RACE_NAME_LONG} · 10K & 4K · {RACE_DATE}</span>
+          </div>
           <h1 className="rs-title">
             <span style={{ display:'block' }}>MIS</span>
             <span className="rs-title-line2" style={{ display:'block' }}>TIEMPOS</span>
@@ -728,6 +885,15 @@ export default function ResultsSection() {
           {/* TAB INDIVIDUAL */}
           {tab === 'individual' && (
             <motion.div key="individual" initial={{ opacity:0,y:12 }} animate={{ opacity:1,y:0 }} exit={{ opacity:0,y:-8 }} transition={{ duration:0.22 }}>
+
+              {!RESULTS_PUBLISHED && (
+                <div className="rs-notice">
+                  <span className="rs-eyebrow-dot"/>
+                  <span className="rs-notice-text">
+                    Resultados oficiales en procesamiento. Consulta tu dorsal de {RACE_NAME_SHORT} para ver tu estado en vivo.
+                  </span>
+                </div>
+              )}
 
               <div className="rs-search-wrap">
                 <div className="rs-search-box">
@@ -752,7 +918,9 @@ export default function ResultsSection() {
                         <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
                       </svg>
                       <p className="rs-error-text">{error}</p>
-                      <p style={{ fontSize:'11px', color:'rgba(255,255,255,0.2)', letterSpacing:'0.1em' }}>Verifica el número de dorsal e intenta nuevamente</p>
+                      <p style={{ fontSize:'11px', color:'rgba(255,255,255,0.2)', letterSpacing:'0.1em' }}>
+                        Esta consulta solo cubre dorsales de {RACE_NAME_LONG}. Verifica el número e intenta de nuevo.
+                      </p>
                     </div>
                   </motion.div>
                 )}
@@ -762,27 +930,23 @@ export default function ResultsSection() {
                     initial={{ opacity:0,y:30 }} animate={{ opacity:1,y:0 }}
                     exit={{ opacity:0,y:-20 }} transition={{ duration:0.4, ease:[0.16,1,0.3,1] }}>
                     <div className="rs-card-inner">
-                      <div className="rs-bib-watermark">{runner.bib_number}</div>
+                      <div className="rs-bib-watermark">{bib4(runner.bib_number)}</div>
 
+                      {/* V4.0 — fila de atleta sin columna de sponsors */}
                       <div className="rs-athlete-row">
                         <div>
                           <div className="rs-athlete-meta">
-                            <span>DORSAL #{runner.bib_number}</span>
+                            <span>DORSAL #{bib4(runner.bib_number)}</span>
                             <span className="rs-athlete-meta-dot"/>
                             <span>{runner.categoria}</span>
                             <span className="rs-athlete-meta-dot"/>
                             <span>{runner.genero === 'M' ? 'MASCULINO' : 'FEMENINO'}</span>
+                            <span className="rs-mod-chip" style={{ color:modColor, borderColor:`${modColor}40`, background:`${modColor}12` }}>
+                              {MODALIDAD_LABEL[modalidad]}
+                            </span>
                           </div>
                           <div className="rs-athlete-name-first">{runner.nombre}</div>
                           <div className="rs-athlete-name-last">{runner.apellido}</div>
-                        </div>
-
-                        <div className="rs-sponsors-center">
-                          {SPONSORS_WEB.map(sp => (
-                            <div key={sp.src} className="rs-sponsor-pill-sm">
-                              <img src={sp.src} alt={sp.alt}/>
-                            </div>
-                          ))}
                         </div>
 
                         <div className="rs-status-col">
@@ -820,7 +984,7 @@ export default function ResultsSection() {
                       {/* Tiempos hero */}
                       <div className="rs-time-hero">
                         <div>
-                          <div className="rs-time-label">TIEMPO PISTOLA · WE RUN RAYOCERO 10K</div>
+                          <div className="rs-time-label">TIEMPO PISTOLA · {RACE_NAME_SHORT} {modalidad}</div>
                           <div className={`rs-time-value ${(jsonAtleta?.tiempo_oficial || hasTime) ? 'has-time' : ''}`}>
                             {gunTime}
                           </div>
@@ -836,22 +1000,9 @@ export default function ResultsSection() {
                         </div>
                       </div>
 
-                      {/* Stats grid — pos general Y categoría con totales */}
+                      {/* Stats grid V4.2 — solo ritmo y velocidad */}
                       <div className="rs-stats-grid">
-                        <div className="rs-stat">
-                          <div className="rs-stat-label">POS. GENERAL</div>
-                          <div className={`rs-stat-value ${raceResult?.ranking_general ? 'accent' : ''}`}>
-                            {raceResult?.ranking_general ?? '---'}
-                            {raceResult?.ranking_general && <span className="rs-stat-unit">/{TOTAL_FINISHERS}</span>}
-                          </div>
-                        </div>
-                        <div className="rs-stat">
-                          <div className="rs-stat-label">POS. CATEGORÍA</div>
-                          <div className={`rs-stat-value ${posCat ? 'accent' : ''}`}>
-                            {posCat ?? '---'}
-                            {posCat && <span className="rs-stat-unit">/{totalCat}</span>}
-                          </div>
-                        </div>
+                        {/* V4.2 — POS. GENERAL y POS. CATEGORÍA retiradas de la consulta web (siguen en el certificado PNG) */}
                         <div className="rs-stat">
                           <div className="rs-stat-label">RITMO MEDIO</div>
                           <div className="rs-stat-value">
@@ -862,12 +1013,8 @@ export default function ResultsSection() {
                         <div className="rs-stat">
                           <div className="rs-stat-label">VELOCIDAD</div>
                           <div className="rs-stat-value">
-                            {raceResult?.velocidad_kmh
-                              ? raceResult.velocidad_kmh.toFixed(1)
-                              : hasTime ? (36000/runner.finish_time_seconds!).toFixed(1)
-                              : jsonAtleta?.velocidad_kmh ? jsonAtleta.velocidad_kmh.toFixed(1)
-                              : '---'}
-                            {(raceResult?.velocidad_kmh || hasTime || jsonAtleta?.velocidad_kmh) && <span className="rs-stat-unit">km/h</span>}
+                            {velocidad ?? '---'}
+                            {velocidad && <span className="rs-stat-unit">km/h</span>}
                           </div>
                         </div>
                       </div>
@@ -883,7 +1030,12 @@ export default function ResultsSection() {
                             RUTA GPS · KALMAN FILTERED
                           </div>
                           <Suspense fallback={<div className="rs-map-skeleton"/>}>
-                            <RouteMapStrava points={gpsPoints} athleteName={`${runner.nombre} ${runner.apellido}`} eventName="WE RUN RAYOCERO 10K NIGHT FEST" showShareCard={true}/>
+                            <RouteMapStrava
+                              points={gpsPoints}
+                              athleteName={`${runner.nombre} ${runner.apellido}`}
+                              eventName={`${RACE_NAME_LONG} · ${modalidad}`}
+                              showShareCard={true}
+                            />
                           </Suspense>
                         </div>
                       )}
@@ -906,26 +1058,26 @@ export default function ResultsSection() {
 
         {/* ═══════════════════════════════════════════════════════ */}
         {/* CERTIFICADO OFF-SCREEN — portrait 1080×1920            */}
-        {/* Diseño V2.7 preservado + mejoras: pos_cat X/Total,     */}
-        {/* sin pos_general, engine html-to-image grado militar     */}
+        {/* V4.0: sin logos de sponsors, header con tag del evento  */}
         {/* ═══════════════════════════════════════════════════════ */}
         {runner && (
           <div className="rs-cert-offscreen-wrapper">
             <div ref={certRef} className="rs-cert-canvas">
 
               {/* Fondo mapa con filtro táctico */}
-              <div className="rs-cert-map-bg" style={{ backgroundImage: `url(${mapImg})` }}/>
+              <div className="rs-cert-map-bg" style={{ backgroundImage: `url(${CERT_BG_IMG})` }}/>
               <div className="rs-cert-overlay"/>
 
               <div className="rs-cert-content">
 
-                {/* Header */}
+                {/* Header — logo + tag del evento (sponsors retirados) */}
                 <div className="rs-cert-header">
                   <div className="rs-cert-logo">
-                    <img src={logoImg} alt="RayoCero Logo"/>
+                    <img src={CERT_LOGO_IMG} alt="RAYOCERO"/>
                   </div>
-                  <div className="rs-cert-sponsors">
-                    <img src={sponsor15} alt="Sponsor 15"/>
+                  <div className="rs-cert-eventtag">
+                    <div className="rs-cert-eventtag-line1">{modalidad}</div>
+                    <div className="rs-cert-eventtag-line2">{RACE_CITY} · {RACE_DATE}</div>
                   </div>
                 </div>
 
@@ -933,14 +1085,13 @@ export default function ResultsSection() {
                 <div className="rs-cert-athlete">
                   <div className="rs-cert-athlete-meta">
                     <span style={{ display:'inline-block', width:12, height:12, background:'#00f2ff', borderRadius:'50%' }}/>
-                    WE RUN RAYOCERO 10K NIGHT FEST · DORSAL #{String(runner.bib_number).padStart(3,'0')}
+                    {RACE_NAME_SHORT} · DORSAL #{bib4(runner.bib_number)}
                   </div>
                   <div className="rs-cert-name">{runner.nombre}</div>
                   <div className="rs-cert-surname">{runner.apellido}</div>
                 </div>
 
-                {/* Métricas — 4 bloques: tiempos + ritmo + categoría + pos_cat X/Total */}
-                {/* SIN posición general — eliminada del PNG */}
+                {/* Métricas — 6 bloques */}
                 <div className="rs-cert-metrics">
 
                   <div className="rs-cert-metric-box">
@@ -968,14 +1119,13 @@ export default function ResultsSection() {
                     </div>
                   </div>
 
-                  {/* Posición categoría X/Total + Posición general (solo número) */}
                   <div className="rs-cert-metric-box">
                     <div className="rs-cert-metric-lbl">POSICIÓN EN CATEGORÍA</div>
                     <div style={{ display:'flex', alignItems:'baseline', gap:12 }}>
                       <div className="rs-cert-metric-val" style={{ fontSize:80 }}>
                         {posCat ?? '---'}
                       </div>
-                      {posCat && totalCat > 0 && (
+                      {!!posCat && totalCat > 0 && (
                         <>
                           <div style={{ fontStyle:'italic', fontWeight:900, fontSize:44, color:'rgba(0,242,255,0.45)', lineHeight:1 }}>
                             / {totalCat}
@@ -991,7 +1141,7 @@ export default function ResultsSection() {
                   </div>
 
                   <div className="rs-cert-metric-box">
-                    <div className="rs-cert-metric-lbl">POSICIÓN GENERAL</div>
+                    <div className="rs-cert-metric-lbl">POSICIÓN GENERAL {modalidad}</div>
                     <div className="rs-cert-metric-val" style={{ fontSize:80 }}>
                       {raceResult?.ranking_general ?? jsonAtleta?.posicion_general ?? '---'}
                     </div>
@@ -1001,16 +1151,10 @@ export default function ResultsSection() {
 
                 {/* Footer */}
                 <div className="rs-cert-footer">
-                  <div className="rs-cert-watermark">RAYOCERO · WE RUN · BARQUISIMETO 2026</div>
-                  {/* Powered by Valkyron — pequeño y elegante */}
-                  <div style={{ display:'flex', alignItems:'center', gap:14 }}>
-                    <span style={{ fontSize:16, fontWeight:700, letterSpacing:'0.25em',
-                      color:'rgba(255,255,255,0.2)', textTransform:'uppercase' }}>
-                      POWERED BY
-                    </span>
-                    <img src={sponsor12} alt="Valkyron Group"
-                      style={{ height:28, width:'auto', objectFit:'contain',
-                        filter:'brightness(0.9) opacity(0.7)' }}/>
+                  <div className="rs-cert-watermark">RAYOCERO · 499 RUN · {RACE_CITY} {RACE_DATE}</div>
+                  <div className="rs-cert-powered">
+                    <span className="rs-cert-powered-lbl">POWERED BY</span>
+                    <span className="rs-cert-powered-val">VALKYRON GROUP</span>
                   </div>
                 </div>
 
