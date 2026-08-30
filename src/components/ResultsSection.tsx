@@ -1,6 +1,38 @@
 /**
- * RAYOCERO — RESULTS SECTION V4.0 · 499 RUN CORO · TACTICAL CERTIFICATE ENGINE
+ * RAYOCERO — RESULTS SECTION V4.6 · 499 RUN CORO · TACTICAL CERTIFICATE ENGINE
  * CEO: Lualdo Sciscioli | Valkyron Group
+ *
+ * CHANGELOG V4.6:
+ * ─ Fuera la franja de estadísticas (finishers / masculino / femenino / categorías)
+ *   y la línea de conteo sobre la tabla. Quedan podio + buscador + tabla.
+ * ─ El useMemo `stats` y su CSS (.rs-tabla-stat*, .rs-tabla-count) se eliminan por
+ *   quedar sin consumidores.
+ *
+ * CHANGELOG V4.5:
+ * ─ Hoja de estilos reescrita MOBILE FIRST: la base es el teléfono pequeño y los
+ *   breakpoints amplían con min-width (381 / 481 / 769). Cero cambio visual.
+ * ─ Breakpoint intermedio 481px: el podio pasa a dos columnas antes que la tabla.
+ * ─ Spinners nativos del input numérico suprimidos (webkit + firefox).
+ * ─ Hover states confinados a ≥769px: en táctil no existen y ensucian el :active.
+ * ─ prefers-reduced-motion: se desactivan animaciones y transiciones.
+ *
+ * CHANGELOG V4.4:
+ * ─ Bloque PODIO ABSOLUTO sobre la tabla: dos columnas lado a lado — 1·2·3
+ *   masculino y 1·2·3 femenino — alimentadas por PODIO_M / PODIO_F (tiempo neto).
+ * ─ La tabla inferior queda como listado limpio de tiempos, sin medallas ni
+ *   resaltado: el podio ya vive arriba.
+ *
+ * CHANGELOG V4.3:
+ * ─ Tabla general unificada: se retiran las pestañas 10K / 4K. Una sola tabla de
+ *   tiempos ordenada por tiempo neto ascendente (DNF/DNS al final).
+ * ─ Se elimina la columna de posición numérica y la columna Pos/Total. Solo se
+ *   marcan los podios ABSOLUTOS: 1-2-3 masculino y 1-2-3 femenino,
+ *   calculados por tiempo neto sobre el total de finishers.
+ * ─ TOTAL_FINISHERS y MODALIDADES eliminados: sin consumidores tras V4.2/V4.3.
+ *
+ * CHANGELOG V4.2:
+ * ─ Consulta web: stats grid reducido a RITMO MEDIO + VELOCIDAD. POS. GENERAL y
+ *   POS. CATEGORÍA retiradas de la sección de resultados (el certificado las conserva).
  *
  * CHANGELOG V4.0 (sobre V3.1 funcional — base preservada íntegra):
  * ─ EVENTO: 499 RUN CORO, FALCÓN 2026 (RACE_ID_CORO). Búsqueda scoped por race_id:
@@ -55,8 +87,6 @@ type Modalidad = '10K' | '4K';
 
 /** Distancia oficial por modalidad [km]. Alimenta ritmo y velocidad media. */
 const DIST_KM: Record<Modalidad, number> = { '10K': 10, '4K': 4 };
-
-const MODALIDADES: Modalidad[] = ['10K', '4K'];
 
 const MODALIDAD_LABEL: Record<Modalidad, string> = {
   '10K': '10K COMPETITIVA',
@@ -125,12 +155,6 @@ const RESULTS_PUBLISHED = RESULTADOS.length > 0;
 const RESULTADOS_INDEX = new Map<number, JsonAtleta>(
   RESULTADOS.map(r => [r.dorsal, r])
 );
-
-/** Finishers por modalidad — denominador de "POS. GENERAL". */
-const TOTAL_FINISHERS: Record<Modalidad, number> = {
-  '10K': RESULTADOS.filter(r => r.modalidad === '10K' && !r.sin_tiempo).length,
-  '4K':  RESULTADOS.filter(r => r.modalidad === '4K'  && !r.sin_tiempo).length,
-};
 
 const catKey = (mod: Modalidad, cat: string) => `${mod}::${cat}`;
 
@@ -246,78 +270,93 @@ const bib4 = (n: number) => String(n).padStart(4, '0');
 /* CSS — base V3.1 preservada · bloque sponsors retirado          */
 /* ────────────────────────────────────────────────────────────── */
 
+/* ────────────────────────────────────────────────────────────── */
+/* CSS V4.5 — MOBILE FIRST                                        */
+/* Estrategia: la base es el teléfono pequeño (≤380px). Los       */
+/* breakpoints AMPLÍAN con min-width, nunca corrigen hacia abajo.  */
+/*   base            → ≤380px  (iPhone SE / 13 mini)              */
+/*   min-width 381px → teléfonos actuales                          */
+/*   min-width 481px → phablet / landscape                         */
+/*   min-width 769px → tablet horizontal y escritorio              */
+/* El certificado (.rs-cert-*) es un canvas fijo de 1080×1920:     */
+/* vive fuera del flujo responsive y NO se toca en ningún query.   */
+/* ────────────────────────────────────────────────────────────── */
+
 const CSS = `
   @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,300;0,400;1,400;1,700;1,800;1,900&family=Barlow:wght@300;400;500&display=swap');
+
+  /* ══════════════════════════════════════════════════════════════
+     BASE — MOBILE (≤380px)
+     ══════════════════════════════════════════════════════════════ */
 
   .rs-root { min-height: 100vh; background: #03070b; font-family: 'Barlow', sans-serif; color: #fff; overflow-x: hidden; position: relative; }
   .rs-glow-1 { position: absolute; top: -200px; left: 50%; transform: translateX(-50%); width: 900px; height: 600px; background: radial-gradient(ellipse, rgba(0,242,255,0.04) 0%, transparent 70%); pointer-events: none; }
   .rs-glow-2 { position: absolute; bottom: 0; right: -200px; width: 600px; height: 600px; background: radial-gradient(ellipse, rgba(0,100,255,0.03) 0%, transparent 70%); pointer-events: none; }
 
-  .rs-header { padding: 7rem 2rem 4rem; max-width: 1100px; margin: 0 auto; position: relative; }
+  .rs-header { padding: 4rem 1.25rem 2rem; max-width: 1100px; margin: 0 auto; position: relative; }
   .rs-eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 100px; background: rgba(0,242,255,0.04); border: 1px solid rgba(0,242,255,0.12); margin-bottom: 2rem; }
-  .rs-eyebrow-dot { width: 5px; height: 5px; border-radius: 50%; background: #00f2ff; animation: rs-blink 2s ease infinite; }
+  .rs-eyebrow-dot { width: 5px; height: 5px; border-radius: 50%; background: #00f2ff; animation: rs-blink 2s ease infinite; flex-shrink: 0; }
   @keyframes rs-blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
   .rs-eyebrow-text { font-size: 8px; font-weight: 700; letter-spacing: 0.4em; color: rgba(0,242,255,0.6); text-transform: uppercase; }
-  .rs-title { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: clamp(72px, 12vw, 130px); line-height: 0.85; letter-spacing: -0.02em; text-transform: uppercase; color: #fff; margin: 0; }
+  .rs-title { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: clamp(44px, 15vw, 72px); line-height: 0.85; letter-spacing: -0.02em; text-transform: uppercase; color: #fff; margin: 0; }
   .rs-title-line2 { color: transparent; -webkit-text-stroke: 1.5px rgba(255,255,255,0.25); }
 
-  .rs-tabs-wrap { max-width: 700px; margin: 0 auto; padding: 0 2rem 2.5rem; }
+  .rs-tabs-wrap { max-width: 700px; margin: 0 auto; padding: 0 1.25rem 2rem; }
   .rs-tabs { display: flex; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; }
-  .rs-tab { flex: 1; padding: 14px 20px; background: transparent; border: none; color: rgba(255,255,255,0.3); font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 0.85rem; letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; border-bottom: 2px solid transparent; }
+  .rs-tab { flex: 1; padding: 13px 12px; background: transparent; border: none; color: rgba(255,255,255,0.3); font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: color 0.2s, background 0.2s, border-color 0.2s; border-bottom: 2px solid transparent; }
   .rs-tab.active { background: rgba(0,242,255,0.05); color: #00f2ff; border-bottom-color: #00f2ff; }
-  .rs-tab:hover:not(.active) { color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.02); }
 
-  .rs-search-wrap { max-width: 700px; margin: 0 auto; padding: 0 2rem 5rem; }
+  .rs-search-wrap { max-width: 700px; margin: 0 auto; padding: 0 1.25rem 3rem; }
   .rs-search-box { display: flex; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; transition: border-color 0.2s, box-shadow 0.2s; }
   .rs-search-box:focus-within { border-color: rgba(0,242,255,0.3); box-shadow: 0 0 0 1px rgba(0,242,255,0.1); }
-  .rs-search-input { flex: 1; background: transparent; border: none; outline: none; padding: 20px 28px; color: #fff; font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 2.5rem; letter-spacing: 0.1em; text-align: center; }
+  .rs-search-input { flex: 1; min-width: 0; background: transparent; border: none; outline: none; padding: 12px 14px; color: #fff; font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 1.5rem; letter-spacing: 0.1em; text-align: center; }
   .rs-search-input::placeholder { color: rgba(255,255,255,0.1); letter-spacing: 0.3em; }
-  .rs-search-btn { padding: 20px 32px; background: #00f2ff; border: none; color: #03070b; font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 0.9rem; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 8px; white-space: nowrap; flex-shrink: 0; }
-  .rs-search-btn:hover:not(:disabled) { background: #fff; letter-spacing: 0.25em; }
+  /* Sin spinners nativos: el dorsal se teclea, no se incrementa */
+  .rs-search-input::-webkit-outer-spin-button,
+  .rs-search-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .rs-search-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+  .rs-search-btn { padding: 12px 14px; background: #00f2ff; border: none; color: #03070b; font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: background 0.15s, letter-spacing 0.15s, transform 0.15s; display: flex; align-items: center; gap: 8px; white-space: nowrap; flex-shrink: 0; }
   .rs-search-btn:active:not(:disabled) { transform: scaleX(0.98); }
   .rs-search-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-  .rs-notice { max-width: 700px; margin: 0 auto 2.5rem; padding: 14px 20px; border: 1px solid rgba(0,242,255,0.14); background: rgba(0,242,255,0.03); border-radius: 4px; display: flex; align-items: center; gap: 12px; }
+  .rs-notice { max-width: 700px; margin: 0 1.25rem 2rem; padding: 14px 20px; border: 1px solid rgba(0,242,255,0.14); background: rgba(0,242,255,0.03); border-radius: 4px; display: flex; align-items: center; gap: 12px; }
   .rs-notice-text { font-size: 9px; font-weight: 700; letter-spacing: 0.22em; color: rgba(0,242,255,0.65); text-transform: uppercase; line-height: 1.7; }
 
-  .rs-card { max-width: 1100px; margin: 0 auto; padding: 0 2rem 6rem; }
-  .rs-card-inner { position: relative; border-top: 1px solid rgba(255,255,255,0.08); border-bottom: 1px solid rgba(255,255,255,0.08); padding: 4rem 0; }
-  .rs-bib-watermark { position: absolute; top: 50%; right: -2rem; transform: translateY(-50%); font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: clamp(160px, 25vw, 300px); color: transparent; -webkit-text-stroke: 1px rgba(0,242,255,0.06); line-height: 1; pointer-events: none; user-select: none; letter-spacing: -0.04em; }
+  .rs-card { max-width: 1100px; margin: 0 auto; padding: 0 1.25rem 4rem; }
+  .rs-card-inner { position: relative; border-top: 1px solid rgba(255,255,255,0.08); border-bottom: 1px solid rgba(255,255,255,0.08); padding: 2rem 0; }
+  /* La marca de agua del dorsal solo aparece cuando hay ancho que la sostenga */
+  .rs-bib-watermark { display: none; }
 
-  /* V4.0 — 2 columnas: atleta | estado. La columna central de sponsors fue retirada. */
-  .rs-athlete-row { display: grid; grid-template-columns: 1fr auto; gap: 2.5rem; align-items: center; margin-bottom: 3rem; position: relative; }
-
+  .rs-athlete-row { display: grid; grid-template-columns: 1fr; gap: 1.25rem; align-items: center; margin-bottom: 3rem; position: relative; }
   .rs-athlete-meta { font-size: 9px; font-weight: 700; letter-spacing: 0.35em; color: rgba(0,242,255,0.5); text-transform: uppercase; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .rs-athlete-meta-dot { width: 3px; height: 3px; border-radius: 50%; background: rgba(0,242,255,0.3); }
-  .rs-athlete-name-first { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: clamp(3rem, 8vw, 6rem); line-height: 0.85; text-transform: uppercase; color: #fff; letter-spacing: -0.02em; }
-  .rs-athlete-name-last { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 300; font-size: clamp(3rem, 8vw, 6rem); line-height: 0.85; text-transform: uppercase; color: rgba(255,255,255,0.4); letter-spacing: -0.02em; }
+  .rs-athlete-name-first { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: clamp(1.9rem, 9vw, 3rem); line-height: 0.85; text-transform: uppercase; color: #fff; letter-spacing: -0.02em; }
+  .rs-athlete-name-last { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 300; font-size: clamp(1.9rem, 9vw, 3rem); line-height: 0.85; text-transform: uppercase; color: rgba(255,255,255,0.4); letter-spacing: -0.02em; }
 
   .rs-mod-chip { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 2px; font-size: 8px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; border: 1px solid; }
 
-  .rs-status-col { display: flex; flex-direction: column; align-items: flex-end; gap: 0.75rem; padding-top: 1rem; }
+  .rs-status-col { display: flex; flex-direction: column; align-items: flex-start; gap: 0.6rem; padding-top: 0; }
   .rs-status-badge { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 3px; font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-size: 10px; font-weight: 900; letter-spacing: 0.2em; text-transform: uppercase; white-space: nowrap; }
   .rs-status-badge.finished { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.25); color: #22c55e; }
   .rs-status-badge.pending { background: rgba(0,242,255,0.06); border: 1px solid rgba(0,242,255,0.2); color: rgba(0,242,255,0.8); animation: rs-pending-pulse 2s ease infinite; }
   @keyframes rs-pending-pulse { 0%,100%{box-shadow:0 0 0 rgba(0,242,255,0)} 50%{box-shadow:0 0 16px rgba(0,242,255,0.15)} }
 
-  .rs-action-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 8px; }
-  .rs-share-btn { display: inline-flex; align-items: center; gap: 7px; padding: 10px 18px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; color: rgba(255,255,255,0.4); font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-size: 9px; font-weight: 900; letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; }
-  .rs-share-btn:hover:not(:disabled) { border-color: rgba(0,242,255,0.3); color: #00f2ff; background: rgba(0,242,255,0.04); }
+  .rs-action-btns { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-start; margin-top: 8px; }
+  .rs-share-btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; color: rgba(255,255,255,0.4); font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-size: 7.5px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s, transform 0.2s; }
   .rs-share-btn:active:not(:disabled) { transform: scale(0.97); }
   .rs-share-btn:disabled { opacity: 0.45; cursor: wait; }
   .rs-share-btn.primary { background: rgba(0,242,255,0.08); border-color: rgba(0,242,255,0.3); color: #00f2ff; }
-  .rs-share-btn.primary:hover:not(:disabled) { background: rgba(0,242,255,0.18); }
 
-  .rs-time-hero { padding: 3rem 0; border-top: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 3rem; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2rem; }
+  .rs-time-hero { padding: 3rem 0; border-top: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 3rem; display: grid; grid-template-columns: 1fr; align-items: center; gap: 1.25rem; }
   .rs-time-label { font-size: 8px; font-weight: 700; letter-spacing: 0.4em; color: rgba(255,255,255,0.2); text-transform: uppercase; margin-bottom: 0.75rem; }
-  .rs-time-value { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: clamp(4rem, 12vw, 8rem); line-height: 1; color: #fff; letter-spacing: -0.02em; }
+  .rs-time-value { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: clamp(2.5rem, 14vw, 5rem); line-height: 1; color: #fff; letter-spacing: -0.02em; }
   .rs-time-value.has-time { color: #00f2ff; }
 
   .rs-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0; margin-bottom: 3rem; }
-  .rs-stat { padding: 1.5rem 0; border-right: 1px solid rgba(255,255,255,0.05); padding-right: 1.5rem; margin-right: 1.5rem; }
+  .rs-stat { padding: 1rem 0; border-right: 1px solid rgba(255,255,255,0.05); padding-right: 1rem; margin-right: 1rem; }
   .rs-stat:last-child { border-right: none; padding-right: 0; margin-right: 0; }
   .rs-stat-label { font-size: 7px; font-weight: 700; letter-spacing: 0.3em; color: rgba(255,255,255,0.2); text-transform: uppercase; margin-bottom: 0.5rem; }
-  .rs-stat-value { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 2rem; color: #fff; line-height: 1; }
+  .rs-stat-value { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 1.6rem; color: #fff; line-height: 1; }
   .rs-stat-value.accent { color: #00f2ff; }
   .rs-stat-unit { font-size: 0.7rem; color: rgba(255,255,255,0.25); font-style: italic; margin-left: 4px; }
 
@@ -329,7 +368,130 @@ const CSS = `
   .rs-error { max-width: 500px; margin: 0 auto; padding: 2rem; border: 1px solid rgba(239,68,68,0.15); border-radius: 2px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
   .rs-error-text { font-size: 9px; font-weight: 700; letter-spacing: 0.2em; color: rgba(239,68,68,0.7); text-transform: uppercase; }
 
-  /* ── CERTIFICADO OFF-SCREEN ── */
+  /* ── PODIO ABSOLUTO ── */
+  .rs-podio { display: grid; grid-template-columns: 1fr; gap: 1.75rem; margin-bottom: 2rem; padding-bottom: 1.75rem; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .rs-podio-col { min-width: 0; }
+  .rs-podio-head { display: flex; align-items: center; gap: 10px; margin-bottom: 1.1rem; }
+  .rs-podio-head-line { flex: 1; height: 1px; background: rgba(255,255,255,0.07); }
+  .rs-podio-title { font-size: 8px; font-weight: 700; letter-spacing: 0.4em; text-transform: uppercase; white-space: nowrap; }
+  .rs-podio-card { display: grid; grid-template-columns: 34px 1fr auto; gap: 0 1rem; align-items: center; padding: 0.75rem 0.85rem; margin-bottom: 4px; border: 1px solid rgba(255,255,255,0.05); border-radius: 3px; background: rgba(255,255,255,0.015); position: relative; overflow: hidden; }
+  .rs-podio-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; }
+  .rs-podio-card.p1::before { background: #fbbf24; }
+  .rs-podio-card.p2::before { background: rgba(255,255,255,0.45); }
+  .rs-podio-card.p3::before { background: #d97706; }
+  .rs-podio-card.p1 { background: rgba(251,191,36,0.035); border-color: rgba(251,191,36,0.16); }
+  .rs-podio-medal { font-size: 1.25rem; line-height: 1; text-align: center; }
+  .rs-podio-nombre { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 0.95rem; color: #fff; text-transform: uppercase; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rs-podio-meta { font-size: 8px; letter-spacing: 0.18em; color: rgba(255,255,255,0.28); text-transform: uppercase; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rs-podio-time { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 1.25rem; color: #00f2ff; line-height: 1; text-align: right; }
+  .rs-podio-pace { font-size: 8px; letter-spacing: 0.15em; color: rgba(255,255,255,0.25); text-align: right; margin-top: 3px; }
+  .rs-podio-empty { padding: 1.5rem 0; font-size: 9px; letter-spacing: 0.2em; color: rgba(255,255,255,0.15); text-transform: uppercase; }
+
+  /* ── TABLA GENERAL ── */
+  .rs-tabla-section { max-width: 1100px; margin: 0 auto; padding: 0 1.25rem 4rem; }
+  .rs-tabla-search-wrap { margin-bottom: 1.75rem; }
+  .rs-tabla-search-box { display: flex; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
+  .rs-tabla-search-box:focus-within { border-color: rgba(0,242,255,0.3); box-shadow: 0 0 0 1px rgba(0,242,255,0.1); }
+  .rs-tabla-search-icon { padding: 0 1.25rem; color: rgba(255,255,255,0.2); display: flex; align-items: center; flex-shrink: 0; }
+  .rs-tabla-search-input { flex: 1; min-width: 0; background: transparent; border: none; outline: none; padding: 1rem 0; color: #fff; font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 700; font-size: 1.1rem; letter-spacing: 0.08em; }
+  .rs-tabla-search-input::placeholder { color: rgba(255,255,255,0.15); }
+  .rs-tabla-search-clear { padding: 0 1.25rem; background: none; border: none; color: rgba(255,255,255,0.2); cursor: pointer; display: flex; align-items: center; }
+
+  /* V4.6 — la tabla arranca directo tras el buscador: sin franja de estadísticas.
+     En móvil es una lista apilada: sin cabecera, sin categoría ni ritmo */
+  .rs-tbl-head { display: none; }
+  .rs-th { font-size: 7px; font-weight: 700; letter-spacing: 0.3em; color: rgba(255,255,255,0.2); text-transform: uppercase; }
+  .rs-th.r { text-align: right; }
+  .rs-tbl-row { display: grid; grid-template-columns: 1fr; grid-template-rows: auto auto; gap: 0.3rem; padding: 0.85rem 1rem; border-radius: 0; border: 1px solid transparent; align-items: center; margin-bottom: 2px; position: relative; transition: background 0.12s, border-color 0.12s; }
+  .rs-tbl-row::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: transparent; transition: background 0.2s; border-radius: 2px 0 0 2px; }
+  .rs-tbl-atleta { min-width: 0; }
+  .rs-tbl-nombre { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 700; font-size: 1rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rs-tbl-dorsal-lbl { font-size: 8px; letter-spacing: 0.15em; color: rgba(255,255,255,0.25); margin-top: 1px; }
+  .rs-tbl-cat-badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 2px; font-size: 7px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; border: 1px solid; white-space: nowrap; width: fit-content; }
+  .rs-tbl-cat-col, .rs-tbl-pace { display: none; }
+  .rs-tbl-time { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 0.9rem; color: #00f2ff; text-align: left; grid-row: 2; }
+  .rs-loader-bar { width: 200px; height: 2px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; margin: 0 auto; }
+  .rs-loader-fill { height: 100%; background: linear-gradient(90deg, transparent, #00f2ff, transparent); animation: rs-sweep 1.4s ease infinite; }
+  @keyframes rs-sweep { 0%{transform:translateX(-100%);width:60%} 100%{transform:translateX(250%);width:60%} }
+  .rs-tabla-empty { padding: 4rem 0; text-align: center; font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 1.4rem; color: rgba(255,255,255,0.12); letter-spacing: 0.05em; text-transform: uppercase; }
+
+  /* ══════════════════════════════════════════════════════════════
+     ≥ 381px — teléfonos actuales
+     ══════════════════════════════════════════════════════════════ */
+  @media (min-width: 381px) {
+    .rs-title { font-size: clamp(52px, 16vw, 90px); }
+    .rs-tab { padding: 14px 20px; font-size: 0.85rem; letter-spacing: 0.15em; }
+    .rs-search-input { font-size: 1.8rem; padding: 14px 16px; }
+    .rs-search-btn { padding: 14px 18px; font-size: 0.72rem; letter-spacing: 0.2em; }
+    .rs-athlete-name-first, .rs-athlete-name-last { font-size: clamp(2.2rem, 10vw, 3.5rem); }
+    .rs-stat-value { font-size: 2rem; }
+    .rs-share-btn { padding: 9px 14px; font-size: 8px; letter-spacing: 0.12em; }
+    .rs-action-btns { gap: 6px; }
+    .rs-time-value { font-size: clamp(3rem, 15vw, 6rem); }
+    }
+
+  /* ══════════════════════════════════════════════════════════════
+     ≥ 481px — phablet / landscape: el podio ya cabe en dos columnas
+     ══════════════════════════════════════════════════════════════ */
+  @media (min-width: 481px) {
+    .rs-podio { grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    .rs-podio-card { grid-template-columns: 38px 1fr auto; }
+    .rs-time-hero { grid-template-columns: 1fr auto; gap: 2rem; }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     ≥ 769px — tablet horizontal y escritorio: tabla en rejilla,
+     hover states y marca de agua del dorsal
+     ══════════════════════════════════════════════════════════════ */
+  @media (min-width: 769px) {
+    .rs-header { padding: 7rem 2rem 4rem; }
+    .rs-title { font-size: clamp(72px, 12vw, 130px); }
+    .rs-tabs-wrap { padding: 0 2rem 2.5rem; }
+    .rs-tab:hover:not(.active) { color: rgba(255,255,255,0.55); background: rgba(255,255,255,0.02); }
+
+    .rs-search-wrap { padding: 0 2rem 5rem; }
+    .rs-search-input { padding: 20px 28px; font-size: 2.5rem; }
+    .rs-search-btn { padding: 20px 32px; font-size: 0.9rem; }
+    .rs-search-btn:hover:not(:disabled) { background: #fff; letter-spacing: 0.25em; }
+
+    .rs-notice { margin: 0 auto 2.5rem; }
+    .rs-card { padding: 0 2rem 6rem; }
+    .rs-card-inner { padding: 4rem 0; }
+    .rs-bib-watermark { display: block; position: absolute; top: 50%; right: -2rem; transform: translateY(-50%); font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: clamp(160px, 25vw, 300px); color: transparent; -webkit-text-stroke: 1px rgba(0,242,255,0.06); line-height: 1; pointer-events: none; user-select: none; letter-spacing: -0.04em; }
+
+    .rs-athlete-row { grid-template-columns: 1fr auto; gap: 2.5rem; }
+    .rs-athlete-name-first, .rs-athlete-name-last { font-size: clamp(3rem, 8vw, 6rem); }
+    .rs-status-col { align-items: flex-end; gap: 0.75rem; padding-top: 1rem; }
+    .rs-action-btns { justify-content: flex-end; gap: 8px; }
+    .rs-share-btn { padding: 10px 18px; font-size: 9px; letter-spacing: 0.18em; }
+    .rs-share-btn:hover:not(:disabled) { border-color: rgba(0,242,255,0.3); color: #00f2ff; background: rgba(0,242,255,0.04); }
+    .rs-share-btn.primary:hover:not(:disabled) { background: rgba(0,242,255,0.18); }
+
+    .rs-time-value { font-size: clamp(4rem, 12vw, 8rem); }
+    .rs-stat { padding: 1.5rem 0; padding-right: 1.5rem; margin-right: 1.5rem; }
+
+    .rs-podio { gap: 2.5rem; margin-bottom: 3rem; padding-bottom: 2.5rem; }
+    .rs-podio-card { grid-template-columns: 42px 1fr auto; padding: 0.85rem 1rem; }
+    .rs-podio-medal { font-size: 1.5rem; }
+    .rs-podio-nombre { font-size: 1.05rem; }
+
+    .rs-tabla-section { padding: 0 2rem 6rem; }
+    .rs-tabla-search-clear:hover { color: #00f2ff; }
+  
+    .rs-tbl-head { display: grid; grid-template-columns: 1fr 180px 165px 100px; padding: 0 1rem 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 3px; }
+    .rs-tbl-row { grid-template-columns: 1fr 180px 165px 100px; grid-template-rows: auto; gap: 0; padding: 0.75rem 1rem; border-radius: 3px; }
+    .rs-tbl-row:hover { background: rgba(255,255,255,0.025); border-color: rgba(255,255,255,0.06); }
+    .rs-tbl-row:hover::before { background: #00f2ff; }
+    .rs-tbl-cat-col { display: flex; }
+    .rs-tbl-pace { display: block; font-size: 0.78rem; color: rgba(255,255,255,0.28); text-align: right; }
+    .rs-tbl-time { grid-row: auto; text-align: right; font-size: 1rem; }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     CERTIFICADO OFF-SCREEN — canvas fijo 1080×1920.
+     Fuera del flujo responsive: medidas absolutas en px para que el
+     PNG exportado sea idéntico en cualquier dispositivo.
+     ══════════════════════════════════════════════════════════════ */
   .rs-cert-offscreen-wrapper {
     position: absolute;
     left: -9999px;
@@ -372,7 +534,6 @@ const CSS = `
   .rs-cert-header { display: flex; justify-content: space-between; align-items: flex-start; }
   .rs-cert-logo img { width: 350px; height: auto; object-fit: contain; }
 
-  /* V4.0 — el bloque de sponsors del header fue sustituido por el tag del evento */
   .rs-cert-eventtag { text-align: right; padding-top: 10px; }
   .rs-cert-eventtag-line1 { font-style: italic; font-weight: 900; font-size: 46px; letter-spacing: -0.01em; color: #00f2ff; line-height: 1; }
   .rs-cert-eventtag-line2 { font-size: 20px; font-weight: 700; letter-spacing: 0.32em; color: rgba(255,255,255,0.35); text-transform: uppercase; margin-top: 12px; }
@@ -424,93 +585,10 @@ const CSS = `
   .rs-cert-powered-lbl { font-size: 16px; font-weight: 700; letter-spacing: 0.25em; color: rgba(255,255,255,0.18); text-transform: uppercase; }
   .rs-cert-powered-val { font-style: italic; font-weight: 900; font-size: 24px; letter-spacing: 0.06em; color: rgba(255,255,255,0.45); text-transform: uppercase; }
 
-  /* ── TABLA GENERAL ── */
-  .rs-tabla-section { max-width: 1100px; margin: 0 auto; padding: 0 2rem 6rem; }
-  .rs-mod-tabs { display: flex; gap: 6px; margin-bottom: 1.25rem; }
-  .rs-mod-tab { padding: 9px 18px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 3px; color: rgba(255,255,255,0.3); font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 0.78rem; letter-spacing: 0.16em; text-transform: uppercase; cursor: pointer; transition: all 0.18s; }
-  .rs-mod-tab.active { background: rgba(0,242,255,0.07); border-color: rgba(0,242,255,0.28); color: #00f2ff; }
-  .rs-mod-tab:hover:not(.active) { color: rgba(255,255,255,0.55); }
-  .rs-tabla-search-wrap { margin-bottom: 1.5rem; }
-  .rs-tabla-search-box { display: flex; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
-  .rs-tabla-search-box:focus-within { border-color: rgba(0,242,255,0.3); box-shadow: 0 0 0 1px rgba(0,242,255,0.1); }
-  .rs-tabla-search-icon { padding: 0 1.25rem; color: rgba(255,255,255,0.2); display: flex; align-items: center; flex-shrink: 0; }
-  .rs-tabla-search-input { flex: 1; background: transparent; border: none; outline: none; padding: 1rem 0; color: #fff; font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 700; font-size: 1.1rem; letter-spacing: 0.08em; }
-  .rs-tabla-search-input::placeholder { color: rgba(255,255,255,0.15); }
-  .rs-tabla-search-clear { padding: 0 1.25rem; background: none; border: none; color: rgba(255,255,255,0.2); cursor: pointer; display: flex; align-items: center; }
-  .rs-tabla-search-clear:hover { color: #00f2ff; }
-  .rs-tabla-stats { display: flex; gap: 2rem; flex-wrap: wrap; padding-bottom: 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 1.25rem; }
-  .rs-tabla-stat-val { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 1.8rem; color: #00f2ff; line-height: 1; }
-  .rs-tabla-stat-lbl { font-size: 7px; font-weight: 700; letter-spacing: 0.3em; color: rgba(255,255,255,0.2); text-transform: uppercase; margin-top: 2px; }
-  .rs-tabla-stat-div { width: 1px; background: rgba(255,255,255,0.06); align-self: stretch; }
-  .rs-tabla-count { font-size: 8px; font-weight: 700; letter-spacing: 0.25em; color: rgba(255,255,255,0.2); text-transform: uppercase; margin-bottom: 0.75rem; }
-  .rs-tbl-head { display: grid; grid-template-columns: 52px 1fr 150px 155px 90px 90px; padding: 0 1rem 0.6rem; border-bottom: 1px solid rgba(255,255,255,0.06); margin-bottom: 3px; }
-  .rs-th { font-size: 7px; font-weight: 700; letter-spacing: 0.3em; color: rgba(255,255,255,0.2); text-transform: uppercase; }
-  .rs-th.r { text-align: right; }
-  .rs-tbl-row { display: grid; grid-template-columns: 52px 1fr 150px 155px 90px 90px; padding: 0.75rem 1rem; border-radius: 3px; border: 1px solid transparent; transition: background 0.12s, border-color 0.12s; align-items: center; margin-bottom: 2px; position: relative; }
-  .rs-tbl-row::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: transparent; transition: background 0.2s; border-radius: 2px 0 0 2px; }
-  .rs-tbl-row:hover { background: rgba(255,255,255,0.025); border-color: rgba(255,255,255,0.06); }
-  .rs-tbl-row:hover::before { background: #00f2ff; }
-  .rs-tbl-row.podio { background: rgba(0,242,255,0.02); }
-  .rs-tbl-row.podio::before { background: #00f2ff; }
-  .rs-tbl-pos { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 1rem; color: rgba(255,255,255,0.3); display: flex; align-items: center; }
-  .rs-tbl-atleta { min-width: 0; }
-  .rs-tbl-nombre { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 700; font-size: 1rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rs-tbl-dorsal-lbl { font-size: 8px; letter-spacing: 0.15em; color: rgba(255,255,255,0.25); margin-top: 1px; }
-  .rs-tbl-cat-badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 2px; font-size: 7px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; border: 1px solid; white-space: nowrap; width: fit-content; }
-  .rs-tbl-time { font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 1rem; color: #00f2ff; text-align: right; }
-  .rs-tbl-pace { font-size: 0.78rem; color: rgba(255,255,255,0.28); text-align: right; }
-  .rs-tbl-catpos { font-size: 0.78rem; color: rgba(255,255,255,0.28); text-align: right; }
-  .rs-loader-bar { width: 200px; height: 2px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; margin: 0 auto; }
-  .rs-loader-fill { height: 100%; background: linear-gradient(90deg, transparent, #00f2ff, transparent); animation: rs-sweep 1.4s ease infinite; }
-  @keyframes rs-sweep { 0%{transform:translateX(-100%);width:60%} 100%{transform:translateX(250%);width:60%} }
-  .rs-tabla-empty { padding: 4rem 0; text-align: center; font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 900; font-size: 1.4rem; color: rgba(255,255,255,0.12); letter-spacing: 0.05em; text-transform: uppercase; }
-
-  @media (max-width: 768px) {
-    .rs-header { padding: 4rem 1.25rem 2rem; }
-    .rs-title { font-size: clamp(52px, 16vw, 90px); }
-    .rs-tabs-wrap { padding: 0 1.25rem 2rem; }
-    .rs-search-wrap { padding: 0 1.25rem 3rem; }
-    .rs-notice { margin: 0 1.25rem 2rem; }
-    .rs-card { padding: 0 1.25rem 4rem; }
-    .rs-tabla-section { padding: 0 1.25rem 4rem; }
-
-    .rs-stats-grid { grid-template-columns: repeat(2, 1fr); gap: 0; }
-    .rs-stat { padding: 1rem 0; padding-right: 1rem; margin-right: 1rem; }
-
-    .rs-athlete-row { grid-template-columns: 1fr; gap: 1.25rem; }
-
-    .rs-status-col { align-items: flex-start; flex-direction: column; gap: 0.6rem; padding-top: 0; }
-    .rs-action-btns { justify-content: flex-start; flex-wrap: wrap; gap: 6px; }
-    .rs-share-btn { padding: 9px 14px; font-size: 8px; letter-spacing: 0.12em; }
-
-    .rs-time-hero { grid-template-columns: 1fr; gap: 1.25rem; }
-    .rs-time-value { font-size: clamp(3rem, 15vw, 6rem); }
-    .rs-bib-watermark { display: none; }
-    .rs-card-inner { padding: 2rem 0; }
-
-    .rs-athlete-name-first, .rs-athlete-name-last { font-size: clamp(2.2rem, 10vw, 3.5rem); }
-
-    .rs-search-input { font-size: 1.8rem; padding: 14px 16px; }
-    .rs-search-btn { padding: 14px 18px; font-size: 0.72rem; }
-
-    .rs-tbl-head { display: none; }
-    .rs-tbl-row { grid-template-columns: 40px 1fr; grid-template-rows: auto auto; gap: 0.3rem 0.6rem; padding: 0.85rem 1rem; border-radius: 0; }
-    .rs-tbl-cat-col, .rs-tbl-pace, .rs-tbl-catpos { display: none; }
-    .rs-tbl-time { text-align: left; grid-column: 2; grid-row: 2; font-size: 0.9rem; }
-    .rs-tbl-pos { grid-row: 1 / span 2; align-self: center; }
-    .rs-tabla-stats { gap: 1rem; }
-  }
-
-  @media (max-width: 380px) {
-    .rs-title { font-size: clamp(44px, 15vw, 72px); }
-    .rs-search-input { font-size: 1.5rem; padding: 12px 14px; }
-    .rs-search-btn { padding: 12px 14px; font-size: 0.65rem; letter-spacing: 0.1em; }
-    .rs-athlete-name-first, .rs-athlete-name-last { font-size: clamp(1.9rem, 9vw, 3rem); }
-    .rs-stats-grid { grid-template-columns: repeat(2, 1fr); }
-    .rs-stat-value { font-size: 1.6rem; }
-    .rs-share-btn { padding: 8px 12px; font-size: 7.5px; }
-    .rs-action-btns { gap: 4px; }
-    .rs-time-value { font-size: clamp(2.5rem, 14vw, 5rem); }
+  /* Accesibilidad: respeta la preferencia de movimiento reducido */
+  @media (prefers-reduced-motion: reduce) {
+    .rs-eyebrow-dot, .rs-status-badge.pending, .rs-loader-fill, .rs-map-skeleton { animation: none; }
+    .rs-tab, .rs-share-btn, .rs-tbl-row, .rs-search-btn { transition: none; }
   }
 `;
 
@@ -518,15 +596,80 @@ const CSS = `
 /* TABLA ROW                                                      */
 /* ────────────────────────────────────────────────────────────── */
 
+/**
+ * Podio ABSOLUTO — 1·2·3 masculino y 1·2·3 femenino sobre el total de finishers,
+ * ordenados por tiempo neto. Es el único ranking que la tabla expone.
+ */
+const timeOf = (r: JsonAtleta): number | null =>
+  r.sin_tiempo ? null : parseTimeToSeconds(r.tiempo_chip || r.tiempo_neto || r.tiempo_bruto);
+
+const podioDe = (gen: string): JsonAtleta[] =>
+  RESULTADOS
+    .filter(r => r.genero === gen && timeOf(r) !== null)
+    .sort((a, b) => timeOf(a)! - timeOf(b)!)
+    .slice(0, 3);
+
+const PODIO_M = podioDe('M');
+const PODIO_F = podioDe('F');
+
+/** Lista maestra: tiempo neto ascendente, DNF/DNS al final. */
+const RESULTADOS_ORDENADOS: JsonAtleta[] = [...RESULTADOS].sort((a, b) => {
+  const ta = timeOf(a), tb = timeOf(b);
+  if (ta === null && tb === null) return a.dorsal - b.dorsal;
+  if (ta === null) return 1;
+  if (tb === null) return -1;
+  return ta - tb;
+});
+
+/** Ritmo mostrado: usa el del JSON y, si viene vacío, lo deriva del tiempo neto. */
+const rowPace = (r: JsonAtleta): string => {
+  const p = normalizePace(r.pace);
+  if (p) return p;
+  const t = timeOf(r);
+  return t ? formatPace(t, DIST_KM[r.modalidad]) : '—';
+};
+
+/** Tarjeta de podio — posición 1..3 dentro de su género. */
+const PodioCard = ({ r, pos }: { r: JsonAtleta; pos: number }) => (
+  <div className={`rs-podio-card p${pos}`}>
+    <div className="rs-podio-medal">{medalEmoji(pos)}</div>
+    <div style={{ minWidth: 0 }}>
+      <div className="rs-podio-nombre">{r.nombre_completo}</div>
+      <div className="rs-podio-meta">#{bib4(r.dorsal)} · {r.categoria}</div>
+    </div>
+    <div>
+      <div className="rs-podio-time">{r.tiempo_chip || r.tiempo_neto || r.tiempo_bruto}</div>
+      <div className="rs-podio-pace">{rowPace(r)} MIN/KM</div>
+    </div>
+  </div>
+);
+
+/** Columna de podio por género. */
+const PodioCol = ({ titulo, color, atletas }: { titulo: string; color: string; atletas: JsonAtleta[] }) => (
+  <div className="rs-podio-col">
+    <div className="rs-podio-head">
+      <span className="rs-podio-title" style={{ color }}>{titulo}</span>
+      <span className="rs-podio-head-line"/>
+    </div>
+    {atletas.length === 0
+      ? <div className="rs-podio-empty">Sin datos</div>
+      : atletas.map((r, i) => <PodioCard key={r.dorsal} r={r} pos={i + 1}/>)
+    }
+  </div>
+);
+
+/** Bloque completo: masculino y femenino lado a lado. */
+const PodioAbsoluto = () => (
+  <div className="rs-podio">
+    <PodioCol titulo="Absoluto masculino" color="rgba(0,242,255,0.55)"  atletas={PODIO_M}/>
+    <PodioCol titulo="Absoluto femenino"  color="rgba(232,121,249,0.6)" atletas={PODIO_F}/>
+  </div>
+);
+
 const TablaRow = ({ r }: { r: JsonAtleta }) => {
-  const accent   = catColor(r.categoria);
-  const medal    = medalEmoji(r.posicion_general);
-  const totalCat = getCatTotal(r.modalidad, r.categoria) || '?';
+  const accent = catColor(r.categoria);
   return (
-    <div className={`rs-tbl-row ${r.posicion_general <= 3 ? 'podio' : ''}`}>
-      <div className="rs-tbl-pos">
-        {medal ? <span>{medal}</span> : <span>{r.posicion_general || '—'}</span>}
-      </div>
+    <div className="rs-tbl-row">
       <div className="rs-tbl-atleta">
         <div className="rs-tbl-nombre">{r.nombre_completo}</div>
         <div className="rs-tbl-dorsal-lbl">#{bib4(r.dorsal)} · {r.modalidad}</div>
@@ -537,23 +680,19 @@ const TablaRow = ({ r }: { r: JsonAtleta }) => {
         </span>
       </div>
       <div className="rs-tbl-time">{r.sin_tiempo ? 'Sin tiempo' : (r.tiempo_chip || r.tiempo_neto || r.tiempo_bruto)}</div>
-      <div className="rs-tbl-pace">{normalizePace(r.pace) || '—'}</div>
-      <div className="rs-tbl-catpos">
-        {r.posicion_categoria ? `${r.posicion_categoria}/${totalCat}` : '—'}
-      </div>
+      <div className="rs-tbl-pace">{rowPace(r)}</div>
     </div>
   );
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* TABLA GENERAL — segmentada por modalidad                       */
+/* TABLA GENERAL — unificada, sin ranking numérico                */
 /* ────────────────────────────────────────────────────────────── */
 
 const TablaGeneral = () => {
-  const [modalidad, setModalidad] = useState<Modalidad>('10K');
-  const [query, setQuery]         = useState('');
-  const [visible, setVisible]     = useState(80);
-  const loaderRef                 = useRef<HTMLDivElement>(null);
+  const [query, setQuery]     = useState('');
+  const [visible, setVisible] = useState(80);
+  const loaderRef             = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const obs = new IntersectionObserver(entries => {
@@ -563,31 +702,19 @@ const TablaGeneral = () => {
     return () => obs.disconnect();
   }, []);
 
-  useEffect(() => { setVisible(80); }, [query, modalidad]);
-
-  const base = useMemo(
-    () => RESULTADOS.filter(r => r.modalidad === modalidad),
-    [modalidad]
-  );
+  useEffect(() => { setVisible(80); }, [query]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return base;
-    return base.filter(r =>
+    if (!q) return RESULTADOS_ORDENADOS;
+    return RESULTADOS_ORDENADOS.filter(r =>
       String(r.dorsal).includes(q) ||
       r.nombre_completo.toLowerCase().includes(q) ||
       r.categoria.toLowerCase().includes(q)
     );
-  }, [query, base]);
+  }, [query]);
 
   const shown = useMemo(() => filtered.slice(0, visible), [filtered, visible]);
-
-  const stats = useMemo(() => ({
-    total: base.filter(r => !r.sin_tiempo).length,
-    masc:  base.filter(r => r.genero === 'M' && !r.sin_tiempo).length,
-    fem:   base.filter(r => r.genero === 'F' && !r.sin_tiempo).length,
-    cats:  [...new Set(base.map(r => r.categoria))].length,
-  }), [base]);
 
   if (!RESULTS_PUBLISHED) {
     return (
@@ -599,17 +726,7 @@ const TablaGeneral = () => {
 
   return (
     <>
-      <div className="rs-mod-tabs">
-        {MODALIDADES.map(m => (
-          <button
-            key={m}
-            className={`rs-mod-tab ${modalidad === m ? 'active' : ''}`}
-            onClick={() => setModalidad(m)}
-          >
-            {MODALIDAD_LABEL[m]}
-          </button>
-        ))}
-      </div>
+      <PodioAbsoluto/>
 
       <div className="rs-tabla-search-wrap">
         <div className="rs-tabla-search-box">
@@ -630,30 +747,11 @@ const TablaGeneral = () => {
         </div>
       </div>
 
-      <div className="rs-tabla-stats">
-        <div><div className="rs-tabla-stat-val">{stats.total}</div><div className="rs-tabla-stat-lbl">Finishers</div></div>
-        <div className="rs-tabla-stat-div"/>
-        <div><div className="rs-tabla-stat-val">{stats.masc}</div><div className="rs-tabla-stat-lbl">Masculino</div></div>
-        <div className="rs-tabla-stat-div"/>
-        <div><div className="rs-tabla-stat-val">{stats.fem}</div><div className="rs-tabla-stat-lbl">Femenino</div></div>
-        <div className="rs-tabla-stat-div"/>
-        <div><div className="rs-tabla-stat-val">{stats.cats}</div><div className="rs-tabla-stat-lbl">Categorías</div></div>
-      </div>
-
-      <div className="rs-tabla-count">
-        {query
-          ? `${filtered.length} resultado${filtered.length !== 1 ? 's' : ''} para "${query}" · ${modalidad}`
-          : `${filtered.length} atletas · ${RACE_NAME_SHORT} · ${MODALIDAD_LABEL[modalidad]} · ${RACE_DATE}`
-        }
-      </div>
-
       <div className="rs-tbl-head">
-        <span className="rs-th">Pos</span>
         <span className="rs-th">Atleta</span>
         <span className="rs-th">Categoría</span>
         <span className="rs-th r">Tiempo chip</span>
         <span className="rs-th r">Ritmo</span>
-        <span className="rs-th r">Pos / Total</span>
       </div>
 
       {shown.length === 0
