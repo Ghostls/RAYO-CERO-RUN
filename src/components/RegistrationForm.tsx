@@ -216,8 +216,8 @@ const CANINATA_CONFIG: RaceStaticConfig = {
     proximaEd: "TEMPORADA 2026", targetDate: new Date("2026-10-04T07:00:00"),
   },
   pago: {
-    titular: "V-5.245.463", cedula: "5.245.463", pagoMovil: "0414-5192879",
-    banco: "Banco de Venezuela / Banco Mercantil",
+    titular: "Caninata", cedula: "5.245.463", pagoMovil: "0414-5192876",
+    banco: "Banco de Venezuela",
     cuenta: "Zelle: piolas.art@gmail.com | Soporte: 0412-1394596",
   },
 };
