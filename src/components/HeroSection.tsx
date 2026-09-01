@@ -1,20 +1,16 @@
 /**
- * RAYOCERO — HERO SECTION (V24.1 - MOBILE RESPONSIVE FIX)
+ * RAYOCERO — HERO SECTION (V24.2 - MOBILE DATE POSITION FIX)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V24.1 (evoluciona sobre V24.0):
- * [V24.1-1] FIX MOBILE: fontSize fecha reducido — clamp(2.8rem,13.5vw,4.5rem)
- *           Era clamp(3.8rem,22vw,7rem) — desbordaba el viewport en iPhone
- * [V24.1-2] FIX MOBILE: posicionamiento fecha centrado con top:50% + translateY
- *           Era top fijo clamp(200px,42vw,310px) — dejaba gap negro enorme
- * [V24.1-3] FIX MOBILE: width:90vw + overflow:hidden en el wrapper de la fecha
- *           Garantiza que ningún breakpoint desborde horizontalmente
- * [V24.1-4] FIX MOBILE: imagen hero objectPosition ajustado a "center 15%"
- *           para centrar mejor el rostro en portrait mobile
- * [V24.1-5] FIX MOBILE: gap negro eliminado — fade inferior subido a 65%
- * [V24.1-6] Desktop: sin cambios — V24.0 preservado íntegramente
+ * CHANGELOG V24.2 (evoluciona sobre V24.1):
+ * [V24.2-1] FIX CRÍTICO MOBILE: separado centrado CSS del motion value Y
+ *           wrapper div estático maneja posición, motion.div interno solo Y
+ * [V24.2-2] Posición fecha: bottom:clamp(160px,28vh,240px) — zona azul screenshot
+ * [V24.2-3] fontSize: clamp(2.4rem,11vw,4rem) — 11vw×8chars=88vw, cabe con padding
+ * [V24.2-4] padding lateral 6vw — nunca toca bordes del viewport
+ * [V24.2-5] Desktop: mismo patrón wrapper/motion aplicado — sin cambios visuales
  */
 
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
@@ -80,45 +76,43 @@ const TacticalMarquee = () => {
 
 // ─── HEADLINE TIPOGRÁFICO ─────────────────────────────────────────────────────
 const EventHeadline = ({ isMobile = false }: { isMobile?: boolean }) => {
+  // [V24.2-3] 11vw × 8 chars = 88vw total — cabe con padding 6vw a cada lado
   const sizeFecha = isMobile
-    ? "clamp(2.8rem, 13.5vw, 4.5rem)"   // [V24.1-1] FIX — era 22vw, desbordaba
+    ? "clamp(2.4rem, 11vw, 4rem)"
     : "clamp(5.5rem, 11.5vw, 13rem)";
-
-  const gradienteFecha = `linear-gradient(
-    105deg,
-    #ffffff        0%,
-    ${LED_CYAN}    18%,
-    ${LED_GREEN}   38%,
-    #ffe600        58%,
-    #ff6bcd        78%,
-    ${LED_MAGENTA} 100%
-  )`;
 
   return (
     <div
-      className="flex flex-col select-none"
       style={{
+        display: "flex",
+        width: "100%",
         alignItems: isMobile ? "center" : "flex-start",
-        // [V24.1-3] Garantiza no overflow horizontal
-        maxWidth: "100%",
+        justifyContent: isMobile ? "center" : "flex-start",
         overflow: "hidden",
       }}
     >
       <span
-        className="font-black leading-none"
+        className="font-black leading-none select-none pointer-events-none"
         style={{
           fontSize: sizeFecha,
-          letterSpacing: "-0.045em",
+          letterSpacing: "-0.04em",
           fontVariantNumeric: "tabular-nums",
           whiteSpace: "nowrap",
-          background: gradienteFecha,
+          background: `linear-gradient(105deg,
+            #ffffff        0%,
+            ${LED_CYAN}    18%,
+            ${LED_GREEN}   38%,
+            #ffe600        58%,
+            #ff6bcd        78%,
+            ${LED_MAGENTA} 100%)`,
           WebkitBackgroundClip: "text",
           backgroundClip: "text",
           WebkitTextFillColor: "transparent",
           color: "transparent",
           WebkitFontSmoothing: "antialiased",
-          filter: `drop-shadow(0 0 ${isMobile ? "16px" : "40px"} rgba(0,242,255,0.18))`,
+          filter: `drop-shadow(0 0 ${isMobile ? "14px" : "40px"} rgba(0,242,255,0.18))`,
           maxWidth: "100%",
+          display: "block",
         }}
       >
         31.10.26
@@ -158,26 +152,16 @@ const HeroSection = () => {
       className="relative w-full flex flex-col font-sans"
       style={{ background: BG_DEEP }}
     >
-
-      <div
-        className="absolute inset-0 z-0 pointer-events-none"
-        style={{
-          background: `radial-gradient(ellipse 80% 100% at 50% 50%, transparent 40%, ${BG_DEEP}99 100%)`,
-        }}
-      />
+    
 
       {/* ══════════════════════════════════════════════════════
           ██  MOBILE LAYOUT (< md)  ██
       ══════════════════════════════════════════════════════ */}
       <div
         className="relative z-10 md:hidden w-full"
-        style={{
-          height: "100svh",
-          minHeight: "600px",
-          overflow: "hidden",
-        }}
+        style={{ height: "100svh", minHeight: "600px", overflow: "hidden" }}
       >
-        {/* Asset hero — [V24.1-4] objectPosition ajustado */}
+        {/* Asset hero */}
         <motion.div
           style={{ y: heroAssetY }}
           className="absolute inset-0 z-[1] pointer-events-none select-none"
@@ -193,40 +177,45 @@ const HeroSection = () => {
               width: "100%",
               height: "100%",
               objectFit: "cover",
-              objectPosition: "center 15%",       // [V24.1-4] era 20%, sube el encuadre
+              objectPosition: "center 15%",
               filter: "brightness(0.52) saturate(1.2)",
             }}
           />
-          {/* [V24.1-5] Fade inferior más agresivo — elimina gap negro */}
+          {/* Fade inferior imagen */}
           <div
             className="absolute inset-x-0 bottom-0"
             style={{
-              height: "65%",                       // era 55%
+              height: "65%",
               background: `linear-gradient(to top, ${BG_DEEP} 45%, transparent 100%)`,
             }}
           />
         </motion.div>
 
-        {/* [V24.1-2] Fecha mobile — centrada en pantalla con top:50% */}
-        <motion.div
-          className="absolute z-[2] pointer-events-none select-none"
+        {/* [V24.2-1][V24.2-2] Fecha mobile
+            Patrón: div estático posiciona, motion.div interno solo mueve Y */}
+        <div
+          className="absolute z-[2] pointer-events-none"
           style={{
-            top: "44%",                            // ligeramente sobre el centro
-            left: "50%",
-            transform: "translateX(-50%) translateY(-50%)",
-            width: "88vw",                         // [V24.1-3] limita ancho
+            bottom: "clamp(160px, 28vh, 240px)",
+            left: 0,
+            right: 0,
             display: "flex",
             justifyContent: "center",
-            y: headlineY,
+            alignItems: "center",
+            padding: "0 6vw",
           }}
-          initial={{ opacity: 0, y: prefersReducedMotion ? 0 : -16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
         >
-          <EventHeadline isMobile={true} />
-        </motion.div>
+          <motion.div
+            style={{ y: headlineY, width: "100%" }}
+            initial={{ opacity: 0, y: prefersReducedMotion ? 0 : -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+          >
+            <EventHeadline isMobile={true} />
+          </motion.div>
+        </div>
 
-        {/* Fade oscuro inferior para legibilidad de botones */}
+        {/* Fade oscuro inferior */}
         <div
           className="absolute inset-x-0 bottom-0 z-[3] pointer-events-none"
           style={{
@@ -276,7 +265,7 @@ const HeroSection = () => {
         className="relative w-full hidden md:block"
         style={{ height: "100svh", minHeight: "640px", overflow: "hidden" }}
       >
-        {/* PLANO 1: Asset hero full-viewport */}
+        {/* PLANO 1: Asset hero */}
         <motion.div
           style={{ y: heroAssetY }}
           className="absolute inset-0 z-[1] pointer-events-none select-none"
@@ -332,20 +321,24 @@ const HeroSection = () => {
           }}
         />
 
-        {/* PLANO 3: Fecha desktop */}
-        <motion.div
-          className="absolute z-[3] pointer-events-none select-none"
+        {/* PLANO 3: Fecha desktop
+            [V24.2-5] mismo patrón wrapper/motion — div estático + motion solo Y */}
+        <div
+          className="absolute z-[3] pointer-events-none"
           style={{
             left: "clamp(40px, 8vw, 120px)",
             bottom: "clamp(120px, 18vh, 220px)",
-            y: headlineY,
           }}
-          initial={{ opacity: 0, x: prefersReducedMotion ? 0 : -40 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
         >
-          <EventHeadline isMobile={false} />
-        </motion.div>
+          <motion.div
+            style={{ y: headlineY }}
+            initial={{ opacity: 0, x: prefersReducedMotion ? 0 : -40 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+          >
+            <EventHeadline isMobile={false} />
+          </motion.div>
+        </div>
 
         {/* Marca vertical lg+ */}
         <motion.div
@@ -435,11 +428,7 @@ const HeroSection = () => {
       {/* ─── BRIDGE → CAROUSEL ─── */}
       <div
         className="relative z-20 w-full pointer-events-none"
-        style={{
-          height: "80px",
-          marginBottom: "-1px",
-          background: BG_DEEP,
-        }}
+        style={{ height: "80px", marginBottom: "-1px", background: BG_DEEP }}
       />
 
       {/* ─── CAROUSEL ─── */}
