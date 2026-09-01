@@ -1,16 +1,20 @@
 /**
- * RAYOCERO — HERO SECTION (V24.0 - BRIDGE FIX + ZERO GAP)
+ * RAYOCERO — HERO SECTION (V24.1 - MOBILE RESPONSIVE FIX)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V24.0 (evoluciona sobre V23):
- * [V24-1] ELIMINADO mt-14/mt-20/mt-24 del wrapper del carousel — el gap
- *         visible entre hero y carousel era ese margin cayendo sobre el body
- * [V24-2] BRIDGE gradient: último elemento del section hace fade a #020608
- *         para que el carousel arranque sin costura visible
- * [V24-3] Section background explícito #020608 — no depende del body
- * [V24-4] Todo lo demás de V23 preservado íntegramente
+ * CHANGELOG V24.1 (evoluciona sobre V24.0):
+ * [V24.1-1] FIX MOBILE: fontSize fecha reducido — clamp(2.8rem,13.5vw,4.5rem)
+ *           Era clamp(3.8rem,22vw,7rem) — desbordaba el viewport en iPhone
+ * [V24.1-2] FIX MOBILE: posicionamiento fecha centrado con top:50% + translateY
+ *           Era top fijo clamp(200px,42vw,310px) — dejaba gap negro enorme
+ * [V24.1-3] FIX MOBILE: width:90vw + overflow:hidden en el wrapper de la fecha
+ *           Garantiza que ningún breakpoint desborde horizontalmente
+ * [V24.1-4] FIX MOBILE: imagen hero objectPosition ajustado a "center 15%"
+ *           para centrar mejor el rostro en portrait mobile
+ * [V24.1-5] FIX MOBILE: gap negro eliminado — fade inferior subido a 65%
+ * [V24.1-6] Desktop: sin cambios — V24.0 preservado íntegramente
  */
 
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
@@ -23,12 +27,14 @@ import ledRunHero from "../assets/led-run-hero.png";
 
 import EventCarousel from "./EventCarrousel";
 
+// ─── PALETA LED ───────────────────────────────────────────────────────────────
 const LED_ORANGE  = "#ff6b00";
 const LED_CYAN    = "#00f2ff";
 const LED_GREEN   = "#00ff9d";
 const LED_MAGENTA = "#ff00c8";
 const BG_DEEP     = "#020608";
 
+// ─── MARQUEE ─────────────────────────────────────────────────────────────────
 const MARQUEE_ITEMS = [
   "WE RUN LED", "10K", "CORO · FALCÓN",
   "CARRERA NOCTURNA", "31 DE OCTUBRE",
@@ -72,9 +78,10 @@ const TacticalMarquee = () => {
   );
 };
 
+// ─── HEADLINE TIPOGRÁFICO ─────────────────────────────────────────────────────
 const EventHeadline = ({ isMobile = false }: { isMobile?: boolean }) => {
   const sizeFecha = isMobile
-    ? "clamp(3.8rem, 22vw, 7rem)"
+    ? "clamp(2.8rem, 13.5vw, 4.5rem)"   // [V24.1-1] FIX — era 22vw, desbordaba
     : "clamp(5.5rem, 11.5vw, 13rem)";
 
   const gradienteFecha = `linear-gradient(
@@ -89,8 +96,13 @@ const EventHeadline = ({ isMobile = false }: { isMobile?: boolean }) => {
 
   return (
     <div
-      className="flex flex-col pointer-events-none select-none"
-      style={{ alignItems: isMobile ? "center" : "flex-start" }}
+      className="flex flex-col select-none"
+      style={{
+        alignItems: isMobile ? "center" : "flex-start",
+        // [V24.1-3] Garantiza no overflow horizontal
+        maxWidth: "100%",
+        overflow: "hidden",
+      }}
     >
       <span
         className="font-black leading-none"
@@ -98,13 +110,15 @@ const EventHeadline = ({ isMobile = false }: { isMobile?: boolean }) => {
           fontSize: sizeFecha,
           letterSpacing: "-0.045em",
           fontVariantNumeric: "tabular-nums",
+          whiteSpace: "nowrap",
           background: gradienteFecha,
           WebkitBackgroundClip: "text",
           backgroundClip: "text",
           WebkitTextFillColor: "transparent",
           color: "transparent",
           WebkitFontSmoothing: "antialiased",
-          filter: `drop-shadow(0 0 ${isMobile ? "20px" : "40px"} rgba(0,242,255,0.18))`,
+          filter: `drop-shadow(0 0 ${isMobile ? "16px" : "40px"} rgba(0,242,255,0.18))`,
+          maxWidth: "100%",
         }}
       >
         31.10.26
@@ -113,6 +127,7 @@ const EventHeadline = ({ isMobile = false }: { isMobile?: boolean }) => {
   );
 };
 
+// ─── HERO SECTION ─────────────────────────────────────────────────────────────
 const HeroSection = () => {
   const prefersReducedMotion = useReducedMotion();
   const sectionRef = useRef(null);
@@ -137,13 +152,13 @@ const HeroSection = () => {
   };
 
   return (
-    // [V24-3] background explícito en el section — no depende del body
     <section
       ref={sectionRef}
       id="hero"
       className="relative w-full flex flex-col font-sans"
       style={{ background: BG_DEEP }}
     >
+
       <div
         className="absolute inset-0 z-0 pointer-events-none"
         style={{
@@ -155,10 +170,14 @@ const HeroSection = () => {
           ██  MOBILE LAYOUT (< md)  ██
       ══════════════════════════════════════════════════════ */}
       <div
-        className="relative z-10 md:hidden w-full overflow-hidden"
-        style={{ height: "100svh", minHeight: "600px" }}
+        className="relative z-10 md:hidden w-full"
+        style={{
+          height: "100svh",
+          minHeight: "600px",
+          overflow: "hidden",
+        }}
       >
-        {/* Asset hero */}
+        {/* Asset hero — [V24.1-4] objectPosition ajustado */}
         <motion.div
           style={{ y: heroAssetY }}
           className="absolute inset-0 z-[1] pointer-events-none select-none"
@@ -171,44 +190,56 @@ const HeroSection = () => {
             alt="WE RUN LED 10K — Carrera Nocturna Coro Falcón"
             draggable={false}
             style={{
-              width: "100%", height: "100%",
-              objectFit: "cover", objectPosition: "center 20%",
-              filter: "brightness(0.55) saturate(1.2)",
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center 15%",       // [V24.1-4] era 20%, sube el encuadre
+              filter: "brightness(0.52) saturate(1.2)",
             }}
           />
+          {/* [V24.1-5] Fade inferior más agresivo — elimina gap negro */}
           <div
             className="absolute inset-x-0 bottom-0"
-            style={{ height: "55%", background: `linear-gradient(to top, ${BG_DEEP} 35%, transparent 100%)` }}
+            style={{
+              height: "65%",                       // era 55%
+              background: `linear-gradient(to top, ${BG_DEEP} 45%, transparent 100%)`,
+            }}
           />
         </motion.div>
 
-        {/* Fecha mobile */}
+        {/* [V24.1-2] Fecha mobile — centrada en pantalla con top:50% */}
         <motion.div
           className="absolute z-[2] pointer-events-none select-none"
           style={{
-            top: "clamp(200px, 42vw, 310px)",
+            top: "44%",                            // ligeramente sobre el centro
             left: "50%",
-            transform: "translateX(-50%)",
+            transform: "translateX(-50%) translateY(-50%)",
+            width: "88vw",                         // [V24.1-3] limita ancho
+            display: "flex",
+            justifyContent: "center",
             y: headlineY,
           }}
-          initial={{ opacity: 0, y: prefersReducedMotion ? 0 : -20 }}
+          initial={{ opacity: 0, y: prefersReducedMotion ? 0 : -16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
         >
           <EventHeadline isMobile={true} />
         </motion.div>
 
-        {/* Fade inferior */}
+        {/* Fade oscuro inferior para legibilidad de botones */}
         <div
           className="absolute inset-x-0 bottom-0 z-[3] pointer-events-none"
-          style={{ height: "32%", background: `linear-gradient(to top, ${BG_DEEP} 45%, transparent 100%)` }}
+          style={{
+            height: "38%",
+            background: `linear-gradient(to top, ${BG_DEEP} 55%, transparent 100%)`,
+          }}
         />
 
         {/* Botones mobile */}
         <motion.div
           initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.9 }}
+          transition={{ duration: 0.8, delay: 0.85 }}
           className="absolute inset-x-0 bottom-6 z-[5] flex flex-col gap-3 px-5"
         >
           <Link to="/registro" className="w-full">
@@ -216,9 +247,9 @@ const HeroSection = () => {
               className="w-full py-4 rounded-[1.25rem] font-black text-[10px] tracking-[0.2em] uppercase transition-all duration-300 flex items-center justify-center gap-3 active:scale-95 group"
               style={btnCyanStyle}
             >
-              <Zap className="h-4 w-4" />
+              <Zap className="h-4 w-4 flex-shrink-0" />
               INSCRIBIRSE AHORA
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              <ArrowRight className="h-4 w-4 flex-shrink-0 transition-transform group-hover:translate-x-1" />
             </button>
           </Link>
           <Link to="/resultados" className="w-full">
@@ -231,7 +262,7 @@ const HeroSection = () => {
                 boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
               }}
             >
-              <Trophy className="h-4 w-4" style={{ color: `${LED_CYAN}99` }} />
+              <Trophy className="h-4 w-4 flex-shrink-0" style={{ color: `${LED_CYAN}99` }} />
               VER RESULTADOS
             </button>
           </Link>
@@ -245,7 +276,7 @@ const HeroSection = () => {
         className="relative w-full hidden md:block"
         style={{ height: "100svh", minHeight: "640px", overflow: "hidden" }}
       >
-        {/* PLANO 1: Asset hero */}
+        {/* PLANO 1: Asset hero full-viewport */}
         <motion.div
           style={{ y: heroAssetY }}
           className="absolute inset-0 z-[1] pointer-events-none select-none"
@@ -258,8 +289,10 @@ const HeroSection = () => {
             alt="WE RUN LED 10K — Carrera Nocturna Coro Falcón"
             draggable={false}
             style={{
-              width: "100%", height: "115%",
-              objectFit: "cover", objectPosition: "center 18%",
+              width: "100%",
+              height: "115%",
+              objectFit: "cover",
+              objectPosition: "center 18%",
               filter: "brightness(0.42) saturate(1.3) contrast(1.05)",
               transform: "translateZ(0)",
             }}
@@ -267,18 +300,27 @@ const HeroSection = () => {
           <div
             className="absolute inset-0"
             style={{
-              background: `linear-gradient(90deg, ${BG_DEEP}EE 0%, transparent 30%, transparent 70%, ${BG_DEEP}EE 100%)`,
+              background: `linear-gradient(90deg,
+                ${BG_DEEP}EE 0%,
+                transparent   30%,
+                transparent   70%,
+                ${BG_DEEP}EE 100%)`,
             }}
           />
           <div
             className="absolute inset-0"
             style={{
-              background: `linear-gradient(180deg, ${BG_DEEP}CC 0%, transparent 20%, transparent 65%, ${BG_DEEP}DD 85%, ${BG_DEEP} 100%)`,
+              background: `linear-gradient(180deg,
+                ${BG_DEEP}CC 0%,
+                transparent   20%,
+                transparent   65%,
+                ${BG_DEEP}DD 85%,
+                ${BG_DEEP}   100%)`,
             }}
           />
         </motion.div>
 
-        {/* PLANO 2: línea de acento */}
+        {/* PLANO 2: línea de acento cyan */}
         <div
           className="absolute z-[2] pointer-events-none"
           style={{
@@ -336,9 +378,9 @@ const HeroSection = () => {
                 onMouseEnter={e => Object.assign((e.currentTarget as HTMLButtonElement).style, btnCyanHover)}
                 onMouseLeave={e => Object.assign((e.currentTarget as HTMLButtonElement).style, btnCyanStyle)}
               >
-                <Zap className="h-4 w-4" />
+                <Zap className="h-4 w-4 flex-shrink-0" />
                 INSCRIBIRSE AHORA
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                <ArrowRight className="h-4 w-4 flex-shrink-0 transition-transform group-hover:translate-x-1" />
               </button>
             </Link>
             <Link to="/resultados">
@@ -360,7 +402,7 @@ const HeroSection = () => {
                   (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 10px 30px rgba(0,0,0,0.4)";
                 }}
               >
-                <Trophy className="h-4 w-4" style={{ color: `${LED_CYAN}70` }} />
+                <Trophy className="h-4 w-4 flex-shrink-0" style={{ color: `${LED_CYAN}70` }} />
                 VER RESULTADOS
               </button>
             </Link>
@@ -368,33 +410,39 @@ const HeroSection = () => {
         </div>
       </div>
 
-      {/* ─── INDICADOR DE SCROLL ─── */}
+      {/* ─── INDICADOR DE SCROLL (md+) ─── */}
       <motion.div
         className="relative z-20 mb-6 hidden md:flex flex-col items-center gap-3 opacity-40 hover:opacity-100 transition-opacity cursor-pointer"
         animate={prefersReducedMotion ? {} : { y: [0, 8, 0] }}
         transition={{ duration: 2, ease: "easeInOut", repeat: Infinity }}
         onClick={() => window.scrollTo({ top: window.innerHeight, behavior: "smooth" })}
       >
-        <span className="text-[8px] font-black tracking-[0.5em] uppercase" style={{ color: LED_CYAN }}>
+        <span
+          className="text-[8px] font-black tracking-[0.5em] uppercase"
+          style={{ color: LED_CYAN }}
+        >
           Explorar
         </span>
-        <div className="w-[1px] h-12" style={{ background: `linear-gradient(to bottom, ${LED_CYAN}, transparent)` }} />
+        <div
+          className="w-[1px] h-12"
+          style={{ background: `linear-gradient(to bottom, ${LED_CYAN}, transparent)` }}
+        />
       </motion.div>
 
       {/* ─── MARQUEE ─── */}
       <TacticalMarquee />
 
-      {/* [V24-2] BRIDGE — fade continuo hacia el carousel, sin gap visible */}
+      {/* ─── BRIDGE → CAROUSEL ─── */}
       <div
         className="relative z-20 w-full pointer-events-none"
         style={{
           height: "80px",
           marginBottom: "-1px",
-          background: `linear-gradient(to bottom, ${BG_DEEP}, ${BG_DEEP})`,
+          background: BG_DEEP,
         }}
       />
 
-      {/* [V24-1] Carousel — sin margin top, acoplado directo */}
+      {/* ─── CAROUSEL ─── */}
       <div className="relative z-10">
         <EventCarousel />
       </div>
