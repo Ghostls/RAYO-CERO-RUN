@@ -1,15 +1,18 @@
 /**
- * RAYO CERO — RACE CALENDAR (EVOLUTION V10.8 — HEADER OPACITY FIX)
+ * RAYO CERO — RACE CALENDAR (EVOLUTION V10.9 — PRECIO CANINATA REMOVED)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V10.8:
- * [V10.8-1] Header LED hero: opacity 20→10, gradientes reforzados
- *           from-[#03070b] via-[#03070b]/85 to-[#03070b]/60 (horizontal)
- *           from-[#03070b] via-[#03070b]/40 to-transparent (vertical)
- *           Evita que los neones del flyer atraviesen el texto del header.
+ * CHANGELOG V10.9 (evoluciona sobre V10.8):
+ * [V10.9-1] Eliminado item Tag "10K CANINATA - $25 (INCLUYE PERRO)" del array
+ *           de info rows — precio manejado exclusivamente en RegistrationForm.
+ *           Import Tag eliminado de lucide-react (ya no se referencia).
+ * [V10.9-2] Fecha caninata viene de Supabase (race.date) — actualizar a
+ *           2026-10-18 directamente en la tabla races de la BD.
  *
+ * CHANGELOG V10.8 (base intacta):
+ * [V10.8-1] Header LED hero: opacity 20→10, gradientes reforzados.
  * CHANGELOG V10.7 (base intacta):
  * [V10.7-1] cfg.isComingSoon: ambos botones disabled sin Link.
  * CHANGELOG V10.6 (base intacta):
@@ -26,7 +29,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   MapPin, Calendar, Clock, Info, Zap, Loader2,
-  Trophy, CheckCircle2, Compass, Dog, Tag, XCircle
+  Trophy, CheckCircle2, Compass, Dog, XCircle
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
@@ -357,7 +360,7 @@ const RacesSection = () => {
     e.preventDefault();
     e.stopPropagation();
     if (isCaninataRace(race.name)) {
-      navigate(`/registro?race=${race.id}&tipo=caninata&distancia=10k&precio=25`);
+      navigate(`/registro?race=${race.id}&tipo=caninata`);
     } else {
       navigate("/registro");
     }
@@ -368,7 +371,7 @@ const RacesSection = () => {
 
       <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-cyan-500/5 blur-[120px] rounded-full pointer-events-none -z-10" />
 
-      {/* ── HEADER — [V10.8-1] opacidad reducida + gradientes reforzados ── */}
+      {/* ── HEADER [V10.8-1] ── */}
       <div className="relative mb-16 rounded-[2.5rem] overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img
@@ -379,9 +382,7 @@ const RacesSection = () => {
             decoding="async"
             className="w-full h-full object-cover object-center opacity-10"
           />
-          {/* Gradiente horizontal — cubre la derecha donde aparece el "10K" */}
           <div className="absolute inset-0 bg-gradient-to-r from-[#03070b] via-[#03070b]/85 to-[#03070b]/60" />
-          {/* Gradiente vertical — refuerza top y bottom */}
           <div className="absolute inset-0 bg-gradient-to-t from-[#03070b] via-[#03070b]/40 to-transparent" />
         </div>
 
@@ -470,7 +471,7 @@ const RacesSection = () => {
                       {race.name}
                     </h3>
 
-                    {/* Countdown — visible en abiertas y próximamente si hay fecha */}
+                    {/* Countdown */}
                     {!cfg.isCompleted && !cfg.isClosed && race.date && (
                       <CountdownChip
                         date={race.date}
@@ -479,7 +480,7 @@ const RacesSection = () => {
                       />
                     )}
 
-                    {/* Chip "Fecha por confirmar" solo si NO hay fecha */}
+                    {/* Chip fecha por confirmar */}
                     {cfg.isComingSoon && !race.date && (
                       <div
                         className="flex items-center gap-2 px-4 py-2.5 rounded-2xl mb-4 border border-white/8"
@@ -505,7 +506,7 @@ const RacesSection = () => {
                       </div>
                     )}
 
-                    {/* Info rows */}
+                    {/* Info rows — [V10.9-1] sin precio caninata */}
                     <div className="space-y-4 mb-10 flex-grow">
                       {[
                         { icon: MapPin, val: race.location },
@@ -522,9 +523,6 @@ const RacesSection = () => {
                             : "FECHA POR CONFIRMAR",
                         },
                         { icon: Clock, val: race.time || "POR CONFIRMAR" },
-                        caninata
-                          ? { icon: Tag, val: "10K CANINATA - $25 (INCLUYE PERRO)" }
-                          : null,
                       ]
                         .filter(Boolean)
                         .map((item: any, i: number) => (
@@ -546,11 +544,7 @@ const RacesSection = () => {
                                   : "#06b6d4",
                               }}
                             />
-                            <span
-                              className={`text-[10px] font-bold tracking-[0.2em] uppercase ${
-                                caninata && i === 3 ? "text-[#FDD454] font-black" : ""
-                              }`}
-                            >
+                            <span className="text-[10px] font-bold tracking-[0.2em] uppercase">
                               {item.val}
                             </span>
                           </div>
@@ -561,7 +555,6 @@ const RacesSection = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-auto">
 
                       {cfg.isCompleted ? (
-                        // ── COMPLETADA ──
                         <>
                           <Link to={`/carrera/${race.id}`} className="w-full">
                             <button className="w-full py-5 bg-white/[0.03] hover:bg-white/[0.06] border border-white/8 rounded-2xl text-[9px] font-black text-white/50 italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase backdrop-blur-md active:scale-95">
@@ -573,8 +566,8 @@ const RacesSection = () => {
                               className="w-full py-5 rounded-2xl text-[9px] font-black italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase active:scale-95"
                               style={{
                                 background: "rgba(245,158,11,0.08)",
-                                border: "1px solid rgba(245,158,11,0.25)",
-                                color: "#FCD34D",
+                                border:     "1px solid rgba(245,158,11,0.25)",
+                                color:      "#FCD34D",
                               }}
                             >
                               <Trophy className="h-3 w-3" /> VER RESULTADOS
@@ -583,15 +576,14 @@ const RacesSection = () => {
                         </>
 
                       ) : cfg.isComingSoon ? (
-                        // ── [V10.7-1] PRÓXIMAMENTE — ambos disabled, sin Link ──
                         <>
                           <button
                             disabled
                             className="w-full h-full py-5 rounded-2xl text-[9px] font-black italic tracking-[0.2em] flex items-center justify-center gap-2 uppercase cursor-not-allowed select-none"
                             style={{
                               background: "rgba(255,255,255,0.02)",
-                              border: "1px solid rgba(255,255,255,0.06)",
-                              color: "rgba(255,255,255,0.15)",
+                              border:     "1px solid rgba(255,255,255,0.06)",
+                              color:      "rgba(255,255,255,0.15)",
                             }}
                           >
                             <Info className="h-3 w-3" /> DETALLES
@@ -601,8 +593,8 @@ const RacesSection = () => {
                             className="w-full h-full py-5 rounded-2xl text-[9px] font-black italic tracking-[0.2em] flex items-center justify-center gap-2 uppercase cursor-not-allowed select-none"
                             style={{
                               background: "rgba(255,255,255,0.02)",
-                              border: "1px solid rgba(255,255,255,0.06)",
-                              color: "rgba(255,255,255,0.15)",
+                              border:     "1px solid rgba(255,255,255,0.06)",
+                              color:      "rgba(255,255,255,0.15)",
                             }}
                           >
                             <Zap className="h-3 w-3" /> PRÓXIMAMENTE
@@ -610,7 +602,6 @@ const RacesSection = () => {
                         </>
 
                       ) : cfg.isClosed ? (
-                        // ── CERRADA ──
                         <>
                           <Link to={`/carrera/${race.id}`} className="w-full">
                             <button className="w-full h-full py-5 bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 rounded-2xl text-[9px] font-black text-white italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase backdrop-blur-md active:scale-95">
@@ -622,8 +613,8 @@ const RacesSection = () => {
                             className="w-full h-full py-5 rounded-2xl text-[9px] font-black italic tracking-[0.2em] flex items-center justify-center gap-2 uppercase cursor-not-allowed"
                             style={{
                               background: "rgba(255,40,40,0.06)",
-                              border: "1px solid rgba(255,60,60,0.2)",
-                              color: "rgba(248,113,113,0.5)",
+                              border:     "1px solid rgba(255,60,60,0.2)",
+                              color:      "rgba(248,113,113,0.5)",
                             }}
                           >
                             <XCircle className="h-3 w-3" /> INSCRIPCIONES CERRADAS
@@ -631,7 +622,6 @@ const RacesSection = () => {
                         </>
 
                       ) : (
-                        // ── ABIERTAS ──
                         <>
                           <Link to={`/carrera/${race.id}`} className="w-full">
                             <button className="w-full h-full py-5 bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 rounded-2xl text-[9px] font-black text-white italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase backdrop-blur-md active:scale-95 text-center">
@@ -645,10 +635,10 @@ const RacesSection = () => {
                               className="w-full h-full py-5 rounded-2xl text-[9px] font-black text-[#050801] italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase active:scale-95 group/btn"
                               style={{
                                 background: "linear-gradient(135deg, #D09644, #FDD454)",
-                                boxShadow: "0 0 20px rgba(253,212,84,0.15)",
+                                boxShadow:  "0 0 20px rgba(253,212,84,0.15)",
                               }}
                             >
-                              INSCRIBIRME $25 <Dog className="h-3 w-3 transition-transform group-hover/btn:scale-110" />
+                              INSCRIBIRME <Dog className="h-3 w-3 transition-transform group-hover/btn:scale-110" />
                             </button>
                           ) : (
                             <button

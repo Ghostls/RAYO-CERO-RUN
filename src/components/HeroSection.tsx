@@ -1,25 +1,24 @@
 /**
- * RAYOCERO — HERO SECTION (V24.2 - MOBILE DATE POSITION FIX)
+ * RAYOCERO — HERO SECTION (V24.4 - PER-SLIDE DATE)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V24.2 (evoluciona sobre V24.1):
- * [V24.2-1] FIX CRÍTICO MOBILE: separado centrado CSS del motion value Y
- *           wrapper div estático maneja posición, motion.div interno solo Y
- * [V24.2-2] Posición fecha: bottom:clamp(160px,28vh,240px) — zona azul screenshot
- * [V24.2-3] fontSize: clamp(2.4rem,11vw,4rem) — 11vw×8chars=88vw, cabe con padding
- * [V24.2-4] padding lateral 6vw — nunca toca bordes del viewport
- * [V24.2-5] Desktop: mismo patrón wrapper/motion aplicado — sin cambios visuales
+ * CHANGELOG V24.4 (evoluciona sobre V24.3):
+ * [V24.4-1] HERO_SLIDES: campos fecha + fechaColor por slide
+ * [V24.4-2] EventHeadline: props fecha + fechaColor — sin hardcode de texto ni color
+ * [V24.4-3] HeroSection: pasa currentSlide.fecha + currentSlide.fechaColor a EventHeadline
+ * [V24.4-4] key={activeIndex} en wrapper fecha — re-triggeriza fade-in al cambiar slide
+ * [V24.4-5] V24.3 intacto — estructura, slider, dots, marquee, carousel sin cambios
  */
 
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Trophy, ArrowRight, Zap } from "lucide-react";
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 
-
-import ledRunHero from "../assets/led-run-hero.png";
+import ledRunHero   from "../assets/led-run-hero.png";
+import caminataHero from "../assets/portada-caninata.png";
 
 import EventCarousel from "./EventCarrousel";
 
@@ -29,6 +28,162 @@ const LED_CYAN    = "#00f2ff";
 const LED_GREEN   = "#00ff9d";
 const LED_MAGENTA = "#ff00c8";
 const BG_DEEP     = "#020608";
+
+// ─── [V24.4-1] SLIDES — fecha y color por slide ───────────────────────────────
+const HERO_SLIDES = [
+  {
+    src        : ledRunHero,
+    alt        : "WE RUN LED 10K — Carrera Nocturna Coro Falcón",
+    fecha      : "31.10.26",
+    fechaColor : `linear-gradient(105deg,
+      #ffffff        0%,
+      ${LED_CYAN}    18%,
+      ${LED_GREEN}   38%,
+      #ffe600        58%,
+      #ff6bcd        78%,
+      ${LED_MAGENTA} 100%)`,
+  },
+  {
+    src        : caminataHero,
+    alt        : "Caminata Recreativa — Rayocero Coro Falcón",
+    fecha      : "18.10.26",
+    fechaColor : `linear-gradient(105deg,
+      ${LED_GREEN}  0%,
+      #a8ff78       40%,
+      #78ffd6       100%)`,
+  },
+] as const;
+
+// ─── [V24.3-3] HOOK SLIDER ───────────────────────────────────────────────────
+const useHeroSlider = (prefersReducedMotion: boolean) => {
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    if (prefersReducedMotion) return;
+    const id = setInterval(() => {
+      setActiveIndex(prev => (prev + 1) % HERO_SLIDES.length);
+    }, 5000);
+    return () => clearInterval(id);
+  }, [prefersReducedMotion]);
+
+  return { activeIndex, setActiveIndex };
+};
+
+// ─── [V24.3-4] HERO IMAGE LAYER ──────────────────────────────────────────────
+interface HeroImageLayerProps {
+  isMobile    : boolean;
+  heroAssetY  : ReturnType<typeof useTransform>;
+  activeIndex : number;
+}
+
+const HeroImageLayer = ({ isMobile, heroAssetY, activeIndex }: HeroImageLayerProps) => {
+  const objPos     = isMobile ? "center 15%" : "center 18%";
+  const brightness = isMobile ? 0.52 : 0.42;
+
+  return (
+    <motion.div
+      style={{ y: heroAssetY }}
+      className="absolute inset-0 z-[1] pointer-events-none select-none"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+    >
+      {HERO_SLIDES.map((slide, i) => (
+        <motion.div
+          key={slide.src}
+          className="absolute inset-0"
+          animate={{ opacity: i === activeIndex ? 1 : 0 }}
+          transition={{ duration: 0.8, ease: "easeInOut" }}
+          style={{ willChange: "opacity" }}
+        >
+          <img
+            src={slide.src}
+            alt={slide.alt}
+            draggable={false}
+            style={{
+              width          : "100%",
+              height         : isMobile ? "100%" : "115%",
+              objectFit      : "cover",
+              objectPosition : objPos,
+              filter         : `brightness(${brightness}) saturate(1.2)${isMobile ? "" : " contrast(1.05)"}`,
+              transform      : "translateZ(0)",
+            }}
+          />
+        </motion.div>
+      ))}
+
+      {/* Fade inferior mobile */}
+      <div
+        className="absolute inset-x-0 bottom-0"
+        style={{
+          height     : isMobile ? "65%" : undefined,
+          background : isMobile
+            ? `linear-gradient(to top, ${BG_DEEP} 45%, transparent 100%)`
+            : undefined,
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* Overlays desktop */}
+      {!isMobile && (
+        <>
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(90deg,
+                ${BG_DEEP}EE 0%,
+                transparent   30%,
+                transparent   70%,
+                ${BG_DEEP}EE 100%)`,
+            }}
+          />
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(180deg,
+                ${BG_DEEP}CC 0%,
+                transparent   20%,
+                transparent   65%,
+                ${BG_DEEP}DD 85%,
+                ${BG_DEEP}   100%)`,
+            }}
+          />
+        </>
+      )}
+    </motion.div>
+  );
+};
+
+// ─── [V24.3-5] SLIDER DOTS ───────────────────────────────────────────────────
+interface SliderDotsProps {
+  activeIndex    : number;
+  setActiveIndex : (i: number) => void;
+  className?     : string;
+  style?         : React.CSSProperties;
+}
+
+const SliderDots = ({ activeIndex, setActiveIndex, className = "", style }: SliderDotsProps) => (
+  <div className={`flex items-center gap-2 ${className}`} style={style}>
+    {HERO_SLIDES.map((_, i) => (
+      <button
+        key={i}
+        aria-label={`Slide ${i + 1}`}
+        onClick={() => setActiveIndex(i)}
+        style={{
+          height      : "4px",
+          width       : i === activeIndex ? "24px" : "8px",
+          borderRadius: "9999px",
+          background  : i === activeIndex ? LED_CYAN : "rgba(255,255,255,0.30)",
+          border      : "none",
+          padding     : 0,
+          cursor      : "pointer",
+          transition  : "width 0.35s ease, background 0.35s ease",
+          flexShrink  : 0,
+        }}
+      />
+    ))}
+  </div>
+);
 
 // ─── MARQUEE ─────────────────────────────────────────────────────────────────
 const MARQUEE_ITEMS = [
@@ -74,9 +229,19 @@ const TacticalMarquee = () => {
   );
 };
 
-// ─── HEADLINE TIPOGRÁFICO ─────────────────────────────────────────────────────
-const EventHeadline = ({ isMobile = false }: { isMobile?: boolean }) => {
-  // [V24.2-3] 11vw × 8 chars = 88vw total — cabe con padding 6vw a cada lado
+// ─── [V24.4-2] HEADLINE TIPOGRÁFICO — fecha y color como props ───────────────
+/**
+ * @param isMobile   true → tamaño mobile, centrado
+ * @param fecha      string de fecha a renderizar (ej: "31.10.26", "18.10.26")
+ * @param fechaColor gradiente CSS string para WebkitBackgroundClip
+ */
+interface EventHeadlineProps {
+  isMobile   : boolean;
+  fecha      : string;
+  fechaColor : string;
+}
+
+const EventHeadline = ({ isMobile, fecha, fechaColor }: EventHeadlineProps) => {
   const sizeFecha = isMobile
     ? "clamp(2.4rem, 11vw, 4rem)"
     : "clamp(5.5rem, 11.5vw, 13rem)";
@@ -84,38 +249,32 @@ const EventHeadline = ({ isMobile = false }: { isMobile?: boolean }) => {
   return (
     <div
       style={{
-        display: "flex",
-        width: "100%",
-        alignItems: isMobile ? "center" : "flex-start",
+        display       : "flex",
+        width         : "100%",
+        alignItems    : isMobile ? "center" : "flex-start",
         justifyContent: isMobile ? "center" : "flex-start",
-        overflow: "hidden",
+        overflow      : "hidden",
       }}
     >
       <span
         className="font-black leading-none select-none pointer-events-none"
         style={{
-          fontSize: sizeFecha,
-          letterSpacing: "-0.04em",
-          fontVariantNumeric: "tabular-nums",
-          whiteSpace: "nowrap",
-          background: `linear-gradient(105deg,
-            #ffffff        0%,
-            ${LED_CYAN}    18%,
-            ${LED_GREEN}   38%,
-            #ffe600        58%,
-            #ff6bcd        78%,
-            ${LED_MAGENTA} 100%)`,
-          WebkitBackgroundClip: "text",
-          backgroundClip: "text",
-          WebkitTextFillColor: "transparent",
-          color: "transparent",
-          WebkitFontSmoothing: "antialiased",
-          filter: `drop-shadow(0 0 ${isMobile ? "14px" : "40px"} rgba(0,242,255,0.18))`,
-          maxWidth: "100%",
-          display: "block",
+          fontSize             : sizeFecha,
+          letterSpacing        : "-0.04em",
+          fontVariantNumeric   : "tabular-nums",
+          whiteSpace           : "nowrap",
+          background           : fechaColor,           // [V24.4-2] dinámico
+          WebkitBackgroundClip : "text",
+          backgroundClip       : "text",
+          WebkitTextFillColor  : "transparent",
+          color                : "transparent",
+          WebkitFontSmoothing  : "antialiased",
+          filter               : `drop-shadow(0 0 ${isMobile ? "14px" : "40px"} rgba(0,242,255,0.18))`,
+          maxWidth             : "100%",
+          display              : "block",
         }}
       >
-        31.10.26
+        {fecha}  {/* [V24.4-2] dinámico */}
       </span>
     </div>
   );
@@ -123,26 +282,31 @@ const EventHeadline = ({ isMobile = false }: { isMobile?: boolean }) => {
 
 // ─── HERO SECTION ─────────────────────────────────────────────────────────────
 const HeroSection = () => {
-  const prefersReducedMotion = useReducedMotion();
+  const prefersReducedMotion = useReducedMotion() ?? false;
   const sectionRef = useRef(null);
 
   const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ["start start", "end start"],
+    target : sectionRef,
+    offset : ["start start", "end start"],
   });
 
   const headlineY  = useTransform(scrollYProgress, [0, 1], ["0%", prefersReducedMotion ? "0%" : "14%"]);
   const heroAssetY = useTransform(scrollYProgress, [0, 1], ["0%", prefersReducedMotion ? "0%" : "8%"]);
 
+  const { activeIndex, setActiveIndex } = useHeroSlider(prefersReducedMotion);
+
+  // [V24.4-3] Slide activo — fuente única de verdad para fecha y color
+  const currentSlide = HERO_SLIDES[activeIndex];
+
   const btnCyanStyle: React.CSSProperties = {
-    background: `linear-gradient(105deg, ${LED_CYAN} 0%, ${LED_GREEN} 100%)`,
-    color: "#000",
-    boxShadow: `0 0 28px ${LED_CYAN}55, 0 0 60px ${LED_CYAN}22, 0 8px 24px rgba(0,0,0,0.45)`,
+    background : `linear-gradient(105deg, ${LED_CYAN} 0%, ${LED_GREEN} 100%)`,
+    color      : "#000",
+    boxShadow  : `0 0 28px ${LED_CYAN}55, 0 0 60px ${LED_CYAN}22, 0 8px 24px rgba(0,0,0,0.45)`,
   };
   const btnCyanHover: React.CSSProperties = {
-    background: `linear-gradient(105deg, ${LED_CYAN} 0%, ${LED_GREEN} 100%)`,
-    color: "#000",
-    boxShadow: `0 0 50px ${LED_CYAN}88, 0 0 100px ${LED_CYAN}33, 0 12px 32px rgba(0,0,0,0.55)`,
+    background : `linear-gradient(105deg, ${LED_CYAN} 0%, ${LED_GREEN} 100%)`,
+    color      : "#000",
+    boxShadow  : `0 0 50px ${LED_CYAN}88, 0 0 100px ${LED_CYAN}33, 0 12px 32px rgba(0,0,0,0.55)`,
   };
 
   return (
@@ -152,7 +316,6 @@ const HeroSection = () => {
       className="relative w-full flex flex-col font-sans"
       style={{ background: BG_DEEP }}
     >
-    
 
       {/* ══════════════════════════════════════════════════════
           ██  MOBILE LAYOUT (< md)  ██
@@ -161,57 +324,51 @@ const HeroSection = () => {
         className="relative z-10 md:hidden w-full"
         style={{ height: "100svh", minHeight: "600px", overflow: "hidden" }}
       >
-        {/* Asset hero */}
-        <motion.div
-          style={{ y: heroAssetY }}
-          className="absolute inset-0 z-[1] pointer-events-none select-none"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <img
-            src={ledRunHero}
-            alt="WE RUN LED 10K — Carrera Nocturna Coro Falcón"
-            draggable={false}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              objectPosition: "center 15%",
-              filter: "brightness(0.52) saturate(1.2)",
-            }}
-          />
-          {/* Fade inferior imagen */}
-          <div
-            className="absolute inset-x-0 bottom-0"
-            style={{
-              height: "65%",
-              background: `linear-gradient(to top, ${BG_DEEP} 45%, transparent 100%)`,
-            }}
-          />
-        </motion.div>
+        <HeroImageLayer
+          isMobile    ={true}
+          heroAssetY  ={heroAssetY}
+          activeIndex ={activeIndex}
+        />
 
-        {/* [V24.2-1][V24.2-2] Fecha mobile
-            Patrón: div estático posiciona, motion.div interno solo mueve Y */}
+        {/* Dots mobile */}
+        <div
+          className="absolute z-[4] pointer-events-auto"
+          style={{
+            bottom        : "clamp(170px, 30vh, 260px)",
+            left          : 0,
+            right         : 0,
+            display       : "flex",
+            justifyContent: "center",
+          }}
+        >
+          <SliderDots activeIndex={activeIndex} setActiveIndex={setActiveIndex} />
+        </div>
+
+        {/* [V24.4-4] Fecha mobile — key={activeIndex} re-triggeriza fade-in por slide */}
         <div
           className="absolute z-[2] pointer-events-none"
           style={{
-            bottom: "clamp(160px, 28vh, 240px)",
-            left: 0,
-            right: 0,
-            display: "flex",
+            bottom        : "clamp(160px, 28vh, 240px)",
+            left          : 0,
+            right         : 0,
+            display       : "flex",
             justifyContent: "center",
-            alignItems: "center",
-            padding: "0 6vw",
+            alignItems    : "center",
+            padding       : "0 6vw",
           }}
         >
           <motion.div
+            key={activeIndex}                                      // [V24.4-4]
             style={{ y: headlineY, width: "100%" }}
-            initial={{ opacity: 0, y: prefersReducedMotion ? 0 : -16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+            initial   ={{ opacity: 0, y: prefersReducedMotion ? 0 : -16 }}
+            animate   ={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           >
-            <EventHeadline isMobile={true} />
+            <EventHeadline
+              isMobile   ={true}
+              fecha      ={currentSlide.fecha}       // [V24.4-3]
+              fechaColor ={currentSlide.fechaColor}  // [V24.4-3]
+            />
           </motion.div>
         </div>
 
@@ -219,15 +376,15 @@ const HeroSection = () => {
         <div
           className="absolute inset-x-0 bottom-0 z-[3] pointer-events-none"
           style={{
-            height: "38%",
-            background: `linear-gradient(to top, ${BG_DEEP} 55%, transparent 100%)`,
+            height     : "38%",
+            background : `linear-gradient(to top, ${BG_DEEP} 55%, transparent 100%)`,
           }}
         />
 
         {/* Botones mobile */}
         <motion.div
-          initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial   ={{ opacity: 0, y: prefersReducedMotion ? 0 : 20 }}
+          animate   ={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.85 }}
           className="absolute inset-x-0 bottom-6 z-[5] flex flex-col gap-3 px-5"
         >
@@ -245,10 +402,10 @@ const HeroSection = () => {
             <button
               className="w-full py-4 rounded-[1.25rem] font-black text-[10px] tracking-[0.2em] uppercase backdrop-blur-xl transition-all duration-300 flex items-center justify-center gap-3 active:scale-95 group"
               style={{
-                background: `${BG_DEEP}CC`,
-                border: `1px solid ${LED_CYAN}30`,
-                color: "rgba(255,255,255,0.85)",
-                boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+                background : `${BG_DEEP}CC`,
+                border     : `1px solid ${LED_CYAN}30`,
+                color      : "rgba(255,255,255,0.85)",
+                boxShadow  : "0 10px 30px rgba(0,0,0,0.4)",
               }}
             >
               <Trophy className="h-4 w-4 flex-shrink-0" style={{ color: `${LED_CYAN}99` }} />
@@ -265,85 +422,63 @@ const HeroSection = () => {
         className="relative w-full hidden md:block"
         style={{ height: "100svh", minHeight: "640px", overflow: "hidden" }}
       >
-        {/* PLANO 1: Asset hero */}
-        <motion.div
-          style={{ y: heroAssetY }}
-          className="absolute inset-0 z-[1] pointer-events-none select-none"
-          initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 1.04 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 1.8, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <img
-            src={ledRunHero}
-            alt="WE RUN LED 10K — Carrera Nocturna Coro Falcón"
-            draggable={false}
-            style={{
-              width: "100%",
-              height: "115%",
-              objectFit: "cover",
-              objectPosition: "center 18%",
-              filter: "brightness(0.42) saturate(1.3) contrast(1.05)",
-              transform: "translateZ(0)",
-            }}
-          />
-          <div
-            className="absolute inset-0"
-            style={{
-              background: `linear-gradient(90deg,
-                ${BG_DEEP}EE 0%,
-                transparent   30%,
-                transparent   70%,
-                ${BG_DEEP}EE 100%)`,
-            }}
-          />
-          <div
-            className="absolute inset-0"
-            style={{
-              background: `linear-gradient(180deg,
-                ${BG_DEEP}CC 0%,
-                transparent   20%,
-                transparent   65%,
-                ${BG_DEEP}DD 85%,
-                ${BG_DEEP}   100%)`,
-            }}
-          />
-        </motion.div>
+        <HeroImageLayer
+          isMobile    ={false}
+          heroAssetY  ={heroAssetY}
+          activeIndex ={activeIndex}
+        />
 
-        {/* PLANO 2: línea de acento cyan */}
+        {/* Línea acento cyan */}
         <div
           className="absolute z-[2] pointer-events-none"
           style={{
-            bottom: "clamp(90px, 14vh, 140px)",
-            left: "clamp(40px, 8vw, 120px)",
-            right: "clamp(40px, 8vw, 120px)",
-            height: "1px",
-            background: `linear-gradient(90deg, transparent, ${LED_CYAN}40, transparent)`,
+            bottom     : "clamp(90px, 14vh, 140px)",
+            left       : "clamp(40px, 8vw, 120px)",
+            right      : "clamp(40px, 8vw, 120px)",
+            height     : "1px",
+            background : `linear-gradient(90deg, transparent, ${LED_CYAN}40, transparent)`,
           }}
         />
 
-        {/* PLANO 3: Fecha desktop
-            [V24.2-5] mismo patrón wrapper/motion — div estático + motion solo Y */}
+        {/* [V24.4-4] Fecha desktop — key={activeIndex} re-triggeriza fade-in */}
         <div
           className="absolute z-[3] pointer-events-none"
           style={{
-            left: "clamp(40px, 8vw, 120px)",
-            bottom: "clamp(120px, 18vh, 220px)",
+            left   : "clamp(40px, 8vw, 120px)",
+            bottom : "clamp(120px, 18vh, 220px)",
           }}
         >
           <motion.div
+            key={activeIndex}                                      // [V24.4-4]
             style={{ y: headlineY }}
-            initial={{ opacity: 0, x: prefersReducedMotion ? 0 : -40 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+            initial   ={{ opacity: 0, x: prefersReducedMotion ? 0 : -40 }}
+            animate   ={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
           >
-            <EventHeadline isMobile={false} />
+            <EventHeadline
+              isMobile   ={false}
+              fecha      ={currentSlide.fecha}       // [V24.4-3]
+              fechaColor ={currentSlide.fechaColor}  // [V24.4-3]
+            />
           </motion.div>
+        </div>
+
+        {/* Dots desktop */}
+        <div
+          className="absolute z-[4] pointer-events-auto"
+          style={{
+            left     : "clamp(40px, 8vw, 120px)",
+            bottom   : "clamp(90px, 14vh, 140px)",
+            transform: "translateY(-16px)",
+          }}
+        >
+          <SliderDots activeIndex={activeIndex} setActiveIndex={setActiveIndex} />
         </div>
 
         {/* Marca vertical lg+ */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          initial   ={{ opacity: 0 }}
+          animate   ={{ opacity: 1 }}
           transition={{ duration: 1, delay: 1.4 }}
           className="absolute left-4 lg:left-6 bottom-24 z-[4] hidden lg:flex items-center"
           style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
@@ -359,8 +494,8 @@ const HeroSection = () => {
         {/* Botonera desktop */}
         <div className="absolute inset-x-0 bottom-8 lg:bottom-10 z-[5] flex justify-start px-[clamp(40px,8vw,120px)]">
           <motion.div
-            initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 24 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial   ={{ opacity: 0, y: prefersReducedMotion ? 0 : 24 }}
+            animate   ={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.9, delay: 1.0 }}
             className="flex flex-row gap-4 items-center"
           >
@@ -380,18 +515,18 @@ const HeroSection = () => {
               <button
                 className="py-4 lg:py-5 rounded-[1.25rem] font-black text-[10px] tracking-[0.2em] uppercase backdrop-blur-xl transition-all duration-300 flex items-center justify-center gap-3 hover:-translate-y-1 active:scale-95 group"
                 style={{
-                  width: "clamp(220px, 20vw, 280px)",
-                  background: `${BG_DEEP}80`,
-                  border: `1px solid ${LED_CYAN}30`,
-                  color: "rgba(255,255,255,0.80)",
-                  boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+                  width      : "clamp(220px, 20vw, 280px)",
+                  background : `${BG_DEEP}80`,
+                  border     : `1px solid ${LED_CYAN}30`,
+                  color      : "rgba(255,255,255,0.80)",
+                  boxShadow  : "0 10px 30px rgba(0,0,0,0.4)",
                 }}
                 onMouseEnter={e => {
-                  (e.currentTarget as HTMLButtonElement).style.border = `1px solid ${LED_CYAN}60`;
+                  (e.currentTarget as HTMLButtonElement).style.border    = `1px solid ${LED_CYAN}60`;
                   (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 20px ${LED_CYAN}20, 0 12px 32px rgba(0,0,0,0.5)`;
                 }}
                 onMouseLeave={e => {
-                  (e.currentTarget as HTMLButtonElement).style.border = `1px solid ${LED_CYAN}30`;
+                  (e.currentTarget as HTMLButtonElement).style.border    = `1px solid ${LED_CYAN}30`;
                   (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 10px 30px rgba(0,0,0,0.4)";
                 }}
               >
@@ -406,7 +541,7 @@ const HeroSection = () => {
       {/* ─── INDICADOR DE SCROLL (md+) ─── */}
       <motion.div
         className="relative z-20 mb-6 hidden md:flex flex-col items-center gap-3 opacity-40 hover:opacity-100 transition-opacity cursor-pointer"
-        animate={prefersReducedMotion ? {} : { y: [0, 8, 0] }}
+        animate   ={prefersReducedMotion ? {} : { y: [0, 8, 0] }}
         transition={{ duration: 2, ease: "easeInOut", repeat: Infinity }}
         onClick={() => window.scrollTo({ top: window.innerHeight, behavior: "smooth" })}
       >

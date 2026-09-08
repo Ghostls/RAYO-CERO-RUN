@@ -1,22 +1,23 @@
 /**
- * RAYO CERO — CORE ROUTER V7.7 (DORSAL_ROUTE)
+ * RAYO CERO — CORE ROUTER V7.8 (CANINATA DORSAL UNIFICATION)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  *
- * CHANGELOG V7.7:
- * [V7.7-1] Ruta `/dorsal` añadida → DorsalPage (Canvas 2D, PNG descargable).
- *          Genera el dorsal oficial 499 RUN CORO FALCÓN con nombre, BIB y categoría.
- * [V7.7-2] Flujos completamente separados — SIN mezcla:
- *          - Coro 10K/4K  → /dorsal        → DorsalPage (PNG Canvas)
- *          - Caninata 5K  → /confirmacion  → ConfirmationPage V5 (glass card)
+ * CHANGELOG V7.8 (evoluciona sobre V7.7):
+ * [V7.8-1] Ruta /confirmacion eliminada — caninata 5K navega a
+ *           /dorsal?tipo=caninata desde V37.2 del RegistrationForm.
+ * [V7.8-2] Import ConfirmationPage eliminado — ya no se referencia.
+ * [V7.8-3] /acceso y /perfil añadidos a isAdminRoute — son rutas de
+ *           portal privado del atleta, no deben mostrar Navbar/Footer.
+ *
+ * CHANGELOG V7.7 (base):
+ * [V7.7-1] Ruta /dorsal → DorsalPage (Canvas 2D, PNG descargable).
+ * [V7.7-2] Flujos separados Coro/Caninata.
  * [V7.7-3] /dorsal excluido de isAdminRoute → muestra Navbar y Footer.
- *
  * CHANGELOG V7.6 (base):
- * [V7.6-1] Ruta `/confirmacion` añadida — ConfirmationPage Caninata.
- * [V7.6-2] `/confirmacion` excluida de isAdminRoute.
- *
+ * [V7.6-1] Ruta /confirmacion — ConfirmationPage Caninata (eliminada V7.8).
  * CHANGELOG V7.5 (base):
- * [V7.5-1] RaceSignalProvider integrado — countdown pre-carrera en todos los dispositivos.
+ * [V7.5-1] RaceSignalProvider integrado.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -27,11 +28,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-// IMPORTACIONES DE COMPONENTES GLOBALES
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-
-// ✅ V7.5 — Provider global de señales de carrera
 import RaceSignalProvider from "./components/RaceSignalProvider";
 
 // ── Skeleton global de carga ─────────────────────────────────────────────────
@@ -67,10 +65,8 @@ const NotFound       = lazy(() => import("./pages/NotFound"));
 const AdminLogin     = lazy(() => import("./pages/AdminLogin"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 
-// ✅ [V7.6-1] Caninata 5K — glass card brand verde/amarillo
-const ConfirmationPage = lazy(() => import("./pages/ConfirmationPage"));
-
-// ✅ [V7.7-1] Coro 10K/4K — genera PNG del dorsal con Canvas 2D API
+// [V7.8-1] ConfirmationPage eliminada — caninata va a /dorsal?tipo=caninata
+// ✅ [V7.7-1] DorsalPage — maneja AMBOS flujos: carrera y caninata
 const DorsalPage = lazy(() => import("./pages/DorsalPage"));
 
 // ── MÓDULOS ESPECÍFICOS — lazy load ─────────────────────────────────────────
@@ -96,13 +92,14 @@ const TrackerPage = () => {
 const AppContent = ({ session, loading }: { session: any; loading: boolean }) => {
   const location = useLocation();
 
+  // [V7.8-3] /acceso y /perfil añadidos — portal privado sin Navbar/Footer
   const isAdminRoute =
     location.pathname.startsWith("/admin")   ||
     location.pathname === "/v-access"        ||
     location.pathname.startsWith("/tracker") ||
     location.pathname === "/acceso"          ||
     location.pathname === "/perfil";
-  // NOTA: /confirmacion y /dorsal NO están aquí → muestran Navbar y Footer
+  // /dorsal y /confirmacion NO están aquí → muestran Navbar y Footer
 
   return (
     <div className="min-h-screen bg-[#03070b] text-white flex flex-col selection:bg-cyan-500/30">
@@ -119,10 +116,7 @@ const AppContent = ({ session, loading }: { session: any; loading: boolean }) =>
           <Route path="/registro"    element={wrap(RegistrationForm)} />
           <Route path="/resultados"  element={wrap(ResultsSection)} />
 
-          {/* ── [V7.6-1] CONFIRMACIÓN CANINATA 5K — glass card verde/amarillo ── */}
-          <Route path="/confirmacion" element={wrap(ConfirmationPage)} />
-
-          {/* ── [V7.7-1] DORSAL CORO 10K/4K — PNG generado con Canvas 2D ── */}
+          {/* ── [V7.7-1] DORSAL — PNG Canvas 2D, maneja carrera y caninata ── */}
           <Route path="/dorsal" element={wrap(DorsalPage)} />
 
           {/* ── TELEMETRÍA GPS ── */}
