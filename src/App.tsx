@@ -1,23 +1,17 @@
 /**
- * RAYO CERO — CORE ROUTER V7.8 (CANINATA DORSAL UNIFICATION)
+ * RAYO CERO — CORE ROUTER V7.9 (CANINATA CLIENT DASHBOARD)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  *
- * CHANGELOG V7.8 (evoluciona sobre V7.7):
- * [V7.8-1] Ruta /confirmacion eliminada — caninata 5K navega a
- *           /dorsal?tipo=caninata desde V37.2 del RegistrationForm.
- * [V7.8-2] Import ConfirmationPage eliminado — ya no se referencia.
- * [V7.8-3] /acceso y /perfil añadidos a isAdminRoute — son rutas de
- *           portal privado del atleta, no deben mostrar Navbar/Footer.
+ * CHANGELOG V7.9 (evoluciona sobre V7.8):
+ * [V7.9-1] Import CaninataDashboard — lazy load desde pages/CaninataDashboard.
+ * [V7.9-2] Ruta /caninata → CaninataDashboard (PIN-based, sin Supabase Auth).
+ * [V7.9-3] /caninata añadido a isAdminRoute — sin Navbar ni Footer.
  *
- * CHANGELOG V7.7 (base):
- * [V7.7-1] Ruta /dorsal → DorsalPage (Canvas 2D, PNG descargable).
- * [V7.7-2] Flujos separados Coro/Caninata.
- * [V7.7-3] /dorsal excluido de isAdminRoute → muestra Navbar y Footer.
- * CHANGELOG V7.6 (base):
- * [V7.6-1] Ruta /confirmacion — ConfirmationPage Caninata (eliminada V7.8).
- * CHANGELOG V7.5 (base):
- * [V7.5-1] RaceSignalProvider integrado.
+ * CHANGELOG V7.8 (base intacta):
+ * [V7.8-1] Ruta /confirmacion eliminada.
+ * [V7.8-2] Import ConfirmationPage eliminado.
+ * [V7.8-3] /acceso y /perfil en isAdminRoute.
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -65,9 +59,11 @@ const NotFound       = lazy(() => import("./pages/NotFound"));
 const AdminLogin     = lazy(() => import("./pages/AdminLogin"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 
-// [V7.8-1] ConfirmationPage eliminada — caninata va a /dorsal?tipo=caninata
 // ✅ [V7.7-1] DorsalPage — maneja AMBOS flujos: carrera y caninata
 const DorsalPage = lazy(() => import("./pages/DorsalPage"));
+
+// ✅ [V7.9-1] CaninataDashboard — acceso PIN para cliente dueño de la caninata
+const CaninataDashboard = lazy(() => import("./pages/CaninataDashboard"));
 
 // ── MÓDULOS ESPECÍFICOS — lazy load ─────────────────────────────────────────
 const RegistrationForm = lazy(() => import("./components/RegistrationForm"));
@@ -92,14 +88,14 @@ const TrackerPage = () => {
 const AppContent = ({ session, loading }: { session: any; loading: boolean }) => {
   const location = useLocation();
 
-  // [V7.8-3] /acceso y /perfil añadidos — portal privado sin Navbar/Footer
+  // [V7.9-3] /caninata añadido — dashboard cliente sin Navbar/Footer
   const isAdminRoute =
     location.pathname.startsWith("/admin")   ||
     location.pathname === "/v-access"        ||
     location.pathname.startsWith("/tracker") ||
     location.pathname === "/acceso"          ||
-    location.pathname === "/perfil";
-  // /dorsal y /confirmacion NO están aquí → muestran Navbar y Footer
+    location.pathname === "/perfil"          ||
+    location.pathname === "/caninata";
 
   return (
     <div className="min-h-screen bg-[#03070b] text-white flex flex-col selection:bg-cyan-500/30">
@@ -116,8 +112,11 @@ const AppContent = ({ session, loading }: { session: any; loading: boolean }) =>
           <Route path="/registro"    element={wrap(RegistrationForm)} />
           <Route path="/resultados"  element={wrap(ResultsSection)} />
 
-          {/* ── [V7.7-1] DORSAL — PNG Canvas 2D, maneja carrera y caninata ── */}
+          {/* ── DORSAL — PNG Canvas 2D, maneja carrera y caninata ── */}
           <Route path="/dorsal" element={wrap(DorsalPage)} />
+
+          {/* ── [V7.9-2] DASHBOARD CLIENTE CANINATA — PIN-based ── */}
+          <Route path="/caninata" element={wrap(CaninataDashboard)} />
 
           {/* ── TELEMETRÍA GPS ── */}
           <Route path="/tracker"      element={wrap(TrackerLanding)} />
