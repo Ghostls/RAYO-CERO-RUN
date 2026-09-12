@@ -1,28 +1,22 @@
 /**
- * RAYO CERO — RACE OPERATIVE DETAIL (EVOLUTION V15.2 — CORO CERRADA / CANINATA ABIERTA)
+ * RAYO CERO — RACE OPERATIVE DETAIL (EVOLUTION V15.4 — WE RUN LED CORO)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V15.2:
- * [V15.2-1] CoroDetail: botón de inscripción reemplazado por panel
- *           "INSCRIPCIONES CERRADAS" con mensaje explicativo cuando
- *           inscripciones_abiertas=false. Inscripción solo desde Admin.
- *           El mapa, ruta y leyenda permanecen intactos.
- * [V15.2-2] ComingSoonPanel: distingue entre carrera CERRADA con datos reales
- *           (tiene location y date) vs PRÓXIMA SIN DATOS.
- *           — Cerrada con datos: "INSCRIPCIONES CERRADAS — 499 RUN CORO"
- *             muestra banner, fecha, ubicación y mensaje de cierre en rojo.
- *           — Próxima sin datos: mantiene el "PRÓXIMA MISIÓN" original.
- * [V15.2-3] CaninataDetail: inscAbiertas siempre true — caninata permanece
- *           abierta independientemente de INSCRIPCIONES_ABIERTAS global.
- * [V15.2-4] BarquisimetoDetail: sin cambios (completada, mantiene CUPO COMPLETO).
+ * CHANGELOG V15.4 (evoluciona sobre V15.3):
+ * [V15.4-1] WeRunCoroDetail: nuevo componente para "WE RUN RAYOCERO LED CORO 10K".
+ *           Muestra panel "Ruta Táctica Próximamente" en lugar del mapa interactivo.
+ *           Botón INSCRIBIRME activo cuando race.inscripciones_abiertas=true,
+ *           panel cerrado cuando false. Dot de estado reactivo.
+ * [V15.4-2] Router: isLedRunRace evaluado ANTES que isCoroRace para evitar
+ *           que la keyword "coro" en el nombre capture esta carrera en CoroDetail.
+ * [V15.4-3] isLedRunRace: detecta por keyword "led" en el nombre.
+ *           Caninata / Barquisimeto / CoroDetail — SIN NINGÚN CAMBIO.
  *
- * CHANGELOG V15.1 (base preservada):
- * [V15.1-1..4] caninataRoute5K/10K corregidas, waypoints corregidos.
- *
- * CHANGELOG V15.0 (base preservada):
- * [V15-1..7] Rutas duales, CaninataDetail toggle, router dinámico.
+ * CHANGELOG V15.3 (base preservada):
+ * [V15.3-1] attribution="" en los 3 TileLayer.
+ * [V15.3-2] CoroDetail inscAbiertas dinámico desde Supabase.
  */
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -31,7 +25,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   MapPin, Clock, Zap, Users, ArrowLeft, Trophy,
   Lock, Calendar, Shield, Dog, Heart, ChevronRight,
-  XCircle, AlertCircle,
+  XCircle, AlertCircle, Map, Loader2 as RouteLoader,
 } from "lucide-react";
 import { MapContainer, TileLayer, Polyline, Marker, useMap, Circle } from "react-leaflet";
 import L from "leaflet";
@@ -41,14 +35,14 @@ import { supabase } from "@/lib/supabase";
 import { INSCRIPCIONES_ABIERTAS } from "@/lib/registrationConfig";
 import flyerPremios from "@/assets/flier_premios_info.png";
 
-// ── BANNERS OPERATIVOS ───────────────────────────────────────────────────────
 import portada499Agosto          from "@/assets/PORTADA_499.png";
 import flyerOctubreInscripciones from "@/assets/flyer-coro-inscripciones.png";
+import ledRunHero                from "@/assets/led-run-hero.png";
 
 let flyerCaninataBanner: string | null = null;
 try {
   flyerCaninataBanner = require("@/assets/flyer-caninata.png").default;
-} catch (_) { /* asset pendiente */ }
+} catch (_) {}
 
 const MapComp    = MapContainer as any;
 const TileComp   = TileLayer   as any;
@@ -67,16 +61,22 @@ const RACE_CONFIGS: Record<string, { hasMap: boolean }> = {
   "Caninata Barquisimeto":             { hasMap: true },
   "CANINATA BARQUISIMETO":             { hasMap: true },
   "Caninata Rayocero":                 { hasMap: true },
+  "WE RUN RAYOCERO LED CORO 10K":      { hasMap: true },
 };
 
 const hasMapConfig = (name: string): boolean => {
   if (!name) return false;
   const n = name.toLowerCase();
   if (n.includes("barquisimeto") || n.includes("night fest")) return true;
+  if (n.includes("led"))     return true;
   if (n.includes("coro") || n.includes("falcón") || n.includes("falcon") || n.includes("499")) return true;
   if (n.includes("caninata")) return true;
   return RACE_CONFIGS[name]?.hasMap ?? false;
 };
+
+// [V15.4-3] Detectores — orden importa en el router
+const isLedRunRace = (name: string): boolean =>
+  (name?.toLowerCase() ?? "").includes("led");
 
 const isBarquisimetoRace = (name: string): boolean => {
   const n = name?.toLowerCase() ?? "";
@@ -85,7 +85,8 @@ const isBarquisimetoRace = (name: string): boolean => {
 
 const isCoroRace = (name: string): boolean => {
   const n = name?.toLowerCase() ?? "";
-  return n.includes("coro") || n.includes("falcón") || n.includes("falcon") || n.includes("499");
+  return (n.includes("coro") || n.includes("falcón") || n.includes("falcon") || n.includes("499"))
+    && !n.includes("led"); // evitar captura de WE RUN LED CORO
 };
 
 const isCaninataRace = (name: string): boolean =>
@@ -97,6 +98,7 @@ const isCaninataRace = (name: string): boolean =>
 const getRaceBanner = (name: string = ""): string | null => {
   const n = name.toLowerCase();
   if (n.includes("caninata"))  return flyerCaninataBanner;
+  if (n.includes("led"))       return ledRunHero;
   if (n.includes("499") || n.includes("agosto")) return portada499Agosto;
   if (n.includes("coro") || n.includes("falcón") || n.includes("falcon") || n.includes("octubre"))
     return flyerOctubreInscripciones;
@@ -192,7 +194,7 @@ const CORO_WAYPOINTS = [
 ];
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* RUTAS CANINATA — V15.1 intactas                                            */
+/* RUTAS CANINATA — intactas                                                  */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const caninataRoute5K: [number, number][] = [
   [10.070519, -69.291850], [10.070007, -69.292075], [10.072938, -69.290581],
@@ -241,26 +243,19 @@ const CANINATA_WAYPOINTS_5K = [
 ];
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* [V15.2-2] COMING SOON PANEL — distingue CERRADA vs PRÓXIMA                */
+/* COMING SOON PANEL — intacto                                                */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
-  race: any;
-  registeredCount: number;
-  onBack: () => void;
-  onRegister: (e: React.MouseEvent) => void;
+  race: any; registeredCount: number;
+  onBack: () => void; onRegister: (e: React.MouseEvent) => void;
 }) => {
   const dateStr = race?.date
     ? new Date(race.date + "T00:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" }).toUpperCase()
     : "—";
-
   const banner    = getRaceBanner(race?.name ?? "");
   const countdown = useCountdown(race?.date);
-
-  // [V15.2-2] Carrera "cerrada con datos reales": tiene location, date
-  // pero INSCRIPCIONES_ABIERTAS=false y no es caninata
-  const hasRealData  = !!(race?.location && race?.date);
-  const isClosed     = hasRealData && !INSCRIPCIONES_ABIERTAS && !isCaninataRace(race?.name ?? "");
-  const isCoroFalcon = isCoroRace(race?.name ?? "");
+  const hasRealData = !!(race?.location && race?.date);
+  const isClosed    = hasRealData && !INSCRIPCIONES_ABIERTAS && !isCaninataRace(race?.name ?? "");
 
   return (
     <div className="min-h-screen w-full bg-[#03070b] flex flex-col text-white relative font-sans pt-[85px] md:pt-[104px] pb-12 overflow-y-auto">
@@ -269,7 +264,6 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
           style={{ background: isClosed ? "rgba(220,38,38,0.04)" : "rgba(245,158,11,0.05)" }} />
         <div className="absolute bottom-1/4 left-1/3 w-[400px] h-[300px] bg-cyan-500/5 blur-[100px] rounded-full" />
       </div>
-
       <div className="relative z-10 w-full max-w-2xl mx-auto px-4 sm:px-6 flex flex-col items-center py-8">
         <div className="w-full flex justify-start mb-8">
           <button onClick={onBack}
@@ -278,15 +272,11 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
             <span className="font-black text-[9px] tracking-[0.3em] uppercase text-white/70">Volver</span>
           </button>
         </div>
-
         <motion.div
           initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: "easeOut" }}
           className="w-full border rounded-[2.5rem] backdrop-blur-2xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.6)] flex flex-col items-center text-center"
-          style={{
-            background: "rgba(255,255,255,0.02)",
-            borderColor: isClosed ? "rgba(220,38,38,0.15)" : "rgba(255,255,255,0.05)",
-          }}
+          style={{ background: "rgba(255,255,255,0.02)", borderColor: isClosed ? "rgba(220,38,38,0.15)" : "rgba(255,255,255,0.05)" }}
         >
           {banner && (
             <div className="w-full relative">
@@ -295,42 +285,28 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
               <div className="absolute inset-0 bg-gradient-to-t from-[#03070b] via-transparent to-transparent" />
             </div>
           )}
-
           <div className="w-full flex flex-col items-center gap-6 p-7 sm:p-10 md:p-12">
-
-            {/* Badge de estado */}
             {isClosed ? (
-              /* [V15.2-2] CERRADA con datos */
               <div className="flex items-center gap-2 px-4 py-2 rounded-full border"
                 style={{ background: "rgba(220,38,38,0.08)", borderColor: "rgba(220,38,38,0.25)" }}>
                 <XCircle className="h-3.5 w-3.5 text-red-400" />
-                <span className="text-[8px] font-black tracking-[0.4em] uppercase text-red-400">
-                  Inscripciones Cerradas
-                </span>
+                <span className="text-[8px] font-black tracking-[0.4em] uppercase text-red-400">Inscripciones Cerradas</span>
               </div>
             ) : (
-              /* Original — próxima misión */
               <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-400/20">
                 <motion.span className="w-1.5 h-1.5 rounded-full bg-amber-400"
                   animate={{ opacity: [1, 0.2, 1] }} transition={{ duration: 1.8, repeat: Infinity }} />
-                <span className="text-[8px] font-black tracking-[0.4em] uppercase text-amber-300">
-                  Detalles Operativos En Preparación
-                </span>
+                <span className="text-[8px] font-black tracking-[0.4em] uppercase text-amber-300">Detalles Operativos En Preparación</span>
               </div>
             )}
-
             <div>
               <h1 className="text-3xl sm:text-4xl md:text-6xl font-black italic uppercase tracking-tighter leading-[0.9] text-white mb-3">
                 {race?.name ?? "PRÓXIMA MISIÓN"}
               </h1>
               <p className="text-white/30 text-sm font-bold tracking-widest uppercase">
-                {isClosed
-                  ? "Las inscripciones para esta carrera han cerrado"
-                  : "La ruta táctica se revelará pronto"}
+                {isClosed ? "Las inscripciones para esta carrera han cerrado" : "La ruta táctica se revelará pronto"}
               </p>
             </div>
-
-            {/* Countdown solo si no está cerrada */}
             {!isClosed && countdown && (
               <div className="flex items-center gap-3 px-6 py-3 rounded-2xl bg-cyan-500/[0.06] border border-cyan-400/15">
                 <Zap className="h-4 w-4 text-cyan-400" />
@@ -339,7 +315,6 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
                 </span>
               </div>
             )}
-
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
               {[
                 { icon: MapPin,   label: "Ubicación", val: race?.location ?? "—" },
@@ -347,60 +322,44 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
                 { icon: Users,    label: "Inscritos", val: `${registeredCount}`  },
               ].map((item, i) => (
                 <div key={i} className="flex flex-col items-center gap-3 p-5 border rounded-2xl"
-                  style={{
-                    background: isClosed ? "rgba(220,38,38,0.03)" : "rgba(255,255,255,0.02)",
-                    borderColor: isClosed ? "rgba(220,38,38,0.1)" : "rgba(255,255,255,0.05)",
-                  }}>
+                  style={{ background: isClosed ? "rgba(220,38,38,0.03)" : "rgba(255,255,255,0.02)", borderColor: isClosed ? "rgba(220,38,38,0.1)" : "rgba(255,255,255,0.05)" }}>
                   <item.icon className="h-5 w-5" style={{ color: isClosed ? "#f87171" : "#22d3ee" }} />
                   <div>
-                    <p className="text-[8px] font-black uppercase tracking-widest mb-1"
-                      style={{ color: "rgba(255,255,255,0.3)" }}>{item.label}</p>
+                    <p className="text-[8px] font-black uppercase tracking-widest mb-1" style={{ color: "rgba(255,255,255,0.3)" }}>{item.label}</p>
                     <p className="text-sm font-black text-white uppercase">{item.val}</p>
                   </div>
                 </div>
               ))}
             </div>
-
             <div className="w-full h-px" style={{ background: isClosed ? "rgba(220,38,38,0.1)" : "rgba(255,255,255,0.05)" }} />
-
             {isClosed ? (
-              /* [V15.2-2] Panel de cierre definitivo */
               <div className="w-full space-y-4">
                 <div className="flex items-start gap-4 text-left border rounded-2xl p-5 w-full"
                   style={{ background: "rgba(220,38,38,0.05)", borderColor: "rgba(220,38,38,0.2)" }}>
                   <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-[11px] font-black uppercase tracking-wider text-red-400 mb-1">
-                      Inscripciones Cerradas
-                    </p>
+                    <p className="text-[11px] font-black uppercase tracking-wider text-red-400 mb-1">Inscripciones Cerradas</p>
                     <p className="text-[11px] text-white/50 leading-relaxed">
-                      Las inscripciones para <strong className="text-white/70">{race?.name}</strong> han
-                      concluido. Si necesitas inscribirte, comunícate con la organización directamente
-                      o visita el canal oficial de Rayocero.
+                      Las inscripciones para <strong className="text-white/70">{race?.name}</strong> han concluido.
+                      Si necesitas inscribirte, comunícate con la organización directamente o visita el canal oficial de Rayocero.
                     </p>
                   </div>
                 </div>
-
-                {/* Botón deshabilitado visualmente claro */}
-                <button
-                  disabled
+                <button disabled
                   className="w-full py-6 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic flex items-center justify-center gap-4 cursor-not-allowed"
-                  style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.25)", color: "rgba(248,113,113,0.5)" }}
-                >
+                  style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.25)", color: "rgba(248,113,113,0.5)" }}>
                   <XCircle className="h-4 w-4" /> INSCRIPCIONES CERRADAS
                 </button>
               </div>
             ) : (
-              /* Original — info futura */
               <>
                 <div className="flex items-start gap-4 text-left bg-cyan-500/[0.04] border border-cyan-400/10 rounded-2xl p-5 w-full">
                   <Shield className="h-5 w-5 text-cyan-400 mt-0.5 shrink-0" />
                   <p className="text-[11px] text-white/50 leading-relaxed">
-                    El mapa de ruta, waypoints de hidratación, cronometraje y estructura de premios
-                    serán publicados en las próximas semanas. Mantente atento al canal oficial de Rayocero.
+                    El mapa de ruta, waypoints de hidratación, cronometraje y estructura de premios serán publicados en las próximas semanas.
+                    Mantente atento al canal oficial de Rayocero.
                   </p>
                 </div>
-
                 <button onClick={onRegister}
                   className="w-full py-6 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
                   style={{ background: "rgba(255,40,40,0.08)", border: "1px solid rgba(255,60,60,0.28)", color: "#F87171" }}>
@@ -416,14 +375,12 @@ const ComingSoonPanel = ({ race, registeredCount, onBack, onRegister }: {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* BARQUISIMETO DETAIL — V14 sin modificaciones                               */
+/* BARQUISIMETO DETAIL — sin cambios                                          */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const BarquisimetoDetail = ({ registeredCount, onRegister }: {
-  registeredCount: number;
-  onRegister: (e: React.MouseEvent) => void;
+  registeredCount: number; onRegister: (e: React.MouseEvent) => void;
 }) => {
   const navigate = useNavigate();
-
   const officialRoute: [number, number][] = [
     [10.077576, -69.283447], [10.067250, -69.284621], [10.062852, -69.282465],
     [10.061500, -69.276373], [10.064014, -69.288046], [10.065609, -69.295721],
@@ -434,7 +391,6 @@ const BarquisimetoDetail = ({ registeredCount, onRegister }: {
     [10.078575, -69.280296], [10.076105, -69.280867], [10.076149, -69.283252],
     [10.077576, -69.283447],
   ];
-
   const WAYPOINTS = [
     { pos: [10.077576, -69.283447], isMeta: true, label: "META", pois: [{ icon: "♪", color: "#a855f7" }, { icon: "B", color: "#94a3b8" }, { icon: "+", color: "#22c55e" }, { icon: "C", color: "#eab308" }] },
     { pos: [10.067250, -69.284621], label: "1K",  pois: [{ icon: "♪", color: "#a855f7" }] },
@@ -447,7 +403,6 @@ const BarquisimetoDetail = ({ registeredCount, onRegister }: {
     { pos: [10.070609, -69.291723], label: "8K",  pois: [{ icon: "P", color: "#3b82f6" }] },
     { pos: [10.079514, -69.288873], label: "9K",  pois: [] },
   ];
-
   const mapBounds = useMemo(() => L.latLngBounds(officialRoute), []);
 
   return (
@@ -455,7 +410,7 @@ const BarquisimetoDetail = ({ registeredCount, onRegister }: {
       <div className="relative w-full lg:w-[65%] h-[45vh] lg:h-full bg-[#080808] z-0">
         <MapComp bounds={mapBounds} zoom={15} className="h-full w-full z-10" zoomControl={false}>
           <MapController bounds={mapBounds} />
-          <TileComp url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution="&copy; CARTO" />
+          <TileComp url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution="" />
           <CircleComp center={[10.077576, -69.283447]} radius={300}
             pathOptions={{ color: "#00f2ff", fillColor: "#00f2ff", fillOpacity: 0.08, weight: 1, className: "radar-pulse" }} />
           <PolyComp positions={officialRoute}
@@ -470,7 +425,6 @@ const BarquisimetoDetail = ({ registeredCount, onRegister }: {
           </h2>
         </div>
       </div>
-
       <aside className="w-full lg:w-[35%] h-[55vh] lg:h-full overflow-y-auto bg-[#03070b] p-8 lg:p-12 custom-scrollbar border-l border-white/5 relative z-10">
         <div className="flex items-center justify-between mb-8 pb-6 border-b border-white/5">
           <button onClick={() => navigate(-1)}
@@ -486,7 +440,6 @@ const BarquisimetoDetail = ({ registeredCount, onRegister }: {
             <div className="h-2 w-2 rounded-full bg-cyan-500 animate-pulse shadow-[0_0_10px_#00f2ff]" />
           </div>
         </div>
-
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-12 pb-10">
           <div className="flex flex-col items-center w-full">
             <p className="flex items-center gap-2 text-[9px] font-black tracking-[0.3em] text-cyan-400 uppercase mb-4 w-full text-left">
@@ -498,14 +451,12 @@ const BarquisimetoDetail = ({ registeredCount, onRegister }: {
                 className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
             </div>
           </div>
-
           <header className="space-y-4">
             <h1 className="text-7xl font-black italic uppercase leading-none tracking-tighter">
               10<span className="text-cyan-400">K</span>
             </h1>
             <p className="text-sm font-black tracking-[0.5em] text-white/30 uppercase">6 . JUN . 2026</p>
           </header>
-
           <div className="grid grid-cols-1 gap-4">
             {[
               { icon: MapPin, label: "Salida / Meta",       val: "Monumento al Sol"  },
@@ -523,8 +474,6 @@ const BarquisimetoDetail = ({ registeredCount, onRegister }: {
               </div>
             ))}
           </div>
-
-          {/* Barquisimeto siempre cerrada — cupo completo */}
           <button onClick={onRegister}
             className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
             style={{ background: "rgba(255,40,40,0.08)", border: "1px solid rgba(255,60,60,0.28)", color: "#F87171" }}>
@@ -532,7 +481,6 @@ const BarquisimetoDetail = ({ registeredCount, onRegister }: {
             <motion.span className="w-2 h-2 rounded-full" style={{ background: "#FF4444" }}
               animate={{ opacity: [1, 0.2, 1] }} transition={{ duration: 2, repeat: Infinity }} />
           </button>
-
           <div className="pt-6 border-t border-white/5">
             <p className="text-[9px] font-black tracking-[0.3em] text-white/40 uppercase mb-6">Leyenda Operativa</p>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-5">
@@ -554,7 +502,6 @@ const BarquisimetoDetail = ({ registeredCount, onRegister }: {
           </div>
         </motion.div>
       </aside>
-
       <style>{`
         .glow-path-cyan { filter: drop-shadow(0 0 15px rgba(0,242,255,0.5)); }
         .radar-pulse { animation: radar 3s ease-out infinite; transform-origin: center; }
@@ -567,32 +514,25 @@ const BarquisimetoDetail = ({ registeredCount, onRegister }: {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* [V15.2-1] CORO DETAIL — Inscripciones cerradas, mapa intacto              */
+/* CORO DETAIL — V15.3 sin cambios                                            */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const CoroDetail = ({ race, registeredCount, onRegister }: {
-  race: any;
-  registeredCount: number;
-  onRegister: (e: React.MouseEvent) => void;
+  race: any; registeredCount: number; onRegister: (e: React.MouseEvent) => void;
 }) => {
-  const navigate  = useNavigate();
-  const mapBounds = useMemo(() => L.latLngBounds(coroRoute), []);
-  const banner    = getRaceBanner(race?.name ?? "");
-
-  // [V15.2-1] inscAbiertas lee de Supabase pero Coro está cerrada
+  const navigate    = useNavigate();
+  const mapBounds   = useMemo(() => L.latLngBounds(coroRoute), []);
+  const banner      = getRaceBanner(race?.name ?? "");
   const inscAbiertas = race?.inscripciones_abiertas ?? false;
-
-  const dateStr = race?.date
+  const dateStr     = race?.date
     ? new Date(race.date + "T00:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" }).toUpperCase()
     : "20 . AGO . 2026";
 
   return (
     <div className="h-screen w-full bg-[#03070b] flex flex-col lg:flex-row overflow-hidden text-white relative font-sans pt-[85px] md:pt-[104px] z-0">
-
-      {/* ── MAPA — intacto ── */}
       <div className="relative w-full lg:w-[65%] h-[45vh] lg:h-full bg-[#080808] z-0">
         <MapComp bounds={mapBounds} zoom={14} className="h-full w-full z-10" zoomControl={false}>
           <MapController bounds={mapBounds} />
-          <TileComp url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution="&copy; CARTO" />
+          <TileComp url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution="" />
           <CircleComp center={[11.409922, -69.675254]} radius={300}
             pathOptions={{ color: "#00f2ff", fillColor: "#00f2ff", fillOpacity: 0.08, weight: 1, className: "radar-pulse" }} />
           <PolyComp positions={coroRoute}
@@ -607,8 +547,6 @@ const CoroDetail = ({ race, registeredCount, onRegister }: {
           </h2>
         </div>
       </div>
-
-      {/* ── SIDEBAR ── */}
       <aside className="w-full lg:w-[35%] h-[55vh] lg:h-full overflow-y-auto bg-[#03070b] p-8 lg:p-12 custom-scrollbar border-l border-white/5 relative z-10">
         <div className="flex items-center justify-between mb-8 pb-6 border-b border-white/5">
           <button onClick={() => navigate(-1)}
@@ -621,11 +559,15 @@ const CoroDetail = ({ race, registeredCount, onRegister }: {
               <p className="text-[9px] font-black text-cyan-400 tracking-widest leading-none">RAYOCERO</p>
               <p className="text-[7px] text-white/30 font-bold uppercase mt-1">499 RUN CORO FALCÓN</p>
             </div>
-            {/* [V15.2-1] Dot rojo = cerrada */}
-            <div className="h-2 w-2 rounded-full bg-red-500" style={{ boxShadow: "0 0 8px #ef4444" }} />
+            {inscAbiertas ? (
+              <motion.div className="h-2 w-2 rounded-full bg-cyan-500"
+                style={{ boxShadow: "0 0 10px #00f2ff" }}
+                animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 2, repeat: Infinity }} />
+            ) : (
+              <div className="h-2 w-2 rounded-full bg-red-500" style={{ boxShadow: "0 0 8px #ef4444" }} />
+            )}
           </div>
         </div>
-
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-10 pb-10">
           {banner && (
             <div className="w-full relative rounded-2xl overflow-hidden border border-white/10 shadow-[0_0_40px_rgba(34,211,238,0.08)] group">
@@ -634,19 +576,17 @@ const CoroDetail = ({ race, registeredCount, onRegister }: {
                 className="w-full h-auto object-cover opacity-70 group-hover:opacity-90 transition-opacity duration-500" />
             </div>
           )}
-
           <header className="space-y-4">
             <h1 className="text-7xl font-black italic uppercase leading-none tracking-tighter">
               10<span className="text-cyan-400">K</span>
             </h1>
             <p className="text-sm font-black tracking-[0.5em] text-white/30 uppercase">{dateStr}</p>
           </header>
-
           <div className="grid grid-cols-1 gap-4">
             {[
-              { icon: MapPin, label: "Salida / Meta",       val: "Av. Manaure, Coro"               },
-              { icon: Clock,  label: "Hora Operativa",      val: race?.time ?? "Por confirmar"     },
-              { icon: Users,  label: "Atletas Confirmados", val: `${registeredCount}`              },
+              { icon: MapPin, label: "Salida / Meta",       val: "Av. Manaure, Coro"           },
+              { icon: Clock,  label: "Hora Operativa",      val: race?.time ?? "Por confirmar" },
+              { icon: Users,  label: "Atletas Confirmados", val: `${registeredCount}`          },
             ].map((item, i) => (
               <div key={i} className="flex items-center gap-6 p-5 bg-white/[0.02] border border-white/5 rounded-3xl group hover:border-cyan-500/30 transition-all backdrop-blur-md">
                 <div className="h-12 w-12 flex items-center justify-center bg-cyan-400/10 rounded-2xl text-cyan-400 transition-colors group-hover:bg-cyan-400 group-hover:text-black">
@@ -659,43 +599,32 @@ const CoroDetail = ({ race, registeredCount, onRegister }: {
               </div>
             ))}
           </div>
-
-          {/* [V15.2-1] Panel de cierre — siempre visible para Coro */}
-          {!inscAbiertas ? (
+          {inscAbiertas ? (
+            <button onClick={onRegister}
+              className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
+              style={{ background: "linear-gradient(135deg, #00c8e0, #00f2ff)", color: "#03070b", boxShadow: "0 0 30px rgba(0,242,255,0.2)" }}>
+              INSCRIBIRME <Zap className="h-4 w-4 fill-current" />
+            </button>
+          ) : (
             <div className="space-y-4">
-              {/* Info de cierre */}
               <div className="flex items-start gap-4 p-5 rounded-2xl border"
                 style={{ background: "rgba(220,38,38,0.05)", borderColor: "rgba(220,38,38,0.2)" }}>
                 <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 shrink-0" />
                 <div>
-                  <p className="text-[9px] font-black uppercase tracking-wider text-red-400 mb-1">
-                    Inscripciones Cerradas
-                  </p>
+                  <p className="text-[9px] font-black uppercase tracking-wider text-red-400 mb-1">Inscripciones Cerradas</p>
                   <p className="text-[11px] text-white/50 leading-relaxed">
-                    Las inscripciones para <strong className="text-white/70">499 Run Coro Falcón</strong> han
-                    concluido. Inscripciones adicionales solo a través de la organización.
-                    El mapa de ruta permanece disponible para los atletas registrados.
+                    Las inscripciones para <strong className="text-white/70">499 Run Coro Falcón</strong> han concluido.
+                    Inscripciones adicionales solo a través de la organización.
                   </p>
                 </div>
               </div>
-
-              {/* Botón deshabilitado */}
-              <button
-                disabled
+              <button disabled
                 className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic flex items-center justify-center gap-4 cursor-not-allowed"
-                style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.25)", color: "rgba(248,113,113,0.5)" }}
-              >
+                style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.25)", color: "rgba(248,113,113,0.5)" }}>
                 <XCircle className="h-4 w-4" /> INSCRIPCIONES CERRADAS
               </button>
             </div>
-          ) : (
-            /* Si en algún futuro se reabre */
-            <button onClick={onRegister}
-              className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 bg-cyan-500 hover:bg-cyan-400 text-black shadow-[0_0_30px_rgba(0,242,255,0.2)] active:scale-95">
-              INSCRIBIRME <Zap className="h-4 w-4 fill-current" />
-            </button>
           )}
-
           <div className="pt-6 border-t border-white/5">
             <p className="text-[9px] font-black tracking-[0.3em] text-white/40 uppercase mb-6">Leyenda Operativa</p>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-5">
@@ -717,7 +646,6 @@ const CoroDetail = ({ race, registeredCount, onRegister }: {
           </div>
         </motion.div>
       </aside>
-
       <style>{`
         .glow-path-cyan { filter: drop-shadow(0 0 15px rgba(0,242,255,0.5)); }
         .radar-pulse { animation: radar 3s ease-out infinite; transform-origin: center; }
@@ -730,14 +658,237 @@ const CoroDetail = ({ race, registeredCount, onRegister }: {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* [V15.2-3] CANINATA DETAIL — inscAbiertas siempre TRUE                     */
+/* [V15.4-1] WE RUN CORO DETAIL — Ruta próximamente, inscripciones reactivas */
+/* ─────────────────────────────────────────────────────────────────────────── */
+const WeRunCoroDetail = ({ race, registeredCount, onRegister }: {
+  race: any; registeredCount: number; onRegister: (e: React.MouseEvent) => void;
+}) => {
+  const navigate     = useNavigate();
+  const inscAbiertas = race?.inscripciones_abiertas ?? false;
+  const countdown    = useCountdown(race?.date);
+  const ACCENT       = "#FCD34D"; // amarillo LED
+
+  const dateStr = race?.date
+    ? new Date(race.date + "T00:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" }).toUpperCase()
+    : "POR CONFIRMAR";
+
+  return (
+    <div className="h-screen w-full bg-[#03070b] flex flex-col lg:flex-row overflow-hidden text-white relative font-sans pt-[85px] md:pt-[104px] z-0">
+
+      {/* ── PANEL IZQUIERDO — Ruta próximamente ── */}
+      <div
+        className="relative w-full lg:w-[65%] h-[45vh] lg:h-full flex flex-col items-center justify-center overflow-hidden"
+        style={{ background: "#03070b" }}
+      >
+        {/* Fondo hero con ledRunHero muy oscuro */}
+        <img
+          src={ledRunHero}
+          alt="WE RUN LED CORO"
+          className="absolute inset-0 w-full h-full object-cover opacity-[0.06] pointer-events-none select-none"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#03070b] via-transparent to-[#03070b]/60 pointer-events-none" />
+
+        {/* Grilla táctica decorativa */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.04]"
+          style={{
+            backgroundImage: `linear-gradient(${ACCENT}33 1px, transparent 1px), linear-gradient(90deg, ${ACCENT}33 1px, transparent 1px)`,
+            backgroundSize: "40px 40px",
+          }} />
+
+        {/* Contenido central */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="relative z-10 flex flex-col items-center gap-6 px-8 text-center max-w-lg"
+        >
+          {/* Ícono mapa animado */}
+          <motion.div
+            className="h-20 w-20 rounded-3xl flex items-center justify-center"
+            style={{ background: `${ACCENT}0f`, border: `1px solid ${ACCENT}25` }}
+            animate={{ boxShadow: [`0 0 20px ${ACCENT}10`, `0 0 50px ${ACCENT}25`, `0 0 20px ${ACCENT}10`] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <Map className="h-9 w-9" style={{ color: ACCENT }} />
+          </motion.div>
+
+          <div>
+            <p className="text-[9px] font-black tracking-[0.5em] uppercase mb-3" style={{ color: `${ACCENT}80` }}>
+              RUTA TÁCTICA
+            </p>
+            <h2 className="text-4xl md:text-5xl font-black italic uppercase leading-[0.9] tracking-tighter text-white mb-3">
+              MUY PRONTO<br />
+              <span style={{ color: ACCENT }}>EN LÍNEA</span>
+            </h2>
+            <p className="text-[11px] text-white/30 leading-relaxed max-w-xs mx-auto">
+              La ruta oficial, waypoints de hidratación y puntos de control LED serán publicados próximamente.
+            </p>
+          </div>
+
+          {/* Countdown si hay fecha */}
+          {countdown && (
+            <div className="flex items-center gap-3 px-6 py-3 rounded-2xl"
+              style={{ background: `${ACCENT}08`, border: `1px solid ${ACCENT}20` }}>
+              <Zap className="h-3.5 w-3.5 shrink-0" style={{ color: ACCENT }} />
+              <span className="text-[10px] font-black tracking-widest uppercase" style={{ color: ACCENT }}>
+                Faltan {countdown.days}d {countdown.hours}h
+              </span>
+            </div>
+          )}
+
+          {/* Pulsos decorativos */}
+          <div className="flex gap-2 mt-2">
+            {[0, 1, 2].map((i) => (
+              <motion.div key={i} className="h-1 w-8 rounded-full"
+                style={{ background: ACCENT }}
+                animate={{ opacity: [0.15, 0.6, 0.15], scaleX: [0.8, 1, 0.8] }}
+                transition={{ duration: 2, repeat: Infinity, delay: i * 0.4, ease: "easeInOut" }} />
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Watermark fondo */}
+        <div className="absolute bottom-8 left-8 z-[5] pointer-events-none hidden md:block">
+          <h2 className="font-black italic text-7xl leading-[0.8] tracking-tighter uppercase opacity-[0.07] select-none"
+            style={{ color: ACCENT }}>
+            WE RUN<br />LED <span className="text-white">10K</span>
+          </h2>
+        </div>
+      </div>
+
+      {/* ── SIDEBAR ── */}
+      <aside className="w-full lg:w-[35%] h-[55vh] lg:h-full overflow-y-auto bg-[#03070b] p-8 lg:p-12 custom-scrollbar relative z-10"
+        style={{ borderLeft: `1px solid ${ACCENT}15` }}>
+
+        <div className="flex items-center justify-between mb-8 pb-6"
+          style={{ borderBottom: `1px solid ${ACCENT}10` }}>
+          <button onClick={() => navigate(-1)}
+            className="flex items-center gap-2 group py-2 px-4 rounded-full transition-all"
+            style={{ background: `${ACCENT}06`, border: `1px solid ${ACCENT}15` }}>
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" style={{ color: ACCENT }} />
+            <span className="font-black text-[9px] tracking-[0.3em] uppercase" style={{ color: "rgba(255,255,255,0.5)" }}>Volver</span>
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="text-[9px] font-black tracking-widest leading-none" style={{ color: ACCENT }}>RAYOCERO</p>
+              <p className="text-[7px] font-bold uppercase mt-1 text-white/25">WE RUN LED CORO</p>
+            </div>
+            {/* Dot reactivo al flag */}
+            {inscAbiertas ? (
+              <motion.div className="h-2 w-2 rounded-full"
+                style={{ background: ACCENT, boxShadow: `0 0 10px ${ACCENT}` }}
+                animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 2, repeat: Infinity }} />
+            ) : (
+              <div className="h-2 w-2 rounded-full bg-red-500" style={{ boxShadow: "0 0 8px #ef4444" }} />
+            )}
+          </div>
+        </div>
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 pb-10">
+
+          {/* Banner */}
+          <div className="w-full relative rounded-2xl overflow-hidden group"
+            style={{ border: `1px solid ${ACCENT}15`, boxShadow: `0 0 40px ${ACCENT}08` }}>
+            <div className="absolute inset-0 bg-gradient-to-t from-[#03070b] via-transparent to-transparent opacity-60 z-10 pointer-events-none" />
+            <img src={ledRunHero} alt="WE RUN LED CORO"
+              className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+          </div>
+
+          {/* Título */}
+          <header className="space-y-3">
+            <h1 className="text-6xl font-black italic uppercase leading-none tracking-tighter text-white">
+              WE RUN<br /><span style={{ color: ACCENT }}>LED</span> 10K
+            </h1>
+            <p className="text-sm font-black tracking-[0.4em] uppercase text-white/25">{dateStr}</p>
+          </header>
+
+          {/* Info cards */}
+          <div className="grid grid-cols-1 gap-3">
+            {[
+              { icon: MapPin, label: "Salida / Meta",  val: race?.location ?? "Coro, Falcón"    },
+              { icon: Clock,  label: "Hora Operativa", val: race?.time     ?? "Por confirmar"   },
+              { icon: Users,  label: "Inscritos",      val: `${registeredCount}`                },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-5 p-4 rounded-2xl transition-all"
+                style={{ background: `${ACCENT}03`, border: `1px solid ${ACCENT}08` }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = `${ACCENT}25`)}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = `${ACCENT}08`)}>
+                <div className="h-11 w-11 flex items-center justify-center rounded-xl"
+                  style={{ background: `${ACCENT}10`, color: ACCENT }}>
+                  <item.icon className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-[8px] font-black uppercase tracking-widest text-white/20">{item.label}</p>
+                  <p className="font-bold text-base uppercase text-white">{item.val}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Panel ruta próximamente — info */}
+          <div className="flex items-start gap-4 p-5 rounded-2xl"
+            style={{ background: `${ACCENT}05`, border: `1px solid ${ACCENT}15` }}>
+            <Map className="h-5 w-5 mt-0.5 shrink-0" style={{ color: ACCENT }} />
+            <div>
+              <p className="text-[9px] font-black tracking-[0.3em] uppercase mb-1" style={{ color: ACCENT }}>
+                Ruta Táctica
+              </p>
+              <p className="text-[11px] text-white/40 leading-relaxed">
+                El recorrido oficial LED estará disponible próximamente. Mantente pendiente del canal oficial de Rayocero.
+              </p>
+            </div>
+          </div>
+
+          {/* CTA reactivo */}
+          {inscAbiertas ? (
+            <button onClick={onRegister}
+              className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
+              style={{
+                background: `linear-gradient(135deg, #e6b800, ${ACCENT})`,
+                color: "#03070b",
+                boxShadow: `0 0 30px ${ACCENT}30`,
+              }}>
+              INSCRIBIRME <Zap className="h-4 w-4 fill-current" />
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-start gap-4 p-5 rounded-2xl border"
+                style={{ background: "rgba(220,38,38,0.05)", borderColor: "rgba(220,38,38,0.2)" }}>
+                <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-wider text-red-400 mb-1">Inscripciones Cerradas</p>
+                  <p className="text-[11px] text-white/50 leading-relaxed">
+                    Las inscripciones para <strong className="text-white/70">WE RUN RAYOCERO LED CORO 10K</strong> han concluido.
+                    Contacta directamente con la organización.
+                  </p>
+                </div>
+              </div>
+              <button disabled
+                className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic flex items-center justify-center gap-4 cursor-not-allowed"
+                style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.25)", color: "rgba(248,113,113,0.5)" }}>
+                <XCircle className="h-4 w-4" /> INSCRIPCIONES CERRADAS
+              </button>
+            </div>
+          )}
+
+        </motion.div>
+      </aside>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
+      `}</style>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* CANINATA DETAIL — V15.2 sin cambios                                        */
 /* ─────────────────────────────────────────────────────────────────────────── */
 type CaninataMode = "10K" | "5K";
 
 const CaninataDetail = ({ race, registeredCount, onRegister }: {
-  race: any;
-  registeredCount: number;
-  onRegister: (e: React.MouseEvent) => void;
+  race: any; registeredCount: number; onRegister: (e: React.MouseEvent) => void;
 }) => {
   const navigate = useNavigate();
   const [activeMode, setActiveMode] = useState<CaninataMode>("10K");
@@ -747,8 +898,7 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
     return L.latLngBounds(route);
   }, [activeMode]);
 
-  // [V15.2-3] Caninata SIEMPRE abierta — override del flag global
-  const inscAbiertas = true;
+  const inscAbiertas = true; // Caninata siempre abierta
 
   const dateStr = race?.date
     ? new Date(race.date + "T00:00:00").toLocaleDateString("es-ES", { day: "2-digit", month: "long", year: "numeric" }).toUpperCase()
@@ -761,33 +911,25 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
   return (
     <div className="h-screen w-full flex flex-col lg:flex-row overflow-hidden text-white relative font-sans pt-[85px] md:pt-[104px] z-0"
       style={{ background: "#050801" }}>
-
-      {/* MAPA */}
       <div className="relative w-full lg:w-[65%] h-[45vh] lg:h-full z-0" style={{ background: "#050801" }}>
-        {/* Toggle 10K / 5K */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[600] flex gap-1 p-1 rounded-full"
           style={{ background: "rgba(5,8,1,0.85)", border: "1px solid rgba(253,212,84,0.2)", backdropFilter: "blur(12px)" }}>
           {(["10K", "5K"] as CaninataMode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setActiveMode(mode)}
+            <button key={mode} onClick={() => setActiveMode(mode)}
               className="px-5 py-2 rounded-full font-black text-[10px] tracking-[0.3em] uppercase transition-all"
-              style={
-                activeMode === mode
-                  ? { background: mode === "10K" ? ACCENT_10K : "#3C491F", color: mode === "10K" ? "#050801" : "#FDD454", boxShadow: `0 0 16px ${mode === "10K" ? "#D0964455" : "#3C491F55"}` }
-                  : { color: "rgba(255,255,255,0.4)" }
-              }>
+              style={activeMode === mode
+                ? { background: mode === "10K" ? ACCENT_10K : "#3C491F", color: mode === "10K" ? "#050801" : "#FDD454", boxShadow: `0 0 16px ${mode === "10K" ? "#D0964455" : "#3C491F55"}` }
+                : { color: "rgba(255,255,255,0.4)" }}>
               {mode === "10K" ? "🏃 10K CARRERA" : "🐾 5K CAMINATA"}
             </button>
           ))}
         </div>
-
         <AnimatePresence mode="wait">
           <motion.div key={activeMode} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.4 }} className="h-full w-full">
             <MapComp bounds={mapBounds} zoom={14} className="h-full w-full z-10" zoomControl={false}>
               <MapController bounds={mapBounds} />
-              <TileComp url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution="&copy; CARTO" />
+              <TileComp url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution="" />
               <CircleComp center={[10.070519, -69.291850]} radius={200}
                 pathOptions={{ color: ACCENT_AMB, fillColor: ACCENT_AMB, fillOpacity: 0.06, weight: 1, className: "radar-pulse-caninata" }} />
               {activeMode === "10K" && (
@@ -811,7 +953,6 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
             </MapComp>
           </motion.div>
         </AnimatePresence>
-
         <div className="absolute bottom-10 left-10 z-[500] pointer-events-none hidden md:block">
           <h2 className="font-black italic text-7xl leading-[0.8] tracking-tighter uppercase opacity-20 select-none drop-shadow-2xl"
             style={{ color: activeMode === "10K" ? ACCENT_10K : "#4ade80" }}>
@@ -820,10 +961,8 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
         </div>
       </div>
 
-      {/* SIDEBAR */}
       <aside className="w-full lg:w-[35%] h-[55vh] lg:h-full overflow-y-auto p-8 lg:p-12 custom-scrollbar relative z-10"
         style={{ background: "#050801", borderLeft: "1px solid rgba(253,212,84,0.08)" }}>
-
         <div className="flex items-center justify-between mb-8 pb-6"
           style={{ borderBottom: "1px solid rgba(253,212,84,0.08)" }}>
           <button onClick={() => navigate(-1)}
@@ -837,7 +976,6 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
               <p className="text-[9px] font-black tracking-widest leading-none" style={{ color: ACCENT_AMB }}>RAYOCERO</p>
               <p className="text-[7px] font-bold uppercase mt-1" style={{ color: "rgba(255,255,255,0.25)" }}>CANINATA BCO</p>
             </div>
-            {/* [V15.2-3] Dot dorado = abierta */}
             <motion.div className="h-2 w-2 rounded-full"
               style={{ background: ACCENT_AMB, boxShadow: `0 0 10px ${ACCENT_AMB}` }}
               animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 2, repeat: Infinity }} />
@@ -845,7 +983,6 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
         </div>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-10 pb-10">
-
           {banner && (
             <div className="w-full relative rounded-2xl overflow-hidden group"
               style={{ border: "1px solid rgba(253,212,84,0.12)", boxShadow: "0 0 40px rgba(253,212,84,0.05)" }}>
@@ -854,40 +991,31 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
                 className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
             </div>
           )}
-
           <header className="space-y-3">
             <h1 className="text-7xl font-black italic uppercase leading-none tracking-tighter text-white">
               CANI<span style={{ color: ACCENT_AMB }}>NATA</span>
             </h1>
-            <p className="text-sm font-black tracking-[0.4em] uppercase" style={{ color: "rgba(255,255,255,0.25)" }}>
-              {dateStr}
-            </p>
+            <p className="text-sm font-black tracking-[0.4em] uppercase" style={{ color: "rgba(255,255,255,0.25)" }}>{dateStr}</p>
             <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: "#4ade80" }}>
               Día Mundial de la Castración Animal
             </p>
           </header>
-
           <div className="flex gap-3 flex-wrap">
             <div className="flex items-center gap-2 px-4 py-2 rounded-full"
               style={{ background: "rgba(208,150,68,0.08)", border: "1px solid rgba(208,150,68,0.25)" }}>
-              <span className="text-[9px] font-black tracking-[0.3em] uppercase" style={{ color: ACCENT_10K }}>
-                🏃 10K CARRERA
-              </span>
+              <span className="text-[9px] font-black tracking-[0.3em] uppercase" style={{ color: ACCENT_10K }}>🏃 10K CARRERA</span>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 rounded-full"
               style={{ background: "rgba(74,222,128,0.06)", border: "1px solid rgba(74,222,128,0.2)" }}>
-              <span className="text-[9px] font-black tracking-[0.3em] uppercase text-green-400">
-                🐾 5K CAMINATA
-              </span>
+              <span className="text-[9px] font-black tracking-[0.3em] uppercase text-green-400">🐾 5K CAMINATA</span>
             </div>
           </div>
-
           <div className="grid grid-cols-1 gap-3">
             {[
-              { icon: MapPin, label: "Salida / Meta",  val: "Lidotel Barquisimeto"         },
-              { icon: Clock,  label: "Hora Operativa", val: race?.time ?? "Por confirmar"  },
-              { icon: Users,  label: "Inscritos",      val: `${registeredCount}`           },
-              { icon: Heart,  label: "Causa",          val: "Castración Animal"            },
+              { icon: MapPin, label: "Salida / Meta",  val: "Lidotel Barquisimeto"        },
+              { icon: Clock,  label: "Hora Operativa", val: race?.time ?? "Por confirmar" },
+              { icon: Users,  label: "Inscritos",      val: `${registeredCount}`          },
+              { icon: Heart,  label: "Causa",          val: "Castración Animal"           },
             ].map((item, i) => (
               <div key={i} className="flex items-center gap-5 p-4 rounded-2xl transition-all"
                 style={{ background: "rgba(253,212,84,0.02)", border: "1px solid rgba(253,212,84,0.06)" }}
@@ -898,44 +1026,30 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
                   <item.icon className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-[8px] font-black uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>
-                    {item.label}
-                  </p>
+                  <p className="text-[8px] font-black uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>{item.label}</p>
                   <p className="font-bold text-base uppercase text-white">{item.val}</p>
                 </div>
               </div>
             ))}
           </div>
-
           <div className="flex items-start gap-4 p-5 rounded-2xl"
             style={{ background: "rgba(253,212,84,0.04)", border: "1px solid rgba(253,212,84,0.1)" }}>
             <Dog className="h-5 w-5 mt-0.5 shrink-0" style={{ color: ACCENT_AMB }} />
             <div>
-              <p className="text-[9px] font-black tracking-[0.3em] uppercase mb-1" style={{ color: ACCENT_AMB }}>
-                Invitado Especial
-              </p>
+              <p className="text-[9px] font-black tracking-[0.3em] uppercase mb-1" style={{ color: ACCENT_AMB }}>Invitado Especial</p>
               <p className="text-sm font-black text-white uppercase">TSUNAMI — Héroe Nacional 🐾</p>
               <p className="text-[10px] mt-1" style={{ color: "rgba(255,255,255,0.4)" }}>
                 El perro que ayudó a salvar vidas en el sismo del 24 de junio de 2026.
               </p>
             </div>
           </div>
-
-          {/* [V15.2-3] Botón siempre activo para Caninata */}
           <button onClick={onRegister}
             className="w-full py-7 rounded-2xl font-black text-xs tracking-[0.4em] uppercase italic transition-all flex items-center justify-center gap-4 active:scale-95"
-            style={{
-              background: `linear-gradient(135deg, ${ACCENT_10K}, ${ACCENT_AMB})`,
-              color: "#050801",
-              boxShadow: `0 0 30px rgba(208,150,68,0.25)`,
-            }}>
+            style={{ background: `linear-gradient(135deg, ${ACCENT_10K}, ${ACCENT_AMB})`, color: "#050801", boxShadow: `0 0 30px rgba(208,150,68,0.25)` }}>
             INSCRIBIRME <ChevronRight className="h-4 w-4" />
           </button>
-
           <div className="pt-5" style={{ borderTop: "1px solid rgba(253,212,84,0.06)" }}>
-            <p className="text-[9px] font-black tracking-[0.3em] uppercase mb-5" style={{ color: "rgba(255,255,255,0.3)" }}>
-              Leyenda Operativa
-            </p>
+            <p className="text-[9px] font-black tracking-[0.3em] uppercase mb-5" style={{ color: "rgba(255,255,255,0.3)" }}>Leyenda Operativa</p>
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               {[
                 { color: ACCENT_10K, icon: "1K", label: "KM 10K"      },
@@ -969,7 +1083,7 @@ const CaninataDetail = ({ race, registeredCount, onRegister }: {
 };
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/* MAIN COMPONENT — router dinámico V15.2                                     */
+/* MAIN — Router V15.4                                                        */
 /* ─────────────────────────────────────────────────────────────────────────── */
 const RaceDetail = () => {
   const { id }   = useParams();
@@ -980,36 +1094,29 @@ const RaceDetail = () => {
 
   useEffect(() => {
     if (!id) return;
-    const fetchRace = async () => {
+    (async () => {
       try {
         const { data, error } = await supabase.from("races").select("*").eq("id", id).single();
         if (!error) setRace(data);
       } catch (err) { console.error("[MIA] Error fetching race:", err); }
       finally { setLoading(false); }
-    };
-    fetchRace();
+    })();
   }, [id]);
 
   useEffect(() => {
     if (!race || !id) return;
-    const fetchCount = async () => {
+    (async () => {
       try {
-        let query = supabase
-          .from("runners")
-          .select("*", { count: "exact", head: true })
-          .eq("estado", "confirmado");
-
+        let query = supabase.from("runners").select("*", { count: "exact", head: true }).eq("estado", "confirmado");
         if (isBarquisimetoRace(race.name)) {
           query = query.is("race_id", null);
         } else {
           query = query.eq("race_id", id);
         }
-
         const { count, error } = await query;
         if (!error && count !== null) setRegisteredCount(count);
       } catch (err) { console.error("[MIA] Error fetching count:", err); }
-    };
-    fetchCount();
+    })();
   }, [race, id]);
 
   const handleRegister = (e: React.MouseEvent) => {
@@ -1017,7 +1124,7 @@ const RaceDetail = () => {
     if (race && isCaninataRace(race.name)) {
       navigate(`/registro?race=${id}&tipo=caninata`);
     } else {
-      navigate("/registro");
+      navigate(`/registro?race=${id}`);
     }
   };
 
@@ -1032,20 +1139,17 @@ const RaceDetail = () => {
     );
   }
 
-  // Router V15.2 — Caninata evaluada primero
+  // [V15.4-2] Router — LED evaluado ANTES que Coro para evitar captura por keyword
   if (race && hasMapConfig(race.name)) {
-    if (isCaninataRace(race.name))    return <CaninataDetail    race={race} registeredCount={registeredCount} onRegister={handleRegister} />;
+    if (isCaninataRace(race.name))     return <CaninataDetail    race={race} registeredCount={registeredCount} onRegister={handleRegister} />;
+    if (isLedRunRace(race.name))       return <WeRunCoroDetail   race={race} registeredCount={registeredCount} onRegister={handleRegister} />;
     if (isBarquisimetoRace(race.name)) return <BarquisimetoDetail            registeredCount={registeredCount} onRegister={handleRegister} />;
-    if (isCoroRace(race.name))        return <CoroDetail         race={race} registeredCount={registeredCount} onRegister={handleRegister} />;
+    if (isCoroRace(race.name))         return <CoroDetail         race={race} registeredCount={registeredCount} onRegister={handleRegister} />;
   }
 
   return (
-    <ComingSoonPanel
-      race={race}
-      registeredCount={registeredCount}
-      onBack={() => navigate(-1)}
-      onRegister={handleRegister}
-    />
+    <ComingSoonPanel race={race} registeredCount={registeredCount}
+      onBack={() => navigate(-1)} onRegister={handleRegister} />
   );
 };
 

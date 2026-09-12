@@ -1,14 +1,26 @@
 /**
- * RAYOCERO — REGISTRATION TERMINAL (STABLE BUILD V37.2 — CANINATA DORSAL FIX)
+ * RAYOCERO — REGISTRATION TERMINAL (STABLE BUILD V37.3 — LED CORO CONFIG)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Architecture: React / TypeScript / Supabase / React Query / Framer Motion
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V37.2 (evoluciona sobre V37.1):
+ * CHANGELOG V37.3 (evoluciona sobre V37.2):
+ * [V37.3-1] LED_CORO_CONFIG: nueva config estática para WE RUN RAYOCERO LED CORO 10K.
+ *           modalidadesDisponibles: ["10K"] — solo una distancia, sin selector de 4K.
+ *           Datos de pago: Cédula 17.627.699, Pago Móvil 0414-5643372, BNC.
+ * [V37.3-2] isLedRunRace(): detector por keyword "led" — paralelo a isCaninataRace.
+ * [V37.3-3] getRaceCfg(): LED Run evaluado ANTES que el fallback CORO_CONFIG
+ *           para que WE RUN LED CORO no herede modalidad 4K ni config 499.
+ * [V37.3-4] accentColor LED: "#FCD34D" (dorado LED) en lugar de "#00f2ff" cyan.
+ * [V37.3-5] Selector de modalidad: cuando hay una sola modalidad (LED 10K)
+ *           el grid ocupa col-span-2 completo — sin botón vacío al lado.
+ * [V37.3-6] Badge de carrera en selector de eventos: LED Run muestra
+ *           "CARRERA OFICIAL 10K" en lugar de "10K / 4K".
+ *
+ * CHANGELOG V37.2 (base preservada):
  * [V37.2-1] BUG FIX CRÍTICO: onSuccess detecta isCaninataRaceType en lugar de
- *           modalidad==="5K". Cualquier modalidad de carrera caninata navega a
- *           /dorsal?tipo=caninata → DorsalCaninata con dorsalCaninataSrc.
+ *           modalidad==="5K". Cualquier modalidad caninata navega a /dorsal?tipo=caninata.
  */
 
 import { useState, useEffect, useMemo } from "react";
@@ -123,6 +135,7 @@ function usePrecioEvento(raceId: string, modalidad: Modalidad): PrecioEvento {
         }
         if (!cancelled && data) {
           setTasaBCV(data.tasa_bcv ?? 0);
+          // LED Coro solo tiene 10K — siempre lee costo_usd
           const usd = modalidad === "10K" ? (data.costo_usd ?? 0) : (data.costo_4k_usd ?? 0);
           setCostoUSD(usd);
         }
@@ -148,6 +161,10 @@ function usePrecioEvento(raceId: string, modalidad: Modalidad): PrecioEvento {
 
 const isCaninataRace = (name: string = ""): boolean =>
   name.toLowerCase().includes("caninata");
+
+// [V37.3-2] Detector LED Run — keyword "led"
+const isLedRunRace = (name: string = ""): boolean =>
+  name.toLowerCase().includes("led");
 
 const getModalidadMeta = (m: Modalidad): { label: string; Icon: React.ElementType } => {
   switch (m) {
@@ -179,6 +196,24 @@ const CORO_CONFIG: RaceStaticConfig = {
   },
 };
 
+// [V37.3-1] Config exclusiva WE RUN RAYOCERO LED CORO 10K
+const LED_CORO_CONFIG: RaceStaticConfig = {
+  tipo: "carrera",
+  modalidadesDisponibles: ["10K"], // solo 10K — sin selector de 4K
+  evento: {
+    nombre: "WE RUN RAYOCERO LED CORO 10K", fecha: "31 OCT 2026", hora: "07:00 PM",
+    distancia: "10K", atletas: "+500", lugar: "CORO, FALCÓN",
+    proximaEd: "TEMPORADA 2026", targetDate: new Date("2026-10-31T19:00:00"),
+  },
+  pago: {
+    titular: "Rayocero",
+    cedula:   "17.627.699",
+    pagoMovil: "0414-5643372",
+    banco:    "Banco Nacional de Crédito (BNC)",
+    cuenta:   "",
+  },
+};
+
 const CANINATA_CONFIG: RaceStaticConfig = {
   tipo: "caninata",
   modalidadesDisponibles: ["10K", "5K"],
@@ -194,9 +229,18 @@ const CANINATA_CONFIG: RaceStaticConfig = {
   },
 };
 
+// [V37.3-3] getRaceCfg: LED evaluado antes del fallback CORO
 const getRaceCfg = (race: ActiveRace | null): RaceStaticConfig => {
   if (race && isCaninataRace(race.name)) return CANINATA_CONFIG;
+  if (race && isLedRunRace(race.name))   return LED_CORO_CONFIG;
   return CORO_CONFIG;
+};
+
+// [V37.3-4] accentColor por tipo de carrera
+const getAccentColor = (cfg: RaceStaticConfig, raceName: string = ""): string => {
+  if (cfg.tipo === "caninata")       return "#FDD454";
+  if (isLedRunRace(raceName))        return "#FCD34D";
+  return "#00f2ff";
 };
 
 // ---------------------------------------------------------------------------
@@ -285,7 +329,16 @@ export default function RegistrationForm() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl w-full">
           {activeRaces.map((r) => {
             const isCan = isCaninataRace(r.name);
-            const color = isCan ? "#FDD454" : "#00f2ff";
+            const isLed = isLedRunRace(r.name);
+            // [V37.3-4] color por tipo
+            const color = isCan ? "#FDD454" : isLed ? "#FCD34D" : "#00f2ff";
+            // [V37.3-6] badge label por tipo
+            const badgeLabel = isCan
+              ? "10K CARRERA / 5K CANINATA"
+              : isLed
+              ? "CARRERA OFICIAL 10K"
+              : "CARRERA OFICIAL 10K / 4K";
+
             return (
               <motion.div
                 key={r.id}
@@ -299,7 +352,7 @@ export default function RegistrationForm() {
                       className="px-3 py-1 rounded-full text-[10px] font-black uppercase"
                       style={{ background: `${color}15`, color, border: `1px solid ${color}30` }}
                     >
-                      {isCan ? "10K CARRERA / 5K CANINATA" : "CARRERA OFICIAL 10K / 4K"}
+                      {badgeLabel}
                     </span>
                     <ChevronRight className="h-5 w-5 text-white/30" />
                   </div>
@@ -351,7 +404,8 @@ function RegistrationFormActive({
 }) {
   const navigate           = useNavigate();
   const isCaninataRaceType = cfg.tipo === "caninata";
-  const accentColor        = isCaninataRaceType ? "#FDD454" : "#00f2ff";
+  // [V37.3-4] accentColor dinámico por tipo
+  const accentColor        = getAccentColor(cfg, race.name);
 
   const [modalidad,          setModalidad]          = useState<Modalidad>(cfg.modalidadesDisponibles[0]);
   const [nombre,             setNombre]             = useState("");
@@ -484,6 +538,9 @@ function RegistrationFormActive({
     }
   };
 
+  // [V37.3-5] Una sola modalidad → col-span completo
+  const solaModalidad = cfg.modalidadesDisponibles.length === 1;
+
   return (
     <div className="min-h-screen bg-[#03070b] text-white pt-24 pb-20 px-4 font-sans flex flex-col items-center">
       <div className="max-w-3xl w-full">
@@ -523,7 +580,8 @@ function RegistrationFormActive({
             <label className="text-xs font-bold uppercase text-white/60 block">
               Modalidad / Distancia
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            {/* [V37.3-5] Una sola modalidad → col-span-1 full, varias → grid-cols-2 */}
+            <div className={`grid gap-3 ${solaModalidad ? "grid-cols-1" : "grid-cols-2"}`}>
               {cfg.modalidadesDisponibles.map((m) => {
                 const isSelected      = modalidad === m;
                 const { label, Icon } = getModalidadMeta(m);
@@ -840,8 +898,8 @@ function RegistrationFormActive({
                   <div
                     className="p-5 rounded-2xl border space-y-3"
                     style={{
-                      background:  isCaninataRaceType ? "rgba(253,212,84,0.04)" : "rgba(0,242,255,0.04)",
-                      borderColor: isCaninataRaceType ? "rgba(253,212,84,0.20)" : "rgba(0,242,255,0.20)",
+                      background:  `${accentColor}07`,
+                      borderColor: `${accentColor}30`,
                     }}
                   >
                     <div className="flex items-center gap-2">

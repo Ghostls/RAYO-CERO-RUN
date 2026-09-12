@@ -1,20 +1,27 @@
 /**
- * RAYOCERO — DORSAL PAGE (V3.0 — DORSAL DOBLE CANINATA)
+ * RAYOCERO — DORSAL PAGE (V4.1 — LED_CONFIG CALIBRADO)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Código completo. Copy-paste ready.
  *
- * CHANGELOG V3.0 (evoluciona sobre V2.0_CALIBRADO):
- * [V3.0-1] Router por ?tipo=caninata — DorsalCarrera (10K) o DorsalCaninata (5K).
- * [V3.0-2] DorsalRenderConfig — tipo que encapsula coords/colores por asset.
- *          CORO_CONFIG: coords V2.0 intactas.
- *          CANINATA_CONFIG: coords base desde Coro, ajustables por pixel.
- * [V3.0-3] renderDorsalToCanvas() — función pura sin side effects.
- *          Consume CORO_CONFIG o CANINATA_CONFIG. Ambos dorsales la llaman.
- * [V3.0-4] canvasRefDueno + canvasRefPerro — dos canvas ocultos independientes.
- *          renderedDueno + renderedPerro — estados de render independientes.
- * [V3.0-5] downloadCanvas() — descarga individual por ref y filename.
- * [V3.0-6] UI DorsalCaninata: bg #080f08, acento #FDD454.
+ * CHANGELOG V4.1 (evoluciona sobre V4.0):
+ * [V4.1-1] LED_CONFIG calibrada sobre DORSAL_LED-01.png:
+ *          bibCy 492→400, bibFont 218→260, bibColor "#03070b"→"#ffffff"
+ *          franjaX1 360→80, franjaX2 1110→1320, franjaY 718→720, franjaH 85→100
+ *          nombreCy 761→770, nombreFontMax 38→72, nombreFontMin 18→28
+ *          catCy 898→870, catColor "#FCD34D"→"#ffffff", catSpacing 3→4
+ *          Sin franja de color — nombre y categoría van sobre fondo oscuro.
+ *
+ * CHANGELOG V4.0 (base preservada — NO MODIFICAR):
+ * [V4.0-1] Import dorsalLedSrc.
+ * [V4.0-2] LED_CONFIG inicial.
+ * [V4.0-3] isLedRunEvento().
+ * [V4.0-4] Router: caninata → DorsalCaninata, led → DorsalLedCoro, default → DorsalCarrera.
+ * [V4.0-5] DorsalLedCoro: un solo canvas, acento #FCD34D.
+ *
+ * CHANGELOG V3.0 (base preservada — NO MODIFICAR):
+ * [V3.0-1..6] Router caninata, DorsalRenderConfig, renderDorsalToCanvas,
+ *             canvas doble caninata, downloadCanvas, UI caninata — INTACTOS.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -26,6 +33,7 @@ import {
 
 import dorsalCoroSrc     from "../assets/dorsal-coro.png";
 import dorsalCaninataSrc from "../assets/dorsal-caninata.png";
+import dorsalLedSrc      from "../assets/dorsal-led.png";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TIPO: DorsalRenderConfig
@@ -53,7 +61,7 @@ interface DorsalRenderConfig {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// [V2.0] CORO_CONFIG — calibrada sobre dorsal-coro.png (NO MODIFICAR)
+// CORO_CONFIG — calibrada sobre dorsal-coro.png (NO MODIFICAR)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CORO_CONFIG: DorsalRenderConfig = {
@@ -66,27 +74,55 @@ const CORO_CONFIG: DorsalRenderConfig = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// [V3.0-2] CANINATA_CONFIG — para dorsal-caninata.png
-//
-// AJUSTE FINO (tras ver asset en pantalla):
-//   BIB desplazado      → bibCy ± 20px
-//   Nombre fuera franja → franjaY y nombreCy con misma diferencia
-//   Categoría solapada  → catCy ± 20px
-//   BIB invisible       → bibColor "#FDD454" o "#ffffff"
+// CANINATA_CONFIG — para dorsal-caninata.png (NO MODIFICAR)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CANINATA_CONFIG: DorsalRenderConfig = {
   cw: 1400, ch: 1000,
   bibCx: 700,  bibCy: 390,  bibFont: 210, bibColor: "#1a1a1a",
   franjaY: 710, franjaH: 90, franjaX1: 130, franjaX2: 1270,
-  nombreCy: 735,  // ← subido de 755
+  nombreCy: 735,
   nombreColor: "#1a1a1a",
   nombreFontMax: 48, nombreFontMin: 20,
   catCx: 700, catCy: 850, catColor: "#ffffff", catSpacing: 2,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// [V3.0-3] renderDorsalToCanvas — función pura, sin side effects
+// [V4.1-1] LED_CONFIG — calibrada sobre DORSAL_LED-01.png
+// Sin franja de color — nombre y categoría sobre fondo oscuro directo.
+// Ajuste fino: bibCy ±20px, nombreCy ±20px, catCy ±20px
+// ─────────────────────────────────────────────────────────────────────────────
+
+const LED_CONFIG: DorsalRenderConfig = {
+  cw: 1400, ch: 1000,
+
+  // BIB — grande, centrado, blanco sobre imagen
+  bibCx:    700,
+  bibCy:    400,
+  bibFont:  260,
+  bibColor: "#ffffff",
+
+  // Franja clip — zona amplia sin barra visible, solo evita que el texto se salga
+  franjaY:  720,
+  franjaH:  100,
+  franjaX1:  80,
+  franjaX2: 1320,
+
+  // Nombre — blanco, font grande, sobre fondo oscuro inferior
+  nombreCy:      770,
+  nombreColor:   "#ffffff",
+  nombreFontMax:  72,
+  nombreFontMin:  28,
+
+  // Categoría — blanco, tracking amplio, debajo del nombre
+  catCx:      700,
+  catCy:      870,
+  catColor:   "#ffffff",
+  catSpacing:  4,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// renderDorsalToCanvas — función pura, sin side effects (NO MODIFICAR)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function renderDorsalToCanvas(
@@ -112,7 +148,7 @@ function renderDorsalToCanvas(
     // 1. Fondo completo sin recortes
     ctx.drawImage(bg, 0, 0, cfg.cw, cfg.ch);
 
-    // 2. BIB — solo texto, zona blanca ya en el asset
+    // 2. BIB — solo texto, zona ya en el asset
     ctx.save();
     ctx.font         = `900 ${cfg.bibFont}px 'Arial Black', Arial, sans-serif`;
     ctx.fillStyle    = cfg.bibColor;
@@ -165,7 +201,7 @@ function renderDorsalToCanvas(
   };
 
   bg.onerror = () => {
-    ctx.fillStyle = "#eeebe6";
+    ctx.fillStyle = "#03070b";
     ctx.fillRect(0, 0, cfg.cw, cfg.ch);
     ctx.fillStyle    = cfg.bibColor;
     ctx.font         = `900 ${cfg.bibFont}px Arial`;
@@ -177,30 +213,33 @@ function renderDorsalToCanvas(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// COMPONENTE RAÍZ
+// [V4.0-3] Detector LED
+// ─────────────────────────────────────────────────────────────────────────────
+
+const isLedRunEvento = (evento: string = ""): boolean =>
+  evento.toLowerCase().includes("led");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPONENTE RAÍZ — Router V4.0
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function DorsalPage() {
   const [searchParams] = useSearchParams();
   const navigate        = useNavigate();
 
-  // [V3.0-1] Detección de modo
   const isCaninata = searchParams.get("tipo") === "caninata";
 
-  // Params comunes
-  const bib      = searchParams.get("bib") ?? "000";
-  const nombre   = searchParams.get("nombre")
+  const bib       = searchParams.get("bib") ?? "000";
+  const nombre    = searchParams.get("nombre")
     ? decodeURIComponent(searchParams.get("nombre")!) : "";
-  const apellido = searchParams.get("apellido")
+  const apellido  = searchParams.get("apellido")
     ? decodeURIComponent(searchParams.get("apellido")!) : "";
-  const evento   = searchParams.get("evento")
+  const evento    = searchParams.get("evento")
     ? decodeURIComponent(searchParams.get("evento")!) : "RAYOCERO";
-
-  // Params carrera
   const categoria = searchParams.get("categoria")
     ? decodeURIComponent(searchParams.get("categoria")!) : "";
 
-  // Params caninata
+  // Params exclusivos caninata
   const nombrePerro = searchParams.get("perro")
     ? decodeURIComponent(searchParams.get("perro")!) : "";
   const razaPerro   = searchParams.get("raza")
@@ -209,9 +248,25 @@ export default function DorsalPage() {
   const bibPad         = bib.toString().padStart(4, "0");
   const nombreCompleto = `${nombre} ${apellido}`.trim().toUpperCase();
 
-  if (!isCaninata) {
+  // [V4.0-4] Router: Caninata → LED → Carrera default
+  if (isCaninata) {
     return (
-      <DorsalCarrera
+      <DorsalCaninata
+        bibPad         ={bibPad}
+        nombreCompleto ={nombreCompleto}
+        nombre         ={nombre}
+        apellido       ={apellido}
+        nombrePerro    ={nombrePerro}
+        razaPerro      ={razaPerro}
+        evento         ={evento}
+        navigate       ={navigate}
+      />
+    );
+  }
+
+  if (isLedRunEvento(evento)) {
+    return (
+      <DorsalLedCoro
         bibPad         ={bibPad}
         nombreCompleto ={nombreCompleto}
         nombre         ={nombre}
@@ -223,13 +278,11 @@ export default function DorsalPage() {
   }
 
   return (
-    <DorsalCaninata
+    <DorsalCarrera
       bibPad         ={bibPad}
       nombreCompleto ={nombreCompleto}
       nombre         ={nombre}
-      apellido       ={apellido}
-      nombrePerro    ={nombrePerro}
-      razaPerro      ={razaPerro}
+      categoria      ={categoria}
       evento         ={evento}
       navigate       ={navigate}
     />
@@ -237,7 +290,7 @@ export default function DorsalPage() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DorsalCarrera — flujo 10K / 4K carrera (V2.0 intacto)
+// DorsalCarrera — 499 RUN CORO (NO MODIFICAR)
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface DorsalCarreraProps {
@@ -294,7 +347,6 @@ function DorsalCarrera({
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       >
-        {/* Header */}
         <div className="text-center mb-6">
           <span
             className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.2em]"
@@ -313,7 +365,6 @@ function DorsalCarrera({
           </p>
         </div>
 
-        {/* Preview */}
         <div
           className="relative rounded-2xl overflow-hidden mb-6"
           style={{
@@ -325,14 +376,12 @@ function DorsalCarrera({
           <DorsalPreview canvasRef={canvasRef} rendered={rendered} />
         </div>
 
-        {/* Chips */}
         <div className="flex flex-wrap gap-2 justify-center mb-6">
           <InfoChip label="Dorsal"    value={`#${bibPad}`} />
           {categoria && <InfoChip label="Categoría" value={categoria} />}
           <InfoChip label="Evento"    value={evento} />
         </div>
 
-        {/* Botones */}
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={() => navigate("/")}
@@ -384,7 +433,170 @@ function DorsalCarrera({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// [V3.0] DorsalCaninata — dorsal doble: dueño + perro
+// [V4.0-5] DorsalLedCoro — WE RUN RAYOCERO LED CORO 10K
+// Un solo canvas. Acento #FCD34D. Asset: dorsal-led.png
+// ─────────────────────────────────────────────────────────────────────────────
+
+const LED_ACCENT = "#FCD34D";
+
+interface DorsalLedCoroProps {
+  bibPad: string; nombreCompleto: string; nombre: string;
+  categoria: string; evento: string;
+  navigate: ReturnType<typeof useNavigate>;
+}
+
+function DorsalLedCoro({
+  bibPad, nombreCompleto, nombre, categoria, evento, navigate,
+}: DorsalLedCoroProps) {
+  const canvasRef               = useRef<HTMLCanvasElement>(null);
+  const [rendered, setRendered] = useState(false);
+  const [copied,   setCopied]   = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    renderDorsalToCanvas(
+      canvas, dorsalLedSrc, LED_CONFIG,
+      bibPad, nombreCompleto, categoria,
+      () => setRendered(true),
+    );
+  }, [bibPad, nombreCompleto, categoria]);
+
+  const handleDownload = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const link    = document.createElement("a");
+    link.download = `dorsal-led-${bibPad}-${nombre.toLowerCase()}.png`;
+    link.href     = canvas.toDataURL("image/png");
+    link.click();
+  };
+
+  const handleShare = async () => {
+    const text =
+      `¡Me inscribí en ${evento} con el dorsal #${bibPad}! 🏃💛 ` +
+      `Categoría: ${categoria}. #WERunLED #Rayocero`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "WE RUN RAYOCERO LED CORO", text, url: window.location.origin });
+        return;
+      } catch (_) {}
+    }
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  return (
+    <div
+      className="min-h-screen flex flex-col items-center justify-center px-4 py-10 font-sans"
+      style={{ background: "#03070b" }}
+    >
+      <canvas ref={canvasRef} style={{ display: "none" }} />
+
+      <motion.div
+        className="w-full max-w-2xl"
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      >
+        {/* Header */}
+        <div className="text-center mb-6">
+          <span
+            className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.2em]"
+            style={{
+              background: `${LED_ACCENT}18`,
+              color:       LED_ACCENT,
+              border:     `1px solid ${LED_ACCENT}35`,
+            }}
+          >
+            Inscripción Confirmada · {evento}
+          </span>
+          <h1
+            className="mt-3 font-black italic uppercase leading-none"
+            style={{ fontSize: "clamp(2rem,6vw,3rem)", color: "#ffffff" }}
+          >
+            ¡Listo para Correr!
+          </h1>
+          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, marginTop: 8 }}>
+            Tu dorsal LED oficial ha sido generado. Descárgalo y guárdalo.
+          </p>
+        </div>
+
+        {/* Preview */}
+        <div
+          className="relative rounded-2xl overflow-hidden mb-6"
+          style={{
+            border:    `1px solid ${LED_ACCENT}30`,
+            boxShadow: `0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px ${LED_ACCENT}15`,
+          }}
+        >
+          {!rendered && <DorsalLoadingOverlay color={LED_ACCENT} bg="#03070b" />}
+          <DorsalPreview canvasRef={canvasRef} rendered={rendered} />
+        </div>
+
+        {/* Chips info */}
+        <div className="flex flex-wrap gap-2 justify-center mb-6">
+          <InfoChipCaninata label="Dorsal"    value={`#${bibPad}`} color={LED_ACCENT} />
+          {categoria && (
+            <InfoChipCaninata label="Categoría" value={categoria}   color={LED_ACCENT} />
+          )}
+          <InfoChipCaninata label="Evento"    value={evento}        color={LED_ACCENT} />
+        </div>
+
+        {/* Botones */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={() => navigate("/")}
+            className="flex-1 py-3.5 rounded-xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 transition-all"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border:     "1px solid rgba(255,255,255,0.08)",
+              color:      "rgba(255,255,255,0.4)",
+            }}
+          >
+            <Home size={15} /> Inicio
+          </button>
+          <button
+            onClick={handleShare}
+            className="flex-1 py-3.5 rounded-xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 transition-all"
+            style={{
+              background: `${LED_ACCENT}18`,
+              border:     `1px solid ${LED_ACCENT}35`,
+              color:       LED_ACCENT,
+            }}
+          >
+            {copied
+              ? <><Check size={15} /> ¡Copiado!</>
+              : <><Share2 size={15} /> Compartir</>}
+          </button>
+          <button
+            onClick={handleDownload}
+            disabled={!rendered}
+            className="flex-1 py-3.5 rounded-xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 transition-all disabled:opacity-40"
+            style={{
+              background: rendered
+                ? `linear-gradient(135deg, #e6b800, ${LED_ACCENT})`
+                : `${LED_ACCENT}20`,
+              color:      "#03070b",
+              boxShadow:  rendered ? `0 4px 20px ${LED_ACCENT}40` : "none",
+            }}
+          >
+            <Download size={15} /> Descargar Dorsal LED
+          </button>
+        </div>
+
+        <p
+          className="text-center mt-8 font-black uppercase tracking-[0.3em]"
+          style={{ fontSize: 9, color: `${LED_ACCENT}30` }}
+        >
+          WE RUN LED · RAYOCERO · VALKYRON GROUP · {new Date().getFullYear()}
+        </p>
+      </motion.div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DorsalCaninata — dorsal doble dueño + perro (NO MODIFICAR)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const YELLOW       = "#FDD454";
@@ -402,8 +614,6 @@ function DorsalCaninata({
   bibPad, nombreCompleto, nombre, apellido,
   nombrePerro, razaPerro, evento, navigate,
 }: DorsalCaninataProps) {
-
-  // [V3.0-4] Dos canvas ocultos independientes
   const canvasRefDueno  = useRef<HTMLCanvasElement>(null);
   const canvasRefPerro  = useRef<HTMLCanvasElement>(null);
   const [renderedDueno, setRenderedDueno] = useState(false);
@@ -412,37 +622,26 @@ function DorsalCaninata({
 
   const nombrePerroUpper = nombrePerro.toUpperCase();
 
-  // Render dorsal dueño
   useEffect(() => {
     const canvas = canvasRefDueno.current;
     if (!canvas) return;
     renderDorsalToCanvas(
-      canvas,
-      dorsalCaninataSrc,
-      CANINATA_CONFIG,
-      bibPad,
-      nombreCompleto,
-      CAT_CANINATA,
+      canvas, dorsalCaninataSrc, CANINATA_CONFIG,
+      bibPad, nombreCompleto, CAT_CANINATA,
       () => setRenderedDueno(true),
     );
   }, [bibPad, nombreCompleto]);
 
-  // Render dorsal perro
   useEffect(() => {
     const canvas = canvasRefPerro.current;
     if (!canvas) return;
     renderDorsalToCanvas(
-      canvas,
-      dorsalCaninataSrc,
-      CANINATA_CONFIG,
-      bibPad,
-      nombrePerroUpper,
-      `MASCOTA · ${razaPerro.toUpperCase()}`,
+      canvas, dorsalCaninataSrc, CANINATA_CONFIG,
+      bibPad, nombrePerroUpper, `MASCOTA · ${razaPerro.toUpperCase()}`,
       () => setRenderedPerro(true),
     );
   }, [bibPad, nombrePerroUpper, razaPerro]);
 
-  // [V3.0-5] Descarga individual
   const downloadCanvas = (
     ref     : React.RefObject<HTMLCanvasElement>,
     filename: string,
@@ -475,7 +674,6 @@ function DorsalCaninata({
       className="min-h-screen flex flex-col items-center px-4 py-10 font-sans"
       style={{ background: "#080f08" }}
     >
-      {/* [V3.0-4] Canvas ocultos */}
       <canvas ref={canvasRefDueno} style={{ display: "none" }} />
       <canvas ref={canvasRefPerro} style={{ display: "none" }} />
 
@@ -484,7 +682,6 @@ function DorsalCaninata({
         initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
       >
-        {/* Header caninata */}
         <div className="text-center mb-8">
           <span
             className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.2em]"
@@ -507,14 +704,10 @@ function DorsalCaninata({
         <div className="mb-3">
           <div className="flex items-center gap-2 mb-3">
             <User size={14} style={{ color: YELLOW }} />
-            <span
-              className="text-[10px] font-black uppercase tracking-[0.2em]"
-              style={{ color: YELLOW }}
-            >
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: YELLOW }}>
               Tu dorsal — {nombre} {apellido}
             </span>
           </div>
-
           <div
             className="relative rounded-2xl overflow-hidden"
             style={{
@@ -525,21 +718,13 @@ function DorsalCaninata({
             {!renderedDueno && <DorsalLoadingOverlay color={YELLOW} bg="#080f08" />}
             <DorsalPreview canvasRef={canvasRefDueno} rendered={renderedDueno} />
           </div>
-
           <div className="flex flex-wrap gap-2 mt-3 mb-3">
             <InfoChipCaninata label="Dorsal"    value={`#${bibPad}`}            color={YELLOW} />
             <InfoChipCaninata label="Categoría" value={CAT_CANINATA}            color={YELLOW} />
             <InfoChipCaninata label="Atleta"    value={`${nombre} ${apellido}`} color={YELLOW} />
           </div>
-
-          {/* [V3.0-5] Descarga dueño */}
           <button
-            onClick={() =>
-              downloadCanvas(
-                canvasRefDueno,
-                `dorsal-${bibPad}-${nombre.toLowerCase()}.png`,
-              )
-            }
+            onClick={() => downloadCanvas(canvasRefDueno, `dorsal-${bibPad}-${nombre.toLowerCase()}.png`)}
             disabled={!renderedDueno}
             className="w-full py-3.5 rounded-xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 transition-all disabled:opacity-40"
             style={{
@@ -564,14 +749,10 @@ function DorsalCaninata({
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-3">
             <Dog size={14} style={{ color: YELLOW }} />
-            <span
-              className="text-[10px] font-black uppercase tracking-[0.2em]"
-              style={{ color: YELLOW }}
-            >
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: YELLOW }}>
               Dorsal mascota — {nombrePerro}
             </span>
           </div>
-
           <div
             className="relative rounded-2xl overflow-hidden"
             style={{
@@ -582,20 +763,14 @@ function DorsalCaninata({
             {!renderedPerro && <DorsalLoadingOverlay color={YELLOW} bg="#080f08" />}
             <DorsalPreview canvasRef={canvasRefPerro} rendered={renderedPerro} />
           </div>
-
           <div className="flex flex-wrap gap-2 mt-3 mb-3">
             <InfoChipCaninata label="Dorsal"  value={`#${bibPad}`} color={YELLOW} />
             <InfoChipCaninata label="Mascota" value={nombrePerro}  color={YELLOW} />
             <InfoChipCaninata label="Raza"    value={razaPerro}    color={YELLOW} />
           </div>
-
-          {/* [V3.0-5] Descarga perro */}
           <button
             onClick={() =>
-              downloadCanvas(
-                canvasRefPerro,
-                `dorsal-${bibPad}-${nombrePerro.toLowerCase()}.png`,
-              )
+              downloadCanvas(canvasRefPerro, `dorsal-${bibPad}-${nombrePerro.toLowerCase()}.png`)
             }
             disabled={!renderedPerro}
             className="w-full py-3.5 rounded-xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 transition-all disabled:opacity-40"
@@ -650,7 +825,7 @@ function DorsalCaninata({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// UTILIDADES COMPARTIDAS
+// UTILIDADES COMPARTIDAS (NO MODIFICAR)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function DorsalPreview({
@@ -671,7 +846,7 @@ function DorsalPreview({
 
   if (!src) {
     return (
-      <div style={{ width: "100%", paddingTop: "71.4%", background: "#080f08" }} />
+      <div style={{ width: "100%", paddingTop: "71.4%", background: "#03070b" }} />
     );
   }
   return (
