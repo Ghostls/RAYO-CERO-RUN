@@ -1,30 +1,33 @@
 /**
- * RAYO CERO — ADMIN DASHBOARD (EVOLUTION V4.2 — CORO 499 FULL FIX)
+ * RAYO CERO — ADMIN DASHBOARD (EVOLUTION V4.3 — TASA PER-RACE)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V4.2:
- * [V4.2-1] getComprobantePublicUrl(): reescrita con estrategia multi-capa:
- *          1. storedPath directo (campo comprobante_url / comprobante_path)  ← ELIMINADO
- *          2. Prefijos de carpeta por carrera: 'coro-499/', 'coro/', raíz, 'lara/', etc.
- *          3. Scan recursivo por prefijo con paginación — subcarpetas visibles
- *          4. Match flexible: cedula sin "V", con "V", con "V-", referencia_pago,
- *             y ahora TELÉFONO como primera prioridad.
- *          5. Runners con referencia_pago = 'INSCRIPCION_ADMIN' muestran badge especial.
- * [V4.2-2] generateCategoryPDF(): cuando el scope es Coro/499:
- *          — "CORO 499" en rojo prominente en portada
- *          — Footer "CORO 499 · RAYOCERO · Valkyron Group · Pág N/T"
- *          — Nombre de carrera en esquina de cada sección de categoría
- *          — Filename: RAYOCERO_CORO499_SEGMENTADO_<ts>.pdf
- * [V4.2-3] inspectComprobante() recibe scope para priorizar prefijo correcto.
- * [V4.2-4] ModuloInscripcionAdmin recibe prop `scope` — inscripción queda
- *          vinculada a la carrera activa con race_id correcto.
- * [V4.2-FIX] getComprobantePublicUrl() agrega parámetro `telefono` para
- *          buscar archivos cuyo nombre inicia con el número telefónico.
- *          inspectComprobante() ahora pasa `a.telefono` al resolver.
- *          Se elimina el uso de `comprobante_url`/`comprobante_path` para evitar 404.
- *          Se agregan logs de depuración `[MIA-COMPROBANTE]`.
+ * CHANGELOG V4.3:
+ * [V4.3-FIX] TasaConfig: bug crítico — el UPDATE escribía siempre sobre
+ *          id=1 (global) cuando la carrera no tenía fila propia, haciendo
+ *          que las dos carreras activas compartieran tasa/costos.
+ *          Ahora la config es PER-RACE:
+ *          — fetchConfig() busca fila por race_id; si no existe, SIEMBRA
+ *            una fila propia (INSERT) copiando la global como base y la
+ *            vincula a scope.raceId. configRowId apunta a la fila propia.
+ *          — handleUpdate() escribe siempre sobre configRowId (fila propia,
+ *            nunca id=1). Guardia anti-contaminación de la global.
+ *          — Manejo de colisión concurrente en el INSERT (re-lee la fila
+ *            que ganó la carrera).
+ *          — Indicador visual PER-RACE / GLOBAL en el header.
+ *          Requiere en Supabase (una vez):
+ *            ALTER TABLE system_config ADD COLUMN IF NOT EXISTS race_id uuid
+ *              REFERENCES races(id) ON DELETE CASCADE;
+ *            CREATE UNIQUE INDEX IF NOT EXISTS system_config_race_id_uidx
+ *              ON system_config (race_id) WHERE race_id IS NOT NULL;
+ *
+ * CHANGELOG V4.2 (base sin modificaciones):
+ * [V4.2-1] getComprobantePublicUrl(): estrategia multi-capa (teléfono primero).
+ * [V4.2-2] generateCategoryPDF(): header/footer Coro 499.
+ * [V4.2-3] inspectComprobante() recibe scope + teléfono.
+ * [V4.2-4] ModuloInscripcionAdmin recibe prop scope.
  *
  * CHANGELOG V4.1 (base sin modificaciones):
  * [V4.1-1] isLegacyRace() — solo 'night fest' es legacy (race_id NULL).
@@ -967,7 +970,15 @@ const ModuloChequeoKits = ({ scope }: { scope: RaceScope }) => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* TASA CONFIG                                                    */
+/* TASA CONFIG — [V4.3] Config por carrera (per-race, no global)  */
+/*                                                                */
+/* [V4.3-FIX] Bug: el UPDATE escribía siempre sobre id=1 (global) */
+/*   cuando la carrera no tenía fila propia, haciendo que las dos */
+/*   carreras activas compartieran tasa/costos.                   */
+/*   Ahora: si no existe fila para scope.raceId, se SIEMBRA una   */
+/*   fila propia (INSERT) copiando la global como base, y todos   */
+/*   los UPDATE quedan vinculados a esa fila (configRowId propio).*/
+/*   La global (id=1) solo se toca en modo legacy.                */
 /* ────────────────────────────────────────────────────────────── */
 
 const TasaConfig = ({ scope }: { scope: RaceScope }) => {
@@ -982,21 +993,81 @@ const TasaConfig = ({ scope }: { scope: RaceScope }) => {
   const [isSaving, setIsSaving]             = useState(false);
   const [successMsg, setSuccessMsg]         = useState(false);
   const [configRowId, setConfigRowId]       = useState<number | null>(null);
+  /* [V4.3] true = fila propia de la carrera; false = global (legacy) */
+  const [isRaceScoped, setIsRaceScoped]     = useState(false);
 
+  /**
+   * [V4.3] Carga config con estrategia scope-aware:
+   *   1. Legacy → usa global (id=1).
+   *   2. Con raceId → busca fila propia; si no existe, SIEMBRA una
+   *      copiando los valores de la global como base y la vincula
+   *      a scope.raceId. A partir de ahí configRowId apunta a la
+   *      fila propia y el UPDATE nunca toca la global.
+   */
   const fetchConfig = useCallback(async () => {
     setIsLoading(true);
     try {
+      // ── Global de referencia (base para sembrar y fallback legacy) ──
+      const { data: globalCfg } = await supabase
+        .from('system_config')
+        .select('*')
+        .eq('id', 1)
+        .single();
+
       let data: any = null;
+      let scoped   = false;
+
       if (!scope.legacy && scope.raceId) {
-        const br = await supabase.from('system_config').select('*').eq('race_id', scope.raceId).maybeSingle();
-        data = br.data;
+        // ── 1. ¿Existe fila propia para esta carrera? ──
+        const { data: raceCfg } = await supabase
+          .from('system_config')
+          .select('*')
+          .eq('race_id', scope.raceId)
+          .maybeSingle();
+
+        if (raceCfg) {
+          data   = raceCfg;
+          scoped = true;
+        } else {
+          // ── 2. No existe → SIEMBRA fila propia desde la global ──
+          const seed = {
+            race_id:              scope.raceId,
+            tasa_bcv:             globalCfg?.tasa_bcv     ?? 0,
+            costo_usd:            globalCfg?.costo_usd    ?? 40,
+            costo_4k_usd:         globalCfg?.costo_4k_usd ?? 20,
+            ultima_actualizacion: new Date().toISOString(),
+          };
+          const { data: inserted, error: insErr } = await supabase
+            .from('system_config')
+            .insert(seed)
+            .select('*')
+            .single();
+
+          if (insErr) {
+            // Colisión concurrente (dos admins abriendo a la vez):
+            // re-lee la fila que ganó el INSERT.
+            console.warn('[MIA-TASA] Insert scoped falló, re-leyendo:', insErr.message);
+            const { data: retry } = await supabase
+              .from('system_config')
+              .select('*')
+              .eq('race_id', scope.raceId)
+              .maybeSingle();
+            data   = retry ?? globalCfg;
+            scoped = !!retry;
+          } else {
+            data   = inserted;
+            scoped = true;
+          }
+        }
+      } else {
+        // ── Legacy → global compartida ──
+        data   = globalCfg;
+        scoped = false;
       }
-      if (!data) {
-        const fb = await supabase.from('system_config').select('*').eq('id', 1).single();
-        data = fb.data;
-      }
+
       if (data) {
         setConfigRowId(data.id);
+        setIsRaceScoped(scoped);
         setTasaActual(data.tasa_bcv);
         setNuevaTasa(String(data.tasa_bcv));
         setCostoUSDActual(data.costo_usd || 40);
@@ -1005,24 +1076,44 @@ const TasaConfig = ({ scope }: { scope: RaceScope }) => {
         setNuevoCosto4k(String(data.costo_4k_usd || 20));
         setUltimaAct(new Date(data.ultima_actualizacion).toLocaleString('es-VE'));
       }
-    } catch (err) { console.error(err); }
+    } catch (err) { console.error('[MIA-TASA]', err); }
     finally { setIsLoading(false); }
   }, [scope.raceId, scope.legacy]);
 
   useEffect(() => { fetchConfig(); }, [fetchConfig]);
 
+  /**
+   * [V4.3] Guarda SIEMPRE sobre configRowId, que ya está garantizado
+   * como fila propia de la carrera (salvo legacy). Se agrega guardia
+   * defensiva: si scope no es legacy pero la fila sigue siendo la
+   * global (id=1), se aborta para no contaminar la tasa compartida.
+   */
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     try {
       if (configRowId === null) throw new Error('Fila config no localizada');
-      const { error } = await supabase.from('system_config').update({
+
+      // [V4.3] Guardia anti-contaminación de la global
+      if (!scope.legacy && scope.raceId && !isRaceScoped) {
+        throw new Error(
+          'La config aún no está vinculada a esta carrera. Recarga el módulo antes de guardar.'
+        );
+      }
+
+      const payload = {
         tasa_bcv:              parseFloat(nuevaTasa.replace(',', '.')),
         costo_usd:             parseFloat(nuevoCostoUSD.replace(',', '.')),
         costo_4k_usd:          parseFloat(nuevoCosto4k.replace(',', '.')),
         ultima_actualizacion:  new Date().toISOString(),
-      }).eq('id', configRowId);
+      };
+
+      const { error } = await supabase
+        .from('system_config')
+        .update(payload)
+        .eq('id', configRowId);
       if (error) throw error;
+
       await fetchConfig();
       setSuccessMsg(true);
       setTimeout(() => setSuccessMsg(false), 3000);
@@ -1036,6 +1127,19 @@ const TasaConfig = ({ scope }: { scope: RaceScope }) => {
         <h4 className="text-sm font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
           <Settings size={18} className="text-cyan-400" /> Parámetros Financieros
           <span className="text-[8px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded font-black uppercase ml-2">{scope.name}</span>
+          {/* [V4.3] Indicador de scope de la config */}
+          {!scope.legacy && (
+            <span
+              className={`text-[8px] px-2 py-0.5 rounded font-black uppercase border ${
+                isRaceScoped
+                  ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                  : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+              }`}
+              title={isRaceScoped ? 'Tasa exclusiva de esta carrera' : 'Sincronizando fila propia...'}
+            >
+              {isRaceScoped ? 'PER-RACE' : 'GLOBAL'}
+            </span>
+          )}
         </h4>
         <form onSubmit={handleUpdate} className="space-y-5">
           <div className="grid grid-cols-1 gap-4">
