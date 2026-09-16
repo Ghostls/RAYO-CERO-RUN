@@ -27,7 +27,7 @@ const BG_DEEP     = "#020608";
 
 const SLIDES = [
   { src: slide1, alt: "WE RUN LED 10K — Portada Carrera Nocturna",   label: "CARRERA NOCTURNA" },
-  { src: slide2, alt: "WE RUN LED 10K — Precio $40 Pago con Cashea", label: "PRECIO $40" },
+  { src: slide2, alt: "WE RUN LED 10K — Precio $30 Pago ", label: "PRECIO $30" },
   { src: slide3, alt: "WE RUN LED 10K — Kit del corredor",            label: "KIT DEL CORREDOR" },
 ];
 
