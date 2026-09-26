@@ -1,22 +1,36 @@
 /**
- * RAYOCERO — REGISTRATION TERMINAL (STABLE BUILD V37.3 — LED CORO CONFIG)
+ * RAYOCERO — REGISTRATION TERMINAL (STABLE BUILD V37.4 — LED CORO 5K CAMINATA)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Architecture: React / TypeScript / Supabase / React Query / Framer Motion
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V37.3 (evoluciona sobre V37.2):
- * [V37.3-1] LED_CORO_CONFIG: nueva config estática para WE RUN RAYOCERO LED CORO 10K.
- *           modalidadesDisponibles: ["10K"] — solo una distancia, sin selector de 4K.
- *           Datos de pago: Cédula 17.627.699, Pago Móvil 0414-5643372, BNC.
- * [V37.3-2] isLedRunRace(): detector por keyword "led" — paralelo a isCaninataRace.
- * [V37.3-3] getRaceCfg(): LED Run evaluado ANTES que el fallback CORO_CONFIG
- *           para que WE RUN LED CORO no herede modalidad 4K ni config 499.
- * [V37.3-4] accentColor LED: "#FCD34D" (dorado LED) en lugar de "#00f2ff" cyan.
- * [V37.3-5] Selector de modalidad: cuando hay una sola modalidad (LED 10K)
- *           el grid ocupa col-span-2 completo — sin botón vacío al lado.
- * [V37.3-6] Badge de carrera en selector de eventos: LED Run muestra
- *           "CARRERA OFICIAL 10K" en lugar de "10K / 4K".
+ * CHANGELOG V37.4 (evoluciona sobre V37.3):
+ * [V37.4-1] LED_CORO_CONFIG: modalidadesDisponibles ["10K", "5K"] — se agrega
+ *           5K CAMINATA RECREATIVA ($20). distancia "10K / 5K".
+ *           Caninata y 499 Coro NO se modifican.
+ * [V37.4-2] isCaminata5K: "5K" en una carrera tipo "carrera" = caminata
+ *           recreativa. En tipo "caninata" el 5K sigue siendo caninata.
+ * [V37.4-3] getModalidadMeta(m, tipo): 5K → "5K CAMINATA" (Footprints) cuando
+ *           tipo === "carrera". Caninata conserva "5K CANINATA" (Dog).
+ * [V37.4-4] usePrecioEvento(raceId, modalidad, usaCosto5k): solo la 5K
+ *           caminata lee system_config.costo_5k_usd. La columna se pide en el
+ *           SELECT únicamente cuando usaCosto5k=true → las demás carreras
+ *           ejecutan exactamente la misma query que en V37.3.
+ *           Caninata 5K sigue leyendo costo_4k_usd (sin cambios).
+ * [V37.4-5] categoria: 5K caminata → "Caminata Recreativa 5K".
+ *           Caninata conserva "Caminata Canina / Familiar".
+ * [V37.4-6] Preview de categoría visible también para 5K caminata.
+ * [V37.4-7] Badge del selector de eventos LED: "10K CARRERA / 5K CAMINATA".
+ * [V37.4-8] Botón submit: label + ícono Footprints para 5K caminata.
+ *
+ * CHANGELOG V37.3 (base preservada):
+ * [V37.3-1] LED_CORO_CONFIG: config estática WE RUN RAYOCERO LED CORO 10K.
+ * [V37.3-2] isLedRunRace(): detector por keyword "led".
+ * [V37.3-3] getRaceCfg(): LED evaluado ANTES que el fallback CORO_CONFIG.
+ * [V37.3-4] accentColor LED: "#FCD34D".
+ * [V37.3-5] Selector de modalidad: una sola modalidad → grid-cols-1.
+ * [V37.3-6] Badge de carrera en selector de eventos por tipo.
  *
  * CHANGELOG V37.2 (base preservada):
  * [V37.2-1] BUG FIX CRÍTICO: onSuccess detecta isCaninataRaceType en lugar de
@@ -28,6 +42,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2, AlertCircle, Banknote,
   ChevronRight, Flag, Timer, Dog, Calendar, Check, Copy, Zap, ShieldAlert,
+  Footprints, // [V37.4-3]
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -109,7 +124,17 @@ interface PrecioEvento {
   loading: boolean; error: string | null;
 }
 
-function usePrecioEvento(raceId: string, modalidad: Modalidad): PrecioEvento {
+/**
+ * @param raceId      Carrera activa (fila per-race de system_config).
+ * @param modalidad   Modalidad seleccionada.
+ * @param usaCosto5k  [V37.4-4] true SOLO para 5K caminata (LED Coro).
+ *                    Controla tanto la columna solicitada como el mapeo del costo.
+ */
+function usePrecioEvento(
+  raceId: string,
+  modalidad: Modalidad,
+  usaCosto5k: boolean = false, // [V37.4-4]
+): PrecioEvento {
   const [tasaBCV,  setTasaBCV]  = useState(0);
   const [costoUSD, setCostoUSD] = useState(0);
   const [loading,  setLoading]  = useState(true);
@@ -117,26 +142,37 @@ function usePrecioEvento(raceId: string, modalidad: Modalidad): PrecioEvento {
 
   useEffect(() => {
     let cancelled = false;
+    // [V37.4-4] costo_5k_usd solo se solicita cuando aplica → query idéntica
+    //           a V37.3 para 499 Coro, Caninata y LED 10K.
+    const cols = usaCosto5k
+      ? "tasa_bcv,costo_usd,costo_4k_usd,costo_5k_usd"
+      : "tasa_bcv,costo_usd,costo_4k_usd";
     (async () => {
       setLoading(true); setError(null);
       try {
         let data: any = null;
         if (raceId) {
           const { data: d } = await supabase
-            .from("system_config").select("tasa_bcv,costo_usd,costo_4k_usd")
+            .from("system_config").select(cols)
             .eq("race_id", raceId).maybeSingle();
           data = d;
         }
         if (!data) {
           const { data: fb } = await supabase
-            .from("system_config").select("tasa_bcv,costo_usd,costo_4k_usd")
+            .from("system_config").select(cols)
             .eq("id", 1).single();
           data = fb;
         }
         if (!cancelled && data) {
           setTasaBCV(data.tasa_bcv ?? 0);
-          // LED Coro solo tiene 10K — siempre lee costo_usd
-          const usd = modalidad === "10K" ? (data.costo_usd ?? 0) : (data.costo_4k_usd ?? 0);
+          // [V37.4-4] Mapeo modalidad → columna de costo:
+          //   10K                → costo_usd
+          //   5K caminata (LED)  → costo_5k_usd
+          //   4K / 5K caninata   → costo_4k_usd (comportamiento V37.3 intacto)
+          let usd: number;
+          if (modalidad === "10K")                    usd = data.costo_usd    ?? 0;
+          else if (modalidad === "5K" && usaCosto5k)  usd = data.costo_5k_usd ?? 0;
+          else                                        usd = data.costo_4k_usd ?? 0;
           setCostoUSD(usd);
         }
       } catch (err: any) {
@@ -146,7 +182,7 @@ function usePrecioEvento(raceId: string, modalidad: Modalidad): PrecioEvento {
       }
     })();
     return () => { cancelled = true; };
-  }, [raceId, modalidad]);
+  }, [raceId, modalidad, usaCosto5k]); // [V37.4-4] usaCosto5k en deps
 
   return {
     tasaBCV, costoUSD,
@@ -166,9 +202,19 @@ const isCaninataRace = (name: string = ""): boolean =>
 const isLedRunRace = (name: string = ""): boolean =>
   name.toLowerCase().includes("led");
 
-const getModalidadMeta = (m: Modalidad): { label: string; Icon: React.ElementType } => {
+/**
+ * [V37.4-3] tipo opcional: en carreras tipo "carrera" el 5K es CAMINATA.
+ * Sin tipo (o tipo "caninata") conserva el comportamiento V37.3.
+ */
+const getModalidadMeta = (
+  m: Modalidad,
+  tipo: RaceStaticConfig["tipo"] = "caninata",
+): { label: string; Icon: React.ElementType } => {
   switch (m) {
-    case "5K":  return { label: "5K CANINATA", Icon: Dog };
+    case "5K":
+      return tipo === "carrera"
+        ? { label: "5K CAMINATA", Icon: Footprints } // [V37.4-3]
+        : { label: "5K CANINATA", Icon: Dog };
     case "4K":  return { label: "4K CARRERA",  Icon: Flag };
     case "10K": return { label: "10K CARRERA", Icon: Timer };
     default:    return { label: `${m} CARRERA`, Icon: Timer };
@@ -196,13 +242,15 @@ const CORO_CONFIG: RaceStaticConfig = {
   },
 };
 
-// [V37.3-1] Config exclusiva WE RUN RAYOCERO LED CORO 10K
+// [V37.3-1] Config exclusiva WE RUN RAYOCERO LED CORO
+// [V37.4-1] + 5K CAMINATA RECREATIVA ($20 — costo en system_config.costo_5k_usd)
 const LED_CORO_CONFIG: RaceStaticConfig = {
   tipo: "carrera",
-  modalidadesDisponibles: ["10K"], // solo 10K — sin selector de 4K
+  modalidadesDisponibles: ["10K", "5K"], // [V37.4-1] antes: ["10K"]
   evento: {
     nombre: "WE RUN RAYOCERO LED CORO 10K", fecha: "31 OCT 2026", hora: "07:00 PM",
-    distancia: "10K", atletas: "+500", lugar: "CORO, FALCÓN",
+    distancia: "10K / 5K", // [V37.4-1] antes: "10K"
+    atletas: "+500", lugar: "CORO, FALCÓN",
     proximaEd: "TEMPORADA 2026", targetDate: new Date("2026-10-31T19:00:00"),
   },
   pago: {
@@ -333,10 +381,11 @@ export default function RegistrationForm() {
             // [V37.3-4] color por tipo
             const color = isCan ? "#FDD454" : isLed ? "#FCD34D" : "#00f2ff";
             // [V37.3-6] badge label por tipo
+            // [V37.4-7] LED ahora muestra 10K + 5K caminata
             const badgeLabel = isCan
               ? "10K CARRERA / 5K CANINATA"
               : isLed
-              ? "CARRERA OFICIAL 10K"
+              ? "10K CARRERA / 5K CAMINATA"
               : "CARRERA OFICIAL 10K / 4K";
 
             return (
@@ -427,7 +476,10 @@ function RegistrationFormActive({
   const [uploading,          setUploading]          = useState(false);
   const [formError,          setFormError]          = useState<string | null>(null);
 
-  const precio = usePrecioEvento(race.id, modalidad);
+  // [V37.4-2] 5K en carrera tipo "carrera" = caminata recreativa (LED Coro)
+  const isCaminata5K = !isCaninataRaceType && modalidad === "5K";
+
+  const precio = usePrecioEvento(race.id, modalidad, isCaminata5K); // [V37.4-4]
 
   const edad = useMemo(
     () => (fechaNacimiento ? calcularEdad(fechaNacimiento) : 0),
@@ -435,9 +487,13 @@ function RegistrationFormActive({
   );
 
   const categoria = useMemo(() => {
-    if (modalidad === "5K") return "Caminata Canina / Familiar";
+    if (modalidad === "5K") {
+      // [V37.4-5] Caninata intacta; carrera tipo "carrera" → caminata 5K
+      if (isCaninataRaceType) return "Caminata Canina / Familiar";
+      return "Caminata Recreativa 5K";
+    }
     return calcularCategoria(edad, genero, movilidadReducida);
-  }, [edad, genero, movilidadReducida, modalidad]);
+  }, [edad, genero, movilidadReducida, modalidad, isCaninataRaceType]);
 
   const genderMismatchWarning = useMemo(
     () => validateGenderCategory(genero, categoria),
@@ -584,7 +640,7 @@ function RegistrationFormActive({
             <div className={`grid gap-3 ${solaModalidad ? "grid-cols-1" : "grid-cols-2"}`}>
               {cfg.modalidadesDisponibles.map((m) => {
                 const isSelected      = modalidad === m;
-                const { label, Icon } = getModalidadMeta(m);
+                const { label, Icon } = getModalidadMeta(m, cfg.tipo); // [V37.4-3]
                 return (
                   <button
                     key={m} type="button" onClick={() => setModalidad(m)}
@@ -691,8 +747,9 @@ function RegistrationFormActive({
           </div>
 
           {/* CATEGORY PREVIEW BADGE */}
+          {/* [V37.4-6] Visible también para 5K caminata; oculto solo en 5K caninata */}
           <AnimatePresence mode="wait">
-            {fechaNacimiento && modalidad !== "5K" && (
+            {fechaNacimiento && (modalidad !== "5K" || isCaminata5K) && (
               <motion.div
                 key={`${categoria}-${genderMismatchWarning ? "warn" : "ok"}`}
                 initial={{ opacity: 0, y: -6 }}
@@ -1002,6 +1059,9 @@ function RegistrationFormActive({
               <><Dog className="h-5 w-5" /> PROCESAR Y GENERAR DORSALES CANINATA</>
             ) : isCaninataRaceType ? (
               <><Dog className="h-5 w-5" /> {`PROCESAR INSCRIPCIÓN CANINATA (${modalidad})`}</>
+            ) : isCaminata5K ? (
+              // [V37.4-8] 5K caminata LED Coro
+              <><Footprints className="h-5 w-5" /> PROCESAR INSCRIPCIÓN CAMINATA (5K)</>
             ) : (
               <><Flag className="h-5 w-5" /> {`PROCESAR INSCRIPCIÓN (${modalidad})`}</>
             )}

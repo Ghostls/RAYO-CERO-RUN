@@ -1,27 +1,36 @@
 /**
- * RAYO CERO — ADMIN DASHBOARD (EVOLUTION V4.3 — TASA PER-RACE)
+ * RAYO CERO — ADMIN DASHBOARD (EVOLUTION V4.4 — LED CORO 5K CAMINATA)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V4.3:
- * [V4.3-FIX] TasaConfig: bug crítico — el UPDATE escribía siempre sobre
- *          id=1 (global) cuando la carrera no tenía fila propia, haciendo
- *          que las dos carreras activas compartieran tasa/costos.
- *          Ahora la config es PER-RACE:
- *          — fetchConfig() busca fila por race_id; si no existe, SIEMBRA
- *            una fila propia (INSERT) copiando la global como base y la
- *            vincula a scope.raceId. configRowId apunta a la fila propia.
- *          — handleUpdate() escribe siempre sobre configRowId (fila propia,
- *            nunca id=1). Guardia anti-contaminación de la global.
- *          — Manejo de colisión concurrente en el INSERT (re-lee la fila
- *            que ganó la carrera).
- *          — Indicador visual PER-RACE / GLOBAL en el header.
- *          Requiere en Supabase (una vez):
- *            ALTER TABLE system_config ADD COLUMN IF NOT EXISTS race_id uuid
- *              REFERENCES races(id) ON DELETE CASCADE;
- *            CREATE UNIQUE INDEX IF NOT EXISTS system_config_race_id_uidx
- *              ON system_config (race_id) WHERE race_id IS NOT NULL;
+ * CHANGELOG V4.4 (evoluciona sobre V4.3):
+ * [V4.4-1] Modalidad '5K' agregada al tipo. isLedScope() detecta
+ *          WE RUN RAYOCERO LED CORO (keyword "led", igual que el terminal).
+ * [V4.4-2] TasaConfig: campo "5K Caminata USD" (system_config.costo_5k_usd)
+ *          visible y persistido SOLO en scope LED. En LED se oculta el 4K
+ *          (esa carrera no tiene 4K). 499 Coro / Caninata: UI y payload
+ *          idénticos a V4.3. Guardia NaN/<=0 sobre el costo 5K.
+ * [V4.4-3] AtletasList: en scope LED la pestaña secundaria es
+ *          "5K CAMINATA" (en lugar de 4K). Badge 5K en columna Modalidad y
+ *          en panel de inspección. Reset de pestaña al cambiar de carrera.
+ * [V4.4-4] PDFExportModal: filtro 5K en scope LED. CATEGORY_ORDER incluye
+ *          'Caminata Recreativa 5K' para que la categoría entre al reporte.
+ * [V4.4-5] ModuloRepresentantes: badge 5K (antes todo lo que no era 10K
+ *          se pintaba como "4K").
+ * [V4.4-FIX1] isCoroScope() no excluía LED: "WE RUN RAYOCERO LED CORO" contiene
+ *          "coro" y heredaba header/footer/slug "CORO 499" en PDFs y HQ.
+ *          Ahora excluye LED.
+ * [V4.4-FIX2] PDFExportModal: el contador de cada botón de modalidad mostraba
+ *          filteredAtletas.length para todos. Ahora cuenta por modalidad.
+ *
+ * Requiere en Supabase (una vez) — ver migración 20260926_led_coro_5k.sql:
+ *   ALTER TABLE system_config ADD COLUMN IF NOT EXISTS costo_5k_usd numeric(10,2) NOT NULL DEFAULT 20;
+ *   + '5K' en el ENUM de runners.modalidad.
+ *
+ * CHANGELOG V4.3 (base sin modificaciones):
+ * [V4.3-FIX] TasaConfig PER-RACE: fila propia por race_id, siembra desde la
+ *          global, UPDATE nunca toca id=1 salvo legacy.
  *
  * CHANGELOG V4.2 (base sin modificaciones):
  * [V4.2-1] getComprobantePublicUrl(): estrategia multi-capa (teléfono primero).
@@ -64,7 +73,7 @@ import ModuloInscripcionAdmin from '../components/admin/ModuloInscripcionAdmin';
 /* TYPES & CONSTANTS                                              */
 /* ────────────────────────────────────────────────────────────── */
 
-type Modalidad = '10K' | '4K';
+type Modalidad = '10K' | '4K' | '5K'; // [V4.4-1] + '5K'
 
 interface Runner {
   id: string;
@@ -119,6 +128,7 @@ const CATEGORY_ORDER: string[] = [
   'Master D Masculino', 'Master D Femenino',
   'Absoluto Masculino', 'Absoluto Femenino',
   'Caminata Recreativa 4K',
+  'Caminata Recreativa 5K', // [V4.4-4]
 ];
 
 const getCategoryColor = (categoria: string): [number, number, number] => {
@@ -200,9 +210,31 @@ const isLegacyRace = (name: string) => {
   return n.includes('night fest');
 };
 
-/** Detecta si la carrera activa es Coro 499 para estilos y labels */
+/**
+ * [V4.4-1] Detecta WE RUN RAYOCERO LED CORO.
+ * Misma keyword que isLedRunRace() del terminal de inscripciones.
+ */
+const isLedScope = (scope: RaceScope): boolean =>
+  (scope.name || '').toLowerCase().includes('led');
+
+/**
+ * Detecta si la carrera activa es Coro 499 para estilos y labels.
+ * [V4.4-FIX1] Excluye LED: "WE RUN RAYOCERO LED CORO" contiene "coro"
+ * y heredaba el branding CORO 499.
+ */
 const isCoroScope = (scope: RaceScope): boolean =>
-  scope.name.toLowerCase().includes('coro') || scope.name.includes('499');
+  !isLedScope(scope) &&
+  (scope.name.toLowerCase().includes('coro') || scope.name.includes('499'));
+
+/* [V4.4-1] Presentación de la modalidad 5K — scope-aware */
+const COLOR_5K = '#a78bfa';
+const STYLE_5K_BADGE: React.CSSProperties = {
+  background: 'rgba(167,139,250,0.07)', borderColor: 'rgba(167,139,250,0.2)', color: COLOR_5K,
+};
+const get5KLabel = (scope: RaceScope): { short: string; long: string } =>
+  isLedScope(scope)
+    ? { short: '🚶 5K', long: '🚶 5K Caminata' }
+    : { short: '🐕 5K', long: '🐕 5K Caninata' };
 
 const applyScopeFilter = (query: any, scope: RaceScope) => {
   if (scope.legacy) return query.is('race_id', null);
@@ -411,7 +443,7 @@ const getComprobantePublicUrl = async (
 /* ────────────────────────────────────────────────────────────── */
 
 type PDFMode            = 'segmented' | 'specific' | 'general';
-type PDFModalidadFilter = 'todos' | '10K' | '4K';
+type PDFModalidadFilter = 'todos' | '10K' | '4K' | '5K'; // [V4.4-4] + '5K'
 
 interface PDFExportModalProps {
   atletas: Runner[];
@@ -447,7 +479,7 @@ const generateCategoryPDF = (
     categoryCounts[c] = (categoryCounts[c] || 0) + 1;
   });
 
-  // ── [V4.2-2] Detección de carrera Coro 499 ──
+  // ── [V4.2-2] Detección de carrera Coro 499 ([V4.4-FIX1] excluye LED) ──
   const isCoro     = isCoroScope(scope);
   const coroLabel  = 'CORO 499';
   const accentR    = isCoro ? 220 : 34;
@@ -629,6 +661,18 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, raceName, scop
   const [modalidadFilter, setMF]  = useState<PDFModalidadFilter>('todos');
   const [isGenerating, setIsGen]  = useState(false);
 
+  // [V4.4-4] LED: 10K + 5K caminata. Resto de carreras: 10K + 4K (V4.3 intacto)
+  const isLed = isLedScope(scope);
+  const modalidadOptions: PDFModalidadFilter[] = isLed
+    ? ['todos', '10K', '5K']
+    : ['todos', '10K', '4K'];
+
+  // [V4.4-FIX2] Conteo real por modalidad
+  const countByModalidad = useCallback((val: PDFModalidadFilter): number => {
+    if (val === 'todos') return atletas.length;
+    return atletas.filter(a => a.modalidad === val).length;
+  }, [atletas]);
+
   const filteredAtletas = useMemo(() => {
     if (modalidadFilter === 'todos') return atletas;
     return atletas.filter(a => a.modalidad === modalidadFilter);
@@ -643,6 +687,7 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, raceName, scop
     const base = 'flex-1 py-2.5 rounded-xl border text-[10px] font-black uppercase transition-all';
     if (modalidadFilter !== val) return `${base} bg-white/[0.02] border-white/5 text-gray-500 hover:border-white/10`;
     if (val === '4K')  return `${base} bg-yellow-500/20 border-yellow-500/40 text-yellow-300`;
+    if (val === '5K')  return `${base} bg-violet-500/20 border-violet-500/40 text-violet-300`; // [V4.4-4]
     if (val === '10K') return `${base} bg-cyan-500/20 border-cyan-500/40 text-cyan-300`;
     return `${base} bg-white/10 border-white/20 text-white`;
   };
@@ -688,13 +733,20 @@ const PDFExportModal: React.FC<PDFExportModalProps> = ({ atletas, raceName, scop
         <div className="mb-5">
           <p className="text-[9px] text-cyan-400 font-black uppercase tracking-widest mb-3">Modalidad</p>
           <div className="flex gap-2">
-            {(['todos', '10K', '4K'] as PDFModalidadFilter[]).map(val => {
-              const labels: Record<PDFModalidadFilter, string> = { todos: 'TODOS', '10K': '🏃 10K', '4K': '🚶 4K' };
-              const subs:   Record<PDFModalidadFilter, string> = { todos: ' atletas', '10K': ' Carrera', '4K': ' Caminata' };
+            {modalidadOptions.map(val => {
+              // [V4.4-4] labels/subs con 5K scope-aware
+              const labels: Record<PDFModalidadFilter, string> = {
+                todos: 'TODOS', '10K': '🏃 10K', '4K': '🚶 4K', '5K': get5KLabel(scope).short,
+              };
+              const subs: Record<PDFModalidadFilter, string> = {
+                todos: ' atletas', '10K': ' Carrera', '4K': ' Caminata',
+                '5K': isLed ? ' Caminata' : ' Caninata',
+              };
               return (
                 <button key={val} onClick={() => setMF(val)} className={getModalidadBtnClass(val)}>
                   {labels[val]}
-                  <span className="text-[8px] opacity-60 block">{filteredAtletas.length}{subs[val]}</span>
+                  {/* [V4.4-FIX2] antes: filteredAtletas.length en todos los botones */}
+                  <span className="text-[8px] opacity-60 block">{countByModalidad(val)}{subs[val]}</span>
                 </button>
               );
             })}
@@ -979,6 +1031,9 @@ const ModuloChequeoKits = ({ scope }: { scope: RaceScope }) => {
 /*   fila propia (INSERT) copiando la global como base, y todos   */
 /*   los UPDATE quedan vinculados a esa fila (configRowId propio).*/
 /*   La global (id=1) solo se toca en modo legacy.                */
+/*                                                                */
+/* [V4.4-2] costo_5k_usd: solo se siembra, muestra y persiste en  */
+/*   scope LED. El resto de carreras envía el mismo payload V4.3. */
 /* ────────────────────────────────────────────────────────────── */
 
 const TasaConfig = ({ scope }: { scope: RaceScope }) => {
@@ -988,6 +1043,8 @@ const TasaConfig = ({ scope }: { scope: RaceScope }) => {
   const [nuevoCostoUSD, setNuevoCostoUSD]   = useState('');
   const [costo4kActual, setCosto4kActual]   = useState<number | null>(null);
   const [nuevoCosto4k, setNuevoCosto4k]     = useState('');
+  const [costo5kActual, setCosto5kActual]   = useState<number | null>(null); // [V4.4-2]
+  const [nuevoCosto5k, setNuevoCosto5k]     = useState('20');                // [V4.4-2]
   const [ultimaAct, setUltimaAct]           = useState<string | null>(null);
   const [isLoading, setIsLoading]           = useState(true);
   const [isSaving, setIsSaving]             = useState(false);
@@ -995,6 +1052,9 @@ const TasaConfig = ({ scope }: { scope: RaceScope }) => {
   const [configRowId, setConfigRowId]       = useState<number | null>(null);
   /* [V4.3] true = fila propia de la carrera; false = global (legacy) */
   const [isRaceScoped, setIsRaceScoped]     = useState(false);
+
+  /* [V4.4-2] LED Coro → 10K + 5K caminata (sin 4K) */
+  const isLed = isLedScope(scope);
 
   /**
    * [V4.3] Carga config con estrategia scope-aware:
@@ -1035,6 +1095,8 @@ const TasaConfig = ({ scope }: { scope: RaceScope }) => {
             tasa_bcv:             globalCfg?.tasa_bcv     ?? 0,
             costo_usd:            globalCfg?.costo_usd    ?? 40,
             costo_4k_usd:         globalCfg?.costo_4k_usd ?? 20,
+            // [V4.4-2] 5K solo se siembra explícitamente en LED
+            ...(isLed ? { costo_5k_usd: globalCfg?.costo_5k_usd ?? 20 } : {}),
             ultima_actualizacion: new Date().toISOString(),
           };
           const { data: inserted, error: insErr } = await supabase
@@ -1074,11 +1136,14 @@ const TasaConfig = ({ scope }: { scope: RaceScope }) => {
         setNuevoCostoUSD(String(data.costo_usd || 40));
         setCosto4kActual(data.costo_4k_usd || 20);
         setNuevoCosto4k(String(data.costo_4k_usd || 20));
+        // [V4.4-2] null si la columna aún no existe (migración pendiente)
+        setCosto5kActual(data.costo_5k_usd ?? null);
+        setNuevoCosto5k(data.costo_5k_usd != null ? String(data.costo_5k_usd) : '20');
         setUltimaAct(new Date(data.ultima_actualizacion).toLocaleString('es-VE'));
       }
     } catch (err) { console.error('[MIA-TASA]', err); }
     finally { setIsLoading(false); }
-  }, [scope.raceId, scope.legacy]);
+  }, [scope.raceId, scope.legacy, isLed]); // [V4.4-2] isLed en deps
 
   useEffect(() => { fetchConfig(); }, [fetchConfig]);
 
@@ -1087,6 +1152,7 @@ const TasaConfig = ({ scope }: { scope: RaceScope }) => {
    * como fila propia de la carrera (salvo legacy). Se agrega guardia
    * defensiva: si scope no es legacy pero la fila sigue siendo la
    * global (id=1), se aborta para no contaminar la tasa compartida.
+   * [V4.4-2] En LED se persiste también costo_5k_usd (validado > 0).
    */
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1101,10 +1167,20 @@ const TasaConfig = ({ scope }: { scope: RaceScope }) => {
         );
       }
 
+      // [V4.4-2] Validación del costo 5K antes de escribir
+      let costo5kParsed: number | null = null;
+      if (isLed) {
+        costo5kParsed = parseFloat(nuevoCosto5k.replace(',', '.'));
+        if (!Number.isFinite(costo5kParsed) || costo5kParsed <= 0) {
+          throw new Error('Costo 5K Caminata inválido. Debe ser un número mayor a 0.');
+        }
+      }
+
       const payload = {
         tasa_bcv:              parseFloat(nuevaTasa.replace(',', '.')),
         costo_usd:             parseFloat(nuevoCostoUSD.replace(',', '.')),
         costo_4k_usd:          parseFloat(nuevoCosto4k.replace(',', '.')),
+        ...(isLed ? { costo_5k_usd: costo5kParsed } : {}), // [V4.4-2]
         ultima_actualizacion:  new Date().toISOString(),
       };
 
@@ -1153,11 +1229,22 @@ const TasaConfig = ({ scope }: { scope: RaceScope }) => {
               <input type="text" value={nuevoCostoUSD} onChange={e => setNuevoCostoUSD(e.target.value)}
                 className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-cyan-500/50" />
             </div>
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest mb-2 block items-center gap-1.5" style={{ color: '#fbbf24' }}>🚶 Inscripción 4K Caminata USD</label>
-              <input type="text" value={nuevoCosto4k} onChange={e => setNuevoCosto4k(e.target.value)}
-                className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-yellow-500/50" />
-            </div>
+            {/* [V4.4-2] 4K oculto en LED (esa carrera no tiene 4K) */}
+            {!isLed && (
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest mb-2 block items-center gap-1.5" style={{ color: '#fbbf24' }}>🚶 Inscripción 4K Caminata USD</label>
+                <input type="text" value={nuevoCosto4k} onChange={e => setNuevoCosto4k(e.target.value)}
+                  className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-yellow-500/50" />
+              </div>
+            )}
+            {/* [V4.4-2] 5K Caminata — solo LED */}
+            {isLed && (
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest mb-2 block items-center gap-1.5" style={{ color: COLOR_5K }}>🚶 Inscripción 5K Caminata USD</label>
+                <input type="text" value={nuevoCosto5k} onChange={e => setNuevoCosto5k(e.target.value)}
+                  className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-5 py-4 text-white outline-none focus:border-violet-500/50" />
+              </div>
+            )}
           </div>
           <button type="submit" disabled={isSaving || isLoading}
             className="w-full flex items-center justify-center gap-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black px-6 py-4 text-xs font-black uppercase tracking-[0.2em] transition-all">
@@ -1179,7 +1266,13 @@ const TasaConfig = ({ scope }: { scope: RaceScope }) => {
               <div className="h-12 w-[1px] bg-white/10" />
               <div className="flex flex-col gap-2">
                 <div><p className="text-[8px] uppercase" style={{ color: 'rgba(0,212,200,0.6)' }}>🏃 10K</p><div className="text-2xl font-black italic" style={{ color: '#00d4c8' }}>${costoUSDActual}</div></div>
-                <div><p className="text-[8px] uppercase" style={{ color: 'rgba(251,191,36,0.6)' }}>🚶 4K</p><div className="text-2xl font-black italic" style={{ color: '#fbbf24' }}>${costo4kActual}</div></div>
+                {!isLed && (
+                  <div><p className="text-[8px] uppercase" style={{ color: 'rgba(251,191,36,0.6)' }}>🚶 4K</p><div className="text-2xl font-black italic" style={{ color: '#fbbf24' }}>${costo4kActual}</div></div>
+                )}
+                {/* [V4.4-2] 5K Caminata — solo LED */}
+                {isLed && (
+                  <div><p className="text-[8px] uppercase" style={{ color: 'rgba(167,139,250,0.6)' }}>🚶 5K</p><div className="text-2xl font-black italic" style={{ color: COLOR_5K }}>{costo5kActual != null ? `$${costo5kActual}` : '— (migración pendiente)'}</div></div>
+                )}
               </div>
             </div>
             <div className="text-[10px] text-cyan-400 font-mono text-center">{ultimaAct}</div>
@@ -1191,10 +1284,10 @@ const TasaConfig = ({ scope }: { scope: RaceScope }) => {
 };
 
 /* ────────────────────────────────────────────────────────────── */
-/* ATLETAS LIST — V4.2                                            */
+/* ATLETAS LIST — V4.2 (+ [V4.4-3] 5K)                            */
 /* ────────────────────────────────────────────────────────────── */
 
-type ModalidadTab = 'todos' | '10K' | '4K';
+type ModalidadTab = 'todos' | '10K' | '4K' | '5K'; // [V4.4-3] + '5K'
 
 const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount?: (n: number) => void }) => {
   const [atletas, setAtletas]               = useState<Runner[]>([]);
@@ -1212,6 +1305,8 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
   const [isTogglingKit, setIsTogglingKit]   = useState<string | null>(null);
   const [showPDFModal, setShowPDFModal]     = useState(false);
 
+  const isLed = isLedScope(scope); // [V4.4-3]
+
   const fetchAtletas = useCallback(async () => {
     setLoading(true);
     try {
@@ -1226,6 +1321,9 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
 
   useEffect(() => { fetchAtletas(); }, [fetchAtletas]);
   useEffect(() => { if (onUpdateCount) onUpdateCount(atletas.length); }, [atletas.length, onUpdateCount]);
+  // [V4.4-3] Al cambiar de carrera, la pestaña vuelve a TODOS
+  //          (evita quedar en '5K' dentro de una carrera sin 5K caminata).
+  useEffect(() => { setModalidadTab('todos'); }, [scope.raceId, scope.legacy]);
 
   const togglePago = async (id: string, current?: boolean) => {
     setIsTogglingPayment(id);
@@ -1319,6 +1417,7 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
 
   const count10k          = atletas.filter(a => a.modalidad === '10K').length;
   const count4k           = atletas.filter(a => a.modalidad === '4K').length;
+  const count5k           = atletas.filter(a => a.modalidad === '5K').length; // [V4.4-3]
   const countSinModalidad = atletas.filter(a => !a.modalidad).length;
   const countMismatch     = atletas.filter(a => validateGenderCategoryConsistency(a) !== null).length;
 
@@ -1326,6 +1425,7 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
     let list = atletas;
     if (modalidadTab === '10K') list = list.filter(a => a.modalidad === '10K');
     else if (modalidadTab === '4K') list = list.filter(a => a.modalidad === '4K');
+    else if (modalidadTab === '5K') list = list.filter(a => a.modalidad === '5K'); // [V4.4-3]
     if (searchTerm) list = list.filter(a =>
       `${a.nombre} ${a.apellido} ${a.cedula} ${a.categoria || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -1334,6 +1434,15 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
 
   const kitsEntregados = atletas.filter(a => a.kit_entregado).length;
 
+  // [V4.4-3] Pestañas: LED → 10K + 5K CAMINATA. Resto → 10K + 4K (V4.3 intacto)
+  const modalidadTabs: [ModalidadTab, string, string][] = [
+    ['todos', `TODOS (${atletas.length})`, '#94a3b8'],
+    ['10K',   `🏃 10K CARRERA (${count10k})`, '#00d4c8'],
+    isLed
+      ? ['5K', `🚶 5K CAMINATA (${count5k})`, COLOR_5K]
+      : ['4K', `🚶 4K CAMINATA (${count4k})`, '#fbbf24'],
+  ];
+
   return (
     <div className="relative text-white">
       <div className="bg-black/40 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
@@ -1341,11 +1450,7 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
         {/* Tabs de modalidad */}
         <div className="px-6 pt-6 pb-0 border-b border-white/5">
           <div className="flex flex-wrap gap-1 mb-0">
-            {([
-              ['todos', `TODOS (${atletas.length})`, '#94a3b8'],
-              ['10K',   `🏃 10K CARRERA (${count10k})`, '#00d4c8'],
-              ['4K',    `🚶 4K CAMINATA (${count4k})`,  '#fbbf24'],
-            ] as [ModalidadTab, string, string][]).map(([val, lbl, color]) => (
+            {modalidadTabs.map(([val, lbl, color]) => (
               <button key={val} onClick={() => setModalidadTab(val)}
                 className={`px-5 py-3 rounded-t-xl font-black uppercase text-[10px] tracking-widest transition-all border-b-2 ${modalidadTab === val ? 'bg-white/[0.04] border-current' : 'bg-transparent border-transparent text-gray-500 hover:text-gray-300'}`}
                 style={{ color: modalidadTab === val ? color : '', borderColor: modalidadTab === val ? color : 'transparent' }}>
@@ -1434,6 +1539,11 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
                     {a.modalidad === '4K' && (
                       <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full border"
                         style={{ background: 'rgba(251,191,36,0.07)', borderColor: 'rgba(251,191,36,0.2)', color: '#fbbf24' }}>🚶 4K</span>
+                    )}
+                    {/* [V4.4-3] Badge 5K scope-aware */}
+                    {a.modalidad === '5K' && (
+                      <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full border"
+                        style={STYLE_5K_BADGE}>{get5KLabel(scope).short}</span>
                     )}
                     {!a.modalidad && (
                       <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full border"
@@ -1559,10 +1669,12 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
                 )}
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5">
                   <p className="text-gray-500 text-[9px] uppercase">Modalidad</p>
+                  {/* [V4.4-3] + 5K */}
                   <p className="font-black uppercase text-sm"
-                    style={{ color: selectedAtleta.modalidad === '10K' ? '#00d4c8' : selectedAtleta.modalidad === '4K' ? '#fbbf24' : 'rgba(255,255,255,0.25)' }}>
+                    style={{ color: selectedAtleta.modalidad === '10K' ? '#00d4c8' : selectedAtleta.modalidad === '4K' ? '#fbbf24' : selectedAtleta.modalidad === '5K' ? COLOR_5K : 'rgba(255,255,255,0.25)' }}>
                     {selectedAtleta.modalidad === '10K' ? '🏃 10K Carrera'
                       : selectedAtleta.modalidad === '4K' ? '🚶 4K Caminata'
+                      : selectedAtleta.modalidad === '5K' ? get5KLabel(scope).long
                       : '— Sin modalidad'}
                   </p>
                 </div>
@@ -1728,12 +1840,20 @@ const ModuloRepresentantes = ({ scope }: { scope: RaceScope }) => {
                     <td className="p-4">
                       <p className="font-black text-white text-sm">{r.bib_number ? `#${r.bib_number}` : '—'}</p>
                       {r.modalidad ? (
-                        <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full border mt-1 inline-block"
-                          style={r.modalidad === '10K'
-                            ? { background: 'rgba(0,212,200,0.07)', borderColor: 'rgba(0,212,200,0.2)', color: '#00d4c8' }
-                            : { background: 'rgba(251,191,36,0.07)', borderColor: 'rgba(251,191,36,0.2)', color: '#fbbf24' }}>
-                          {r.modalidad === '10K' ? '🏃 10K' : '🚶 4K'}
-                        </span>
+                        r.modalidad === '5K' ? (
+                          /* [V4.4-5] 5K ya no se pinta como 4K */
+                          <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full border mt-1 inline-block"
+                            style={STYLE_5K_BADGE}>
+                            {get5KLabel(scope).short}
+                          </span>
+                        ) : (
+                          <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full border mt-1 inline-block"
+                            style={r.modalidad === '10K'
+                              ? { background: 'rgba(0,212,200,0.07)', borderColor: 'rgba(0,212,200,0.2)', color: '#00d4c8' }
+                              : { background: 'rgba(251,191,36,0.07)', borderColor: 'rgba(251,191,36,0.2)', color: '#fbbf24' }}>
+                            {r.modalidad === '10K' ? '🏃 10K' : '🚶 4K'}
+                          </span>
+                        )
                       ) : (
                         <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full border mt-1 inline-block"
                           style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.25)' }}>—</span>
@@ -1810,12 +1930,20 @@ const ModuloRepresentantes = ({ scope }: { scope: RaceScope }) => {
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5">
                   <p className="text-gray-400 text-[9px] uppercase mb-1">Modalidad</p>
                   {selected.modalidad ? (
-                    <span className="font-black uppercase text-sm px-3 py-1 rounded-full"
-                      style={selected.modalidad === '10K'
-                        ? { background: 'rgba(0,212,200,0.08)', border: '1px solid rgba(0,212,200,0.2)', color: '#00d4c8' }
-                        : { background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }}>
-                      {selected.modalidad === '10K' ? '🏃 10K Carrera' : '🚶 4K Caminata'}
-                    </span>
+                    selected.modalidad === '5K' ? (
+                      /* [V4.4-5] 5K scope-aware */
+                      <span className="font-black uppercase text-sm px-3 py-1 rounded-full"
+                        style={{ background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)', color: COLOR_5K }}>
+                        {get5KLabel(scope).long}
+                      </span>
+                    ) : (
+                      <span className="font-black uppercase text-sm px-3 py-1 rounded-full"
+                        style={selected.modalidad === '10K'
+                          ? { background: 'rgba(0,212,200,0.08)', border: '1px solid rgba(0,212,200,0.2)', color: '#00d4c8' }
+                          : { background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#fbbf24' }}>
+                        {selected.modalidad === '10K' ? '🏃 10K Carrera' : '🚶 4K Caminata'}
+                      </span>
+                    )
                   ) : (
                     <span className="font-black uppercase text-sm px-3 py-1 rounded-full"
                       style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.25)' }}>

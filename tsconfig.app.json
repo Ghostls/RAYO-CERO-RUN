@@ -13,9 +13,12 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "baseUrl": ".",
-    /* SOLUCIÓN FINAL: Silenciador actualizado a versión 6.0 */
-    "ignoreDeprecations": "6.0",
+    /* [FIX] Eliminados "baseUrl" e "ignoreDeprecations".
+       - "baseUrl" está deprecado en TS 6; "paths" se resuelve relativo
+         a este tsconfig desde TS 4.1, así que no hace falta.
+       - Sin baseUrl no hay nada que silenciar → sin ignoreDeprecations.
+       Funciona igual en TS 5.8.3 (actual) y en TS 6.x.
+       Vite resuelve "@" desde vite.config.ts, no desde aquí. */
     "paths": {
       "@/*": ["./src/*"]
     },
