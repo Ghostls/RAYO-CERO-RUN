@@ -1,10 +1,20 @@
 /**
- * RAYO CERO — RACE CALENDAR (EVOLUTION V10.11 — STATUS/FLAG PRIORITY FIX)
+ * RAYOCERO — RACE CALENDAR (EVOLUTION V10.12 — LED RUN RENAME-SAFE)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V10.11 (evoluciona sobre V10.10):
+ * CHANGELOG V10.12 (evoluciona sobre V10.11):
+ * [V10.12-1] isLedRunRace: además de "led", reconoce "we run" + "coro".
+ *            La carrera se renombra en Supabase a "WE RUN RAYOCERO 10K - 5K CORO"
+ *            (sin "LED"). Sin este fix caía en isCoroRace → imagen del flyer 499,
+ *            acento cyan y botón genérico.
+ * [V10.12-2] isCoroRace: exclusión vía isLedRunRace() en vez de includes("led").
+ * [V10.12-3] getRaceImage: rama LED usa isLedRunRace() → mantiene ledRunHero.
+ * [V10.12-4] getRegionTag: rama LED usa isLedRunRace() (consistencia).
+ * [V10.12-5] Header: marca corregida a "RAYOCERO" (una palabra).
+ *
+ * CHANGELOG V10.11 (base intacta):
  * [V10.11-1] getStatusConfig: "próximamente" en status ya no bloquea cuando
  *            inscripcionesAbiertas=true. El flag de Supabase es la fuente de
  *            verdad — inscripciones abiertas tienen prioridad sobre status text.
@@ -44,14 +54,23 @@ const DEFAULT_IMAGE = flyerCaninataBanner;
 const isCaninataRace = (name: string = ""): boolean =>
   name.toLowerCase().includes("caninata");
 
-const isLedRunRace = (name: string = ""): boolean =>
-  name.toLowerCase().includes("led");
+/**
+ * [V10.12-1] Detecta la carrera nocturna WE RUN de Coro.
+ * - Nombre legado: "WE RUN RAYOCERO LED CORO 10K" → match por "led".
+ * - Nombre actual: "WE RUN RAYOCERO 10K - 5K CORO" → match por "we run" + "coro".
+ * El requisito "coro" evita capturar carreras WE RUN de Lara (histórico).
+ */
+const isLedRunRace = (name: string = ""): boolean => {
+  const n = name.toLowerCase();
+  return n.includes("led") || (n.includes("we run") && n.includes("coro"));
+};
 
+/** [V10.12-2] Coro "clásica" (499) — excluye la WE RUN nocturna vía isLedRunRace. */
 const isCoroRace = (name: string = ""): boolean => {
   const n = name.toLowerCase();
   return (
     (n.includes("coro") || n.includes("499") || n.includes("falcón") || n.includes("falcon"))
-    && !n.includes("led")
+    && !isLedRunRace(name)
   );
 };
 
@@ -61,7 +80,7 @@ const isCoroRace = (name: string = ""): boolean => {
 const getRaceImage = (name: string = "", fallbackUrl?: string): string => {
   const n = name.toLowerCase();
   if (n.includes("caninata"))                                                           return flyerCaninataBanner || fallbackUrl || DEFAULT_IMAGE;
-  if (n.includes("led"))                                                                return ledRunHero;
+  if (isLedRunRace(name))                                                               return ledRunHero; // [V10.12-3]
   if (n.includes("499") || n.includes("agosto"))                                       return portada499Agosto;
   if (n.includes("coro") || n.includes("falcón") || n.includes("falcon") || n.includes("octubre"))
                                                                                         return flyerOctubreInscripciones;
@@ -78,7 +97,7 @@ const getRegionTag = (
   const l = location.toLowerCase();
   const n = name.toLowerCase();
   if (n.includes("caninata"))                                        return { label: "CANINATA 10K", color: "#FDD454", icon: "dog" };
-  if (n.includes("led"))                                             return { label: "FALCÓN",       color: "#FCD34D" };
+  if (isLedRunRace(name))                                            return { label: "FALCÓN",       color: "#FCD34D" }; // [V10.12-4]
   if (l.includes("barquisimeto") || l.includes("lara"))             return { label: "LARA",         color: "#00f2ff" };
   if (l.includes("coro") || l.includes("falcón") || l.includes("falcon")) return { label: "FALCÓN", color: "#FCD34D" };
   return null;
@@ -371,7 +390,7 @@ const RacesSection = () => {
         <div className="absolute inset-0 z-0">
           <img
             src={ledRunHero}
-            alt="WE RUN RAYOCERO LED CORO 10K"
+            alt="WE RUN RAYOCERO 10K - 5K CORO"
             fetchPriority="high"
             loading="eager"
             decoding="async"
