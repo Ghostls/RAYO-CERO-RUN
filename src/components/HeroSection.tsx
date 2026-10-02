@@ -33,7 +33,7 @@ const BG_DEEP     = "#020608";
 const HERO_SLIDES = [
   {
     src        : ledRunHero,
-    alt        : "WE RUN LED 10K — Carrera Nocturna Coro Falcón",
+    alt        : "WE RUN LED 10K 5k — Carrera Nocturna Coro Falcón",
     fecha      : "31.10.26",
     fechaColor : `linear-gradient(105deg,
       #ffffff        0%,
@@ -46,7 +46,7 @@ const HERO_SLIDES = [
   {
     src        : caminataHero,
     alt        : "Caminata Recreativa — Rayocero Coro Falcón",
-    fecha      : "18.10.26",
+    fecha      : "31.10.26",
     fechaColor : `linear-gradient(105deg,
       ${LED_GREEN}  0%,
       #a8ff78       40%,
@@ -187,7 +187,7 @@ const SliderDots = ({ activeIndex, setActiveIndex, className = "", style }: Slid
 
 // ─── MARQUEE ─────────────────────────────────────────────────────────────────
 const MARQUEE_ITEMS = [
-  "WE RUN LED", "10K", "CORO · FALCÓN",
+  "WE RUN LED", "5K","10K", "CORO · FALCÓN",
   "CARRERA NOCTURNA", "31 DE OCTUBRE",
   "RAYOCERO", "INSCRIPCIONES ABIERTAS",
 ];

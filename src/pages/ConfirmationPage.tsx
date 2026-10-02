@@ -72,7 +72,7 @@ export default function ConfirmationPage() {
         perro   && { icon: <span style={{fontSize:13}}>🐾</span>,  label: "Mascota",   value: perro  },
         raza    && { icon: <Tag  size={14}/>, label: "Raza",       value: raza   },
         ref     && { icon: <Hash size={14}/>, label: "Referencia", value: ref    },
-        { icon: <Calendar size={14}/>, label: "Fecha",  value: "4 OCT 2026 · 07:00 AM" },
+        { icon: <Calendar size={14}/>, label: "Fecha",  value: "18 OCT 2026 · 07:00 AM" },
         { icon: <MapPin   size={14}/>, label: "Lugar",  value: "Lidotel Barquisimeto"   },
       ].filter(Boolean)
     : [
