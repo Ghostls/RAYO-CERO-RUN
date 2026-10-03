@@ -1,9 +1,20 @@
 /**
- * RAYO CERO — CORE ROUTER V7.9 (CANINATA CLIENT DASHBOARD)
+ * RAYO CERO — CORE ROUTER V8.0 (DORSAL LED SWITCH)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  *
- * CHANGELOG V7.9 (evoluciona sobre V7.8):
+ * CHANGELOG V8.0 (evoluciona sobre V7.9):
+ * [V8.0-1] Import DorsalLed — lazy load desde pages/DorsalLed (chunk propio:
+ *          fuentes, canvas y animaciones LED no pesan en el resto de la app).
+ * [V8.0-2] DorsalSwitch: /dorsal decide en runtime qué página montar.
+ *          tipo=led, o evento con "LED" / "WE RUN RAYOCERO" → DorsalLed.
+ *          tipo=caninata y cualquier otro caso → DorsalPage original, intacta.
+ *          La regex se replica aquí (sincronizada con isLedEvento de
+ *          DorsalLed.tsx) para no romper el code-splitting con un import
+ *          estático del módulo LED.
+ * [V8.0-3] useSearchParams agregado al import de react-router-dom.
+ *
+ * CHANGELOG V7.9 (base intacta):
  * [V7.9-1] Import CaninataDashboard — lazy load desde pages/CaninataDashboard.
  * [V7.9-2] Ruta /caninata → CaninataDashboard (PIN-based, sin Supabase Auth).
  * [V7.9-3] /caninata añadido a isAdminRoute — sin Navbar ni Footer.
@@ -15,7 +26,10 @@
  */
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate, useLocation, useParams } from "react-router-dom";
+import {
+  BrowserRouter, Route, Routes, Navigate, useLocation, useParams,
+  useSearchParams, // [V8.0-3]
+} from "react-router-dom";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { supabase } from "./lib/supabase";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -62,6 +76,9 @@ const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 // ✅ [V7.7-1] DorsalPage — maneja AMBOS flujos: carrera y caninata
 const DorsalPage = lazy(() => import("./pages/DorsalPage"));
 
+// ✅ [V8.0-1] DorsalLed — dorsal WE RUN RAYOCERO LED (estilo Tron Legacy)
+const DorsalLed = lazy(() => import("./pages/DorsalLed"));
+
 // ✅ [V7.9-1] CaninataDashboard — acceso PIN para cliente dueño de la caninata
 const CaninataDashboard = lazy(() => import("./pages/CaninataDashboard"));
 
@@ -82,6 +99,24 @@ const queryClient = new QueryClient();
 const TrackerPage = () => {
   const { bib } = useParams<{ bib: string }>();
   return <RaceTracker bibNumber={parseInt(bib ?? "0")} />;
+};
+
+// ── [V8.0-2] Selector de página de dorsal ────────────────────────────────────
+/** Mantener sincronizado con isLedEvento() de pages/DorsalLed.tsx */
+const isLedEventoName = (evento: string = ""): boolean =>
+  /\bled\b/i.test(evento) || /we\s*run\s*rayocero/i.test(evento);
+
+const DorsalSwitch = () => {
+  const [searchParams] = useSearchParams();
+  const tipo   = searchParams.get("tipo");
+  const evento = searchParams.get("evento") ?? "";
+  const isLed  = tipo === "led" || (tipo !== "caninata" && isLedEventoName(evento));
+
+  return (
+    <Suspense fallback={<PageLoader />}>
+      {isLed ? <DorsalLed /> : <DorsalPage />}
+    </Suspense>
+  );
 };
 
 // ── Lógica de visibilidad de UI Global ──────────────────────────────────────
@@ -112,8 +147,8 @@ const AppContent = ({ session, loading }: { session: any; loading: boolean }) =>
           <Route path="/registro"    element={wrap(RegistrationForm)} />
           <Route path="/resultados"  element={wrap(ResultsSection)} />
 
-          {/* ── DORSAL — PNG Canvas 2D, maneja carrera y caninata ── */}
-          <Route path="/dorsal" element={wrap(DorsalPage)} />
+          {/* ── DORSAL — [V8.0-2] LED → DorsalLed | carrera/caninata → DorsalPage ── */}
+          <Route path="/dorsal" element={<DorsalSwitch />} />
 
           {/* ── [V7.9-2] DASHBOARD CLIENTE CANINATA — PIN-based ── */}
           <Route path="/caninata" element={wrap(CaninataDashboard)} />

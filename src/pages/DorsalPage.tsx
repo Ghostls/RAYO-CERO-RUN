@@ -31,7 +31,7 @@ import {
   Download, Home, Share2, Check, Loader2, Dog, User,
 } from "lucide-react";
 
-import dorsalCoroSrc     from "../assets/dorsal-coro.png";
+import dorsalCoroSrc     from "../assets/dorsal-led.png";
 import dorsalCaninataSrc from "../assets/dorsal-caninata.png";
 import dorsalLedSrc      from "../assets/dorsal-led.png";
 
@@ -61,7 +61,7 @@ interface DorsalRenderConfig {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CORO_CONFIG — calibrada sobre dorsal-coro.png (NO MODIFICAR)
+// CORO_CONFIG — calibrada sobre dorsal-led.png (NO MODIFICAR)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const CORO_CONFIG: DorsalRenderConfig = {

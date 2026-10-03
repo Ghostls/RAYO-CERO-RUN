@@ -1,25 +1,52 @@
 /**
- * RAYOCERO — REGISTRATION TERMINAL (STABLE BUILD V37.4 — LED CORO 5K CAMINATA)
+ * RAYOCERO — REGISTRATION TERMINAL (STABLE BUILD V37.7 — PREFETCH DORSAL LED)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Architecture: React / TypeScript / Supabase / React Query / Framer Motion
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V37.4 (evoluciona sobre V37.3):
- * [V37.4-1] LED_CORO_CONFIG: modalidadesDisponibles ["10K", "5K"] — se agrega
- *           5K CAMINATA RECREATIVA ($20). distancia "10K / 5K".
- *           Caninata y 499 Coro NO se modifican.
- * [V37.4-2] isCaminata5K: "5K" en una carrera tipo "carrera" = caminata
- *           recreativa. En tipo "caninata" el 5K sigue siendo caninata.
- * [V37.4-3] getModalidadMeta(m, tipo): 5K → "5K CAMINATA" (Footprints) cuando
- *           tipo === "carrera". Caninata conserva "5K CANINATA" (Dog).
- * [V37.4-4] usePrecioEvento(raceId, modalidad, usaCosto5k): solo la 5K
- *           caminata lee system_config.costo_5k_usd. La columna se pide en el
- *           SELECT únicamente cuando usaCosto5k=true → las demás carreras
- *           ejecutan exactamente la misma query que en V37.3.
- *           Caninata 5K sigue leyendo costo_4k_usd (sin cambios).
+ * CHANGELOG V37.7 (evoluciona sobre V37.6):
+ * [V37.7-1] Prefetch de pages/DorsalLed mientras el usuario llena el
+ *           formulario de una carrera LED: descarga el chunk y, al evaluarse,
+ *           el módulo precarga el arte del dorsal y las fuentes. Al enviar,
+ *           /dorsal abre sin esperas de red. Otras carreras: sin cambios.
+ *
+ * CHANGELOG V37.6 (base preservada):
+ * [V37.6-1] BUG FIX: isLedRunRace() no detectaba la carrera real
+ *           "WE RUN RAYOCERO 10K - 5K CORO" (el nombre en BD no contiene
+ *           "LED") → se cargaba CORO_CONFIG (499: 10K/4K, cian, costo 4K).
+ *           Ahora detecta "LED" como palabra completa O "WE RUN RAYOCERO".
+ *           Regex alineada 1:1 con isLedEvento() de DorsalLed.tsx.
+ * [V37.6-2] "led" pasa a coincidencia por palabra (\bled\b): evita falsos
+ *           positivos por subcadena en nombres que contengan "led".
+ * [V37.6-3] Efecto en cascada (sin tocar más código): config LED_CORO_CONFIG
+ *           (10K / 5K caminata), color #FCD34D, badge del selector, costo
+ *           costo_5k_usd y navegación /dorsal?...&tipo=led&modalidad=...
+ *           → DorsalRouter renderiza DorsalLed.
+ *
+ * CHANGELOG V37.5 (base preservada):
+ * [V37.5-1] mapRegistrationError(): traduce errores Postgres/PostgREST a
+ *           mensajes accionables, identificando el índice violado por nombre:
+ *           uniq_cedula_por_carrera / runners_cedula_per_race,
+ *           uniq_email_por_carrera / runners_email_per_race,
+ *           uniq_bib_por_carrera, runners_rfid_epc_key, FK race_id, CHECKs.
+ *           Log completo a consola (code, details, hint) para diagnóstico.
+ * [V37.5-2] Normalización de entrada antes del INSERT: cédula sin espacios,
+ *           email trim + lowercase (los índices únicos son case-sensitive).
+ * [V37.5-3] Pre-check de cédula duplicada en la misma carrera ANTES de subir
+ *           el comprobante → evita el 409 y archivos huérfanos en storage.
+ *           Si RLS bloquea el SELECT, se omite el pre-check (fail-open) y el
+ *           índice único de BD sigue siendo la garantía final.
+ * [V37.5-4] Navegación a /dorsal para LED Coro: agrega &tipo=led&modalidad=
+ *           para que la página Dorsal seleccione dorsal-led.png.
+ *           499 Coro conserva exactamente la URL de V37.4.
+ *
+ * CHANGELOG V37.4 (base preservada):
+ * [V37.4-1] LED_CORO_CONFIG: modalidadesDisponibles ["10K", "5K"] — 5K CAMINATA.
+ * [V37.4-2] isCaminata5K: "5K" en carrera tipo "carrera" = caminata recreativa.
+ * [V37.4-3] getModalidadMeta(m, tipo): 5K → "5K CAMINATA" (Footprints).
+ * [V37.4-4] usePrecioEvento(raceId, modalidad, usaCosto5k): costo_5k_usd.
  * [V37.4-5] categoria: 5K caminata → "Caminata Recreativa 5K".
- *           Caninata conserva "Caminata Canina / Familiar".
  * [V37.4-6] Preview de categoría visible también para 5K caminata.
  * [V37.4-7] Badge del selector de eventos LED: "10K CARRERA / 5K CAMINATA".
  * [V37.4-8] Botón submit: label + ícono Footprints para 5K caminata.
@@ -51,7 +78,7 @@ import imageCompression from "browser-image-compression";
 import { registerRunner, calcularEdad, type RegistrationFormData } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
-import dorsalCoroSrc from "../assets/dorsal-coro.png";
+import dorsalCoroSrc from "../assets/dorsal-led.png";
 
 let dorsalCaninataSrc: string = dorsalCoroSrc;
 try { dorsalCaninataSrc = require("../assets/dorsal-caninata.png").default; } catch (_) {}
@@ -113,6 +140,86 @@ function validateGenderCategory(genero: "M" | "F", categoria: string): string | 
     return `Conflicto Género/Categoría: seleccionaste Femenino pero la categoría calculada es "${categoria}". Verifica tu género y fecha de nacimiento.`;
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// [V37.5-1] MAPEO DE ERRORES POSTGRES / POSTGREST
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Traduce un error de Supabase (PostgrestError o Error envuelto) a un
+ *        mensaje accionable para el usuario.
+ * @details Postgres incluye el nombre del índice violado en `message`
+ *          ("duplicate key value violates unique constraint \"<indice>\"")
+ *          y la clave en `details` ("Key (email, race_id)=(...) already exists.").
+ *          Se evalúa por nombre de índice primero y por columna como respaldo.
+ * @param err Error lanzado por registerRunner / supabase-js.
+ * @return Mensaje en español listo para formError.
+ */
+function mapRegistrationError(err: any): string {
+  const code: string    = String(err?.code ?? "");
+  const message: string = String(err?.message ?? "");
+  const details: string = String(err?.details ?? "");
+  const blob = `${message} ${details}`.toLowerCase();
+
+  // Log completo para diagnóstico en campo (DevTools)
+  console.error("[RAYOCERO][REGISTRO] Error de inscripción:", {
+    code, message, details, hint: err?.hint, raw: err,
+  });
+
+  // 23505 — unique_violation
+  if (code === "23505" || blob.includes("duplicate key")) {
+    if (
+      blob.includes("uniq_cedula_por_carrera") ||
+      blob.includes("runners_cedula_per_race") ||
+      blob.includes("uniq_cedula_legacy") ||
+      blob.includes("(cedula")
+    ) {
+      return "Esta cédula ya está inscrita en este evento. Si necesitas tu dorsal o corregir datos, contacta a la organización.";
+    }
+    if (
+      blob.includes("uniq_email_por_carrera") ||
+      blob.includes("runners_email_per_race") ||
+      blob.includes("uniq_email_legacy") ||
+      blob.includes("(email")
+    ) {
+      return "Este correo electrónico ya fue usado en otra inscripción de este evento. Usa un correo distinto para este participante.";
+    }
+    if (
+      blob.includes("uniq_bib_por_carrera") ||
+      blob.includes("uniq_bib_legacy") ||
+      blob.includes("(bib_number")
+    ) {
+      return "Colisión al asignar el número de dorsal. Presiona procesar nuevamente; si persiste, contacta a soporte.";
+    }
+    if (blob.includes("rfid_epc")) {
+      return "Conflicto de chip RFID asignado. Contacta a soporte con tu cédula.";
+    }
+    return `Registro duplicado detectado. ${details || message}`.trim();
+  }
+
+  // 23503 — foreign_key_violation
+  if (code === "23503" || blob.includes("foreign key")) {
+    return "El evento seleccionado ya no es válido. Recarga la página y vuelve a seleccionar el evento.";
+  }
+
+  // 23514 — check_violation
+  if (code === "23514" || blob.includes("check constraint")) {
+    if (blob.includes("talla")) {
+      return "La talla de camisa seleccionada no es aceptada por el sistema. Elige una talla de la lista (XS a XXL).";
+    }
+    if (blob.includes("genero")) {
+      return "Género inválido. Selecciona Masculino o Femenino.";
+    }
+    return `Un dato fue rechazado por las reglas de validación. ${details || message}`.trim();
+  }
+
+  // 23502 — not_null_violation
+  if (code === "23502" || blob.includes("null value in column")) {
+    return `Falta un dato obligatorio. ${details || message}`.trim();
+  }
+
+  return message || "Error al procesar la inscripción.";
 }
 
 // ---------------------------------------------------------------------------
@@ -199,8 +306,10 @@ const isCaninataRace = (name: string = ""): boolean =>
   name.toLowerCase().includes("caninata");
 
 // [V37.3-2] Detector LED Run — keyword "led"
+// [V37.6-1] + "WE RUN RAYOCERO" (nombre real en BD sin "LED")
+// [V37.6-2] "led" como palabra completa
 const isLedRunRace = (name: string = ""): boolean =>
-  name.toLowerCase().includes("led");
+  /\bled\b/i.test(name) || /we\s*run\s*rayocero/i.test(name);
 
 /**
  * [V37.4-3] tipo opcional: en carreras tipo "carrera" el 5K es CAMINATA.
@@ -223,6 +332,14 @@ const getModalidadMeta = (
 
 const formatBs = (n: number): string =>
   `Bs. ${n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * [V37.5-2] Normalización de identificadores antes del INSERT.
+ * Los índices únicos (cedula, race_id) y (email, race_id) son case/space
+ * sensitive: " 12345678" ≠ "12345678" y "Juan@x.com" ≠ "juan@x.com".
+ */
+const normalizeCedula = (c: string): string => c.replace(/\s+/g, "").trim();
+const normalizeEmail  = (e: string): string => e.trim().toLowerCase();
 
 // ---------------------------------------------------------------------------
 // CONFIGS ESTÁTICAS
@@ -455,6 +572,15 @@ function RegistrationFormActive({
   const isCaninataRaceType = cfg.tipo === "caninata";
   // [V37.3-4] accentColor dinámico por tipo
   const accentColor        = getAccentColor(cfg, race.name);
+  // [V37.5-4] Detector LED para selección de dorsal en /dorsal
+  const isLedRace          = isLedRunRace(race.name);
+
+  // [V37.7-1] Prefetch DorsalLed (chunk + arte + fuentes) en segundo plano
+  useEffect(() => {
+    if (!isLedRace) return;
+    const t = setTimeout(() => { void import("@/pages/DorsalLed").catch(() => undefined); }, 1500);
+    return () => clearTimeout(t);
+  }, [isLedRace]);
 
   const [modalidad,          setModalidad]          = useState<Modalidad>(cfg.modalidadesDisponibles[0]);
   const [nombre,             setNombre]             = useState("");
@@ -527,12 +653,16 @@ function RegistrationFormActive({
           `&categoria=${encodeURIComponent(data.categoria)}` +
           `&nombre=${encodeURIComponent(nombre)}` +
           `&apellido=${encodeURIComponent(apellido)}` +
-          `&evento=${encodeURIComponent(race.name)}`,
+          `&evento=${encodeURIComponent(race.name)}` +
+          // [V37.5-4] LED Coro: la página Dorsal usa tipo=led → dorsal-led.png
+          (isLedRace
+            ? `&tipo=led&modalidad=${encodeURIComponent(modalidad)}`
+            : ""),
         );
       }
     },
     onError: (err: any) =>
-      setFormError(err?.message || "Error al procesar la inscripción."),
+      setFormError(mapRegistrationError(err)), // [V37.5-1]
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -551,15 +681,39 @@ function RegistrationFormActive({
     const genderErr = validateGenderCategory(genero, categoria);
     if (genderErr) { setFormError(genderErr); return; }
 
+    // [V37.5-2] Identificadores normalizados (coinciden con índices únicos)
+    const cedulaNorm = normalizeCedula(cedula);
+    const emailNorm  = normalizeEmail(email);
+
     try {
       setUploading(true);
+
+      // [V37.5-3] Pre-check de cédula duplicada en esta carrera ANTES de subir
+      //           el comprobante. Fail-open: si RLS bloquea el SELECT, se
+      //           continúa y el índice uniq_cedula_por_carrera decide.
+      const { data: dupRows, error: dupErr } = await supabase
+        .from("runners")
+        .select("id,bib_number")
+        .eq("race_id", race.id)
+        .eq("cedula", cedulaNorm)
+        .limit(1);
+      if (!dupErr && dupRows && dupRows.length > 0) {
+        const bib = (dupRows[0] as { bib_number: number | null }).bib_number;
+        setFormError(
+          `La cédula ${cedulaNorm} ya está inscrita en ${race.name}` +
+          (bib ? ` (dorsal #${bib}).` : ".") +
+          " Si necesitas corregir datos, contacta a la organización.",
+        );
+        return;
+      }
+
       let comprobanteUrl = "";
 
       if (fileComprobante) {
         const compressed = await imageCompression(fileComprobante, {
           maxSizeMB: 0.8, maxWidthOrHeight: 1200,
         });
-        const filePath = `comprobantes/${Date.now()}_${cedula}.jpg`;
+        const filePath = `comprobantes/${Date.now()}_${cedulaNorm}.jpg`; // [V37.5-2]
         const { error: upErr } = await supabase.storage
           .from("comprobantes-pago").upload(filePath, compressed);
         if (upErr) throw upErr;
@@ -572,7 +726,10 @@ function RegistrationFormActive({
         : {};
 
       const payload: RegistrationFormData = {
-        nombre, apellido, cedula, email, telefono,
+        nombre, apellido,
+        cedula: cedulaNorm, // [V37.5-2]
+        email:  emailNorm,  // [V37.5-2]
+        telefono,
         fechaNacimiento: fechaNacimiento || "2000-01-01",
         genero, talla, movilidadReducida, categoria,
         monto: precio.montoBs > 0 ? String(precio.montoBs.toFixed(2)) : "0",
@@ -588,7 +745,7 @@ function RegistrationFormActive({
 
       await mutation.mutateAsync(payload);
     } catch (err: any) {
-      setFormError(err?.message || "Error subiendo comprobante o registrando inscripción.");
+      setFormError(mapRegistrationError(err)); // [V37.5-1]
     } finally {
       setUploading(false);
     }

@@ -21,7 +21,7 @@ const HEAVY = [
   'precio.png',
   'fondobg1.png',
   'flier_inscripciones_abiertas.png',
-  'dorsal-coro.png',
+  'dorsal-led.png',
   'falco-n-2.png',
   'falco-n-1.png',
   'flyer-coro-precios.png',
