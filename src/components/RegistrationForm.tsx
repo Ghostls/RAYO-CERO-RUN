@@ -365,7 +365,7 @@ const LED_CORO_CONFIG: RaceStaticConfig = {
   tipo: "carrera",
   modalidadesDisponibles: ["10K", "5K"], // [V37.4-1] antes: ["10K"]
   evento: {
-    nombre: "WE RUN RAYOCERO LED CORO 10K", fecha: "31 OCT 2026", hora: "07:00 PM",
+    nombre: "WE RUN RAYOCERO LED CORO 10K", fecha: "28 NOV 2026", hora: "07:00 PM",
     distancia: "10K / 5K", // [V37.4-1] antes: "10K"
     atletas: "+500", lugar: "CORO, FALCÓN",
     proximaEd: "TEMPORADA 2026", targetDate: new Date("2026-10-31T19:00:00"),

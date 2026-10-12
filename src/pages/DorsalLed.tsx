@@ -79,7 +79,7 @@ const FONT_HREF =
 const FONT_WAIT_MS = 1200;
 
 const LED_EVENT = {
-  fecha: "31 OCT 2026",
+  fecha: "28 NOV 2026",
   hora:  "07:00 PM",
   lugar: "Coro, Falcón",
 } as const;
