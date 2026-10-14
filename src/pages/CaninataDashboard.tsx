@@ -4,6 +4,14 @@
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
+ * CHANGELOG V1.5 (evolución de V1.4, Dirección de carrera):
+ * [V1.5-1] Reinicio de pruebas exclusivamente desde Dirección de Carrera.
+ * [V1.5-2] Vista previa, doble confirmación, respaldo transaccional en servidor.
+ * [V1.5-3] No reinicia una carrera en marcha; requiere cerrar la prueba.
+ * [V1.5-4] Detección de cambio de salida y limpieza de colas locales obsoletas.
+ * [V1.5-5] Panel de Dirección responsive Liquid Glass, sin modificar otros módulos.
+ * REQUIERE: instalar 20261014_caninata_timing_reset.sql una sola vez.
+ *
  * CHANGELOG V1.4 (evolución sobre V1.3 SIN ELIMINAR FUNCIONES):
  * [V1.4-1] Diseño responsive Liquid Glass encapsulado en este archivo.
  * [V1.4-2] Pestaña Cronometraje aislada (RACE CONTROL: reloj maestro, KM5, meta).
@@ -58,7 +66,7 @@ import {
   Eye, EyeOff, Lock, Phone, Gift, Shield,
   X, FileText, ExternalLink, ShieldAlert, Package, AlertTriangle, // [V1.3]
   Activity, ArrowRight, Check, CheckCircle2, Clock3, Flag, Gauge,
-  LockKeyhole, Smartphone, Timer, Wifi, WifiOff, Zap,
+  LockKeyhole, Smartphone, Timer, Wifi, WifiOff, Zap, RotateCcw, Archive,
 } from "lucide-react";
 
 // [V1.4] Autocontenido: ningún import CSS adicional, no afecta otros módulos.
@@ -358,6 +366,40 @@ const CANINATA_GLASS_STYLES = String.raw`/* RAYOCERO | LIQUID GLASS UI — scope
 }
 @media(max-width:370px){.rcgl-stat{min-height:100px!important;padding:12px!important}}
 @media(prefers-reduced-motion:reduce){.rcgl-dashboard *,.rcgl-login-layout *{transition:none!important;animation-duration:.001ms!important}}
+
+/* V1.5 · DIRECCIÓN DE CARRERA — CONTROL DE REINICIO DE PRUEBAS */
+.rc-dir-actions { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:13px;margin-bottom:16px; }
+.rc-dir-card { min-width:0;padding:clamp(18px,2vw,25px);position:relative;overflow:hidden; }
+.rc-dir-card::before { content:"";position:absolute;inset:0 0 auto;height:1px;pointer-events:none;background:linear-gradient(90deg,rgba(253,212,84,.5),transparent 78%); }
+.rc-dir-heading { display:flex;gap:13px;align-items:flex-start;margin-bottom:12px; }
+.rc-dir-icon { width:44px;height:44px;display:grid;place-items:center;flex:0 0 auto;border-radius:14px;color:#fdd454;border:1px solid rgba(253,212,84,.2);background:rgba(253,212,84,.075); }
+.rc-dir-icon.warn { color:#ffc49a;background:rgba(255,153,102,.09);border-color:rgba(255,153,102,.23); }
+.rc-dir-kicker { color:#fdd454;font-size:9px;font-weight:900;letter-spacing:.17em;margin-bottom:7px; }
+.rc-dir-card h3 { margin:0 0 6px;font-size:clamp(16px,1.8vw,21px);letter-spacing:-.04em;font-weight:850; }
+.rc-dir-card p { margin:0;font-size:11px;line-height:1.65;color:var(--rc-muted); }
+.rc-dir-meta { display:flex;flex-wrap:wrap;gap:8px;margin:15px 0; }
+.rc-dir-pill { border:1px solid rgba(255,255,255,.12);border-radius:30px;padding:7px 10px;color:rgba(255,255,255,.78);background:rgba(255,255,255,.04);font-size:10px;white-space:nowrap; }
+.rc-dir-btn {width:100%;display:flex;align-items:center;justify-content:center;gap:9px;border:1px solid rgba(253,192,129,.38);border-radius:13px;min-height:48px;padding:11px 16px;cursor:pointer;background:rgba(255,153,102,.105);color:#ffd0a4;font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;transition:background .15s,transform .15s;}
+.rc-dir-btn:disabled {opacity:.42;cursor:not-allowed;}
+.rc-dir-btn:hover:not(:disabled) {background:rgba(255,153,102,.18);transform:translateY(-1px);}
+.rc-dir-btn.primary {background:linear-gradient(115deg,#fdd454,#d9fc6b);color:#152018;border:0;}
+.rc-dir-btn:focus-visible {outline:2px solid #fdd454;outline-offset:3px;}
+.rc-dir-note {margin-top:10px!important;color:#f5c5a0!important;font-size:10px!important;}
+.rc-reset-modal {width:min(100%,580px);max-height:94dvh;overflow:auto;padding:clamp(18px,4vw,30px);border:1px solid rgba(255,189,130,.26);}
+.rc-reset-title {display:flex;gap:12px;align-items:flex-start;}
+.rc-reset-title h2 {margin:0;font-size:clamp(19px,3vw,25px);letter-spacing:-.045em;}
+.rc-reset-title p {margin:6px 0 0;color:var(--rc-muted);font-size:11px;line-height:1.6;}
+.rc-reset-preview {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;}
+.rc-reset-preview>div {padding:15px 11px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.035);text-align:center;}
+.rc-reset-preview strong {display:block;font-size:clamp(22px,5vw,32px);font-weight:850;color:#fdd454;}
+.rc-reset-preview span {display:block;color:var(--rc-muted);font-size:9px;text-transform:uppercase;letter-spacing:.08em;margin-top:6px;}
+.rc-reset-confirm {padding:15px;border:1px solid rgba(255,189,130,.20);background:rgba(255,146,84,.06);border-radius:14px;display:flex;gap:12px;align-items:flex-start;font-size:11px;line-height:1.65;cursor:pointer;color:#f3e9df;}
+.rc-reset-confirm input {flex:0 0 18px;width:18px;height:18px;margin-top:2px;accent-color:#fdd454;}
+.rc-reset-buttons {display:grid;grid-template-columns:1fr 1.4fr;gap:10px;}
+.rc-reset-buttons .rc-btn,.rc-reset-buttons .rc-dir-btn {white-space:normal;line-height:1.35;}
+.rc-reset-busy {font-size:11px;color:#fdd454;display:flex;gap:7px;align-items:center;}
+@media(max-width:800px){.rc-dir-actions{grid-template-columns:1fr}.rc-dir-card{padding:19px}.rc-dir-heading{gap:10px}.rc-reset-buttons{grid-template-columns:1fr}}
+@media(max-width:420px){.rc-reset-preview>div{padding:12px 5px}.rc-reset-preview strong{font-size:23px}.rc-dir-icon{width:39px;height:39px}}
 `;
 
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
@@ -1900,6 +1942,24 @@ type Pending = {
 };
 type Notice = { kind: "ok" | "error" | "warn"; text: string };
 type Tap = { request_id: string; checkpoint: Point; observed_at: string; rtt: number | null; stored?: boolean; bib?: string };
+type ResetPreview = {
+  race_id: string;
+  race_name: string;
+  status: SessionState;
+  started_at: string | null;
+  closed_at: string | null;
+  marks_count: number;
+  taps_count: number;
+  audit_count: number;
+  can_reset: boolean;
+};
+type ResetResult = {
+  status: "ready";
+  backup_id: string;
+  marks_archived: number;
+  taps_archived: number;
+  audit_archived: number;
+};
 
 const formatMs = (ms: number | null | undefined) => {
   if (ms == null || !Number.isFinite(ms)) return "--:--:--.---";
@@ -1939,6 +1999,11 @@ function CaninataTiming({ raceId }: { raceId: string }) {
   const [tapBib, setTapBib] = useState<Record<string, string>>({});
   const [captureMode, setCaptureMode] = useState<"direct" | "fast">("direct");
   const [busyControl, setBusyControl] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetPreview, setResetPreview] = useState<ResetPreview | null>(null);
+  const [resetPhrase, setResetPhrase] = useState("");
+  const [resetAgreed, setResetAgreed] = useState(false);
   const [editMark, setEditMark] = useState<Mark | null>(null);
   const [editReason, setEditReason] = useState("");
   const [editTime, setEditTime] = useState("");
@@ -1951,6 +2016,7 @@ function CaninataTiming({ raceId }: { raceId: string }) {
   const lastClockRef = useRef<ClockState | null>(null);
   const queueKey = useMemo(() => `rc_timing_queue:${raceId}:${userId || "anon"}`, [raceId, userId]);
   const tapKey = useMemo(() => `rc_timing_taps:${raceId}:${userId || "anon"}`, [raceId, userId]);
+  const runKey = useMemo(() => `rc_timing_run:${raceId}:${userId || "anon"}`, [raceId, userId]);
 
   useEffect(() => {
     let valid = true;
@@ -2044,10 +2110,28 @@ function CaninataTiming({ raceId }: { raceId: string }) {
     offsetRef.current = best.offset;
     rttRef.current = best.rtt;
     setClockRtt(best.rtt);
+    // Identifica la salida oficial, no el tiempo del navegador. Tras un
+    // reinicio, elimina únicamente colas LOCALMENTE antiguas de este operador.
+    // El backend además rechaza marcas anteriores a la nueva salida oficial.
+    const currentRun = best.data.started_at || "ready";
+    try {
+      const seenRun = localStorage.getItem(runKey);
+      if (seenRun !== null && seenRun !== currentRun) {
+        localStorage.removeItem(queueKey);
+        localStorage.removeItem(tapKey);
+        setPending([]);
+        setTaps([]);
+        setTapBib({});
+        setNotice({kind:"warn",text:"Nueva sesión detectada: se descartaron las capturas locales de una prueba anterior en este dispositivo."});
+      }
+      localStorage.setItem(runKey, currentRun);
+    } catch {
+      setNotice({kind:"warn",text:"No se pudo revisar el almacenamiento local. Comprueba las colas antes de capturar."});
+    }
     setClock(best.data);
     lastClockRef.current = best.data;
     readyRef.current = true;
-  }, [assignment, raceId]);
+  }, [assignment, raceId, queueKey, tapKey, runKey]);
 
   const refreshMarks = useCallback(async () => {
     if (!assignment) return;
@@ -2211,7 +2295,7 @@ function CaninataTiming({ raceId }: { raceId: string }) {
 
   const control = async (type: "start" | "close" | "toggle5k") => {
     if (!assignment || assignment.role !== "admin" || !clock) return;
-    if (type === "start" && !window.confirm("¿Confirmas la SALIDA OFICIAL? El reloj no se puede reiniciar.")) return;
+    if (type === "start" && !window.confirm("¿Confirmas la SALIDA OFICIAL? Para reiniciar una prueba será obligatorio cerrar el evento, respaldar y confirmar desde Dirección.")) return;
     if (type === "close" && !window.confirm("¿Cerrar definitivamente la carrera? No se admitirán nuevas marcas.")) return;
     setBusyControl(true);
     try {
@@ -2224,6 +2308,62 @@ function CaninataTiming({ raceId }: { raceId: string }) {
       setNotice({ kind: "ok", text: type === "start" ? "Salida oficial registrada en servidor." : type === "close" ? "Carrera cerrada." : "Configuración 5K actualizada." });
     } catch (e) { setNotice({ kind: "error", text: msgError(e) }); }
     finally { setBusyControl(false); }
+  };
+
+  // V1.5: Reinicio de PRUEBAS (solo Dirección), nunca por DELETE del navegador.
+  // rc_timing_reset() valida rol y carrera, archiva en la misma transacción,
+  // y falla si el estado cambió o hay otro proceso escribiendo.
+  const openReset = async () => {
+    if (!assignment || assignment.role !== "admin" || !clock || !online) return;
+    if (clock.status === "running") {
+      setNotice({kind:"warn",text:"Primero cierra la prueba desde Dirección y espera al menos 15 segundos."});
+      return;
+    }
+    setResetOpen(true);
+    setResetPhrase("");
+    setResetAgreed(false);
+    setResetPreview(null);
+    setResetLoading(true);
+    try {
+      const preview = await call<ResetPreview>("rc_timing_reset_preview",{p_race_id:raceId});
+      setResetPreview(preview);
+    } catch(e) {
+      setNotice({kind:"error",text:`No se puede preparar el reinicio: ${msgError(e)}. Comprueba que instalaste la migración de reinicio.`});
+      setResetOpen(false);
+    } finally { setResetLoading(false); }
+  };
+  const resetRace = async () => {
+    if (!assignment || assignment.role !== "admin" || !clock || !resetPreview ||
+        !online || clock.status === "running" || !resetPreview.can_reset ||
+        !resetAgreed || resetPhrase.trim() !== "REINICIAR PRUEBA") return;
+    setResetLoading(true);
+    try {
+      const result = await call<ResetResult>("rc_timing_reset",{
+        p_race_id:raceId,
+        p_expected_started_at:resetPreview.started_at,
+        p_confirmation:"REINICIAR PRUEBA",
+      });
+      try {
+        localStorage.removeItem(queueKey);
+        localStorage.removeItem(tapKey);
+        localStorage.setItem(runKey,"ready");
+      } catch {
+        // El servidor ya confirmó el reinicio; un error de almacenamiento
+        // local NO debe presentarse como un fallo del reinicio oficial.
+      }
+      setPending([]);setTaps([]);setTapBib({});setMarks([]);
+      setResetOpen(false);setResetPreview(null);setResetPhrase("");setResetAgreed(false);
+      setNotice({kind:"ok",text:`Prueba reiniciada en servidor. Respaldo ${result.backup_id}. Marcas archivadas: ${result.marks_archived}.`});
+      try { await syncClock(); await refreshMarks(); }
+      catch {
+        setNotice({kind:"warn",text:`Reinicio CONFIRMADO en servidor (respaldo ${result.backup_id}). No se pudo actualizar la pantalla: vuelve a sincronizar antes de empezar otra prueba.`});
+      }
+    } catch(e) {
+      // No hacemos reintentos automáticos en un reinicio.
+      setNotice({kind:"error",text:`Reinicio no confirmado: ${msgError(e)}. Actualiza el reloj ANTES de volver a intentar.`});
+      setResetOpen(false);
+      void syncClock().catch(()=>{});
+    } finally {setResetLoading(false);}
   };
 
   const approve = async (e: React.FormEvent) => {
@@ -2299,7 +2439,7 @@ function CaninataTiming({ raceId }: { raceId: string }) {
                 {isAdmin && <div className="rc-clock-controls">
                   {clock?.status === "ready" && <button className="rc-btn rc-btn-primary" onClick={() => void control("start")} disabled={busyControl || !online}><Zap size={18} /> INICIAR SALIDA OFICIAL</button>}
                   {clock?.status === "running" && <button className="rc-btn rc-btn-dark" onClick={() => void control("close")} disabled={busyControl}>Cerrar evento</button>}
-                  {clock?.status === "closed" && <span className="rc-muted"><CheckCircle2 size={16} /> Evento cerrado. Reloj bloqueado.</span>}
+                  {clock?.status === "closed" && <span className="rc-muted"><CheckCircle2 size={16} /> Evento cerrado. Si fue una prueba, puedes reiniciarla desde Dirección.</span>}
                 </div>}
               </section>
               <div className="rc-stat-grid">
@@ -2310,6 +2450,18 @@ function CaninataTiming({ raceId }: { raceId: string }) {
               </div>
             </div>
             {isAdmin && <section className="rc-glass rc-settings"><div><h2>Configuración de la Caninata 5K</h2><p>¿El arco ubicado en KM 5 es también la meta oficial de 5K? Activar convierte su registro KM5 en FINISH para dorsales 5K.</p></div><label className="rc-toggle"><input type="checkbox" checked={clock?.five_k_finish_at_km5 || false} disabled={clock?.status !== "ready" || busyControl} onChange={() => void control("toggle5k")} /><span /> <b>{clock?.five_k_finish_at_km5 ? "SÍ" : "NO"}</b></label></section>}
+            {isAdmin && <section className="rc-dir-actions" aria-label="Dirección de carrera">
+              <div className="rc-glass rc-dir-card">
+                <div className="rc-dir-heading"><div className="rc-dir-icon"><ShieldCheck size={22}/></div><div><div className="rc-dir-kicker">DIRECCIÓN / CONTROL DE MISIÓN</div><h3>Estado de operación</h3><p>El reloj maestro y las estaciones KM5 / Meta responden a una misma sesión de carrera.</p></div></div>
+                <div className="rc-dir-meta"><span className="rc-dir-pill">ESTADO: {clock?.status?.toUpperCase() || "SIN SINCRONIZAR"}</span><span className="rc-dir-pill">{marks.length} marcas</span><span className="rc-dir-pill">{pendingReview.length} por revisar</span></div>
+                <p className="rc-muted">Antes de reiniciar, confirma que los operadores cerraron la prueba y no mantienen capturas sin enviar.</p>
+              </div>
+              <div className="rc-glass rc-dir-card">
+                <div className="rc-dir-heading"><div className="rc-dir-icon warn"><RotateCcw size={23}/></div><div><div className="rc-dir-kicker">MANTENIMIENTO CONTROLADO / SOLO PRUEBAS</div><h3>Reiniciar carrera de prueba</h3><p>Respalda las marcas, Fast-taps y auditoría de esta carrera y vuelve a 00:00:00, sin alterar inscritos, pagos, kits ni usuarios.</p></div></div>
+                <button type="button" className="rc-dir-btn" onClick={()=>void openReset()} disabled={busyControl || resetLoading || !online || !clock || clock.status === "running"}><RotateCcw size={17}/> REINICIAR PRUEBA</button>
+                <p className="rc-dir-note">{clock?.status === "running" ? "Primero pulsa ‘Cerrar evento’, espera 15 s y desconecta los puestos." : "Disponible únicamente para Dirección y tras una doble confirmación."}</p>
+              </div>
+            </section>}
             {isOperator && <section className="rc-glass rc-capture">
               <div className="rc-capture-heading"><div><p className="rc-eyebrow"><Smartphone size={14} /> {myPoint === "km5" ? "SPLIT STATION 05" : "FINISH LINE"}</p><h2>{myPoint === "km5" ? "Control KM 5" : "Línea de meta"}</h2><p className="rc-muted">Escribe el dorsal y pulsa Registrar en el instante exacto del paso.</p></div><span className="rc-point-icon">{myPoint === "km5" ? "05" : <Flag size={32} />}</span></div>
               <div className="rc-capture-modes"><button type="button" className={captureMode === "direct" ? "active" : ""} onClick={() => setCaptureMode("direct")}>Dorsal + marca</button><button type="button" className={captureMode === "fast" ? "active" : ""} onClick={() => setCaptureMode("fast")}>Fast-tap · marcar primero</button></div>
@@ -2327,6 +2479,21 @@ function CaninataTiming({ raceId }: { raceId: string }) {
           <footer className="rc-footer">RAYOCERO TIMING SYSTEM <span>•</span> VALKYRON GROUP <span>•</span> CAPTURA MANUAL CON AUDITORÍA</footer>
         </main>
       </div>
+      {resetOpen && isAdmin && <div className="rc-modal-backdrop" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget && !resetLoading) setResetOpen(false);}}>
+        <form className="rc-reset-modal rc-glass" role="dialog" aria-modal="true" aria-label="Reiniciar carrera de prueba" onSubmit={e=>{e.preventDefault();void resetRace();}}>
+          <div className="rc-modal-head"><div className="rc-reset-title"><div className="rc-dir-icon warn"><RotateCcw size={22}/></div><div><h2>Reiniciar carrera de prueba</h2><p>Esta acción requiere una sesión cerrada. El servidor crea un respaldo antes de limpiar las marcas.</p></div></div><button type="button" disabled={resetLoading} onClick={()=>setResetOpen(false)} aria-label="Cancelar"><X size={20}/></button></div>
+          <div className="rc-dir-meta"><span className="rc-dir-pill">CANINATA BARQUISIMETO</span><span className="rc-dir-pill">{resetPreview?.status?.toUpperCase() || "CARGANDO"}</span></div>
+          {resetLoading && !resetPreview && <p className="rc-reset-busy"><RefreshCw size={16} className="rc-spin"/> Consultando estado y registros afectados…</p>}
+          {resetPreview && <>
+            <div className="rc-reset-preview"><div><strong>{resetPreview.marks_count}</strong><span>Marcas</span></div><div><strong>{resetPreview.taps_count}</strong><span>Fast-taps</span></div><div><strong>{resetPreview.audit_count}</strong><span>Auditorías</span></div></div>
+            <p className="rc-muted">Los datos anteriores se archivan en Supabase con un identificador de respaldo. No afecta inscritos, dorsales, pagos, comprobantes, kits ni la configuración de 5K.</p>
+            {!resetPreview.can_reset && <div className="rc-alert"><AlertTriangle size={17}/> Cierra primero la carrera. No se reinicia un reloj en marcha.</div>}
+            <label className="rc-reset-confirm"><input type="checkbox" checked={resetAgreed} onChange={e=>setResetAgreed(e.target.checked)} disabled={resetLoading}/><span>Confirmo que es una <strong>prueba</strong>, que los operadores terminaron sus registros y que entiendo que el reloj y las marcas activas volverán a cero.</span></label>
+            <label>Escribe <strong>REINICIAR PRUEBA</strong> para autorizar<input autoComplete="off" value={resetPhrase} onChange={e=>setResetPhrase(e.target.value)} placeholder="REINICIAR PRUEBA" disabled={resetLoading}/></label>
+          </>}
+          <div className="rc-reset-buttons"><button type="button" className="rc-btn rc-btn-dark" onClick={()=>setResetOpen(false)} disabled={resetLoading}>Cancelar</button><button type="submit" className="rc-dir-btn" disabled={resetLoading || !resetPreview?.can_reset || !resetAgreed || resetPhrase.trim()!=="REINICIAR PRUEBA"}>{resetLoading?<RefreshCw size={16} className="rc-spin"/>:<Archive size={16}/>} {resetLoading ? "Procesando…" : "RESPALDAR Y REINICIAR"}</button></div>
+        </form>
+      </div>}
       {editMark && isAdmin && <div className="rc-modal-backdrop" role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setEditMark(null); }}><form className="rc-modal rc-glass" onSubmit={approve} role="dialog" aria-modal="true" aria-label="Auditar marca"><div className="rc-modal-head"><h2>Auditar marca #{editMark.bib}</h2><button type="button" onClick={() => setEditMark(null)} aria-label="Cerrar"><X size={19} /></button></div><p>Registro original: <strong>{formatMs(editMark.elapsed_ms)}</strong> · {editMark.checkpoint.toUpperCase()}</p><label>Fecha y hora local corregida (opcional)<input type="datetime-local" step="0.001" value={editTime} onChange={e => setEditTime(e.target.value)} /></label><label>Motivo obligatorio<input required minLength={6} placeholder="Ej.: Verificado contra video de meta" value={editReason} onChange={e => setEditReason(e.target.value)} /></label><p className="rc-muted">En blanco, aprueba la hora capturada. Si introduces una hora, se guarda el cambio y una entrada de auditoría.</p><button disabled={busyControl} className="rc-btn rc-btn-primary" type="submit"><Check size={16} /> {busyControl ? "Guardando…" : "Aprobar / corregir"}</button></form></div>}
     </div>
   );
