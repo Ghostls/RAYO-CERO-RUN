@@ -5,6 +5,13 @@
  * Architecture: React / TypeScript / Supabase / React Query / Framer Motion
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
+ * CHANGELOG V37.8 (evoluciona sobre V37.7):
+ * [V37.8-1] Aviso obligatorio a nuevos inscritos CANINATA 18/OCT/2026:
+ *           la franela sera entregada despues del evento por contacto directo.
+ * [V37.8-2] Confirmacion explicita antes de inscribir, aislada de otras carreras.
+ * [V37.8-3] El flag lo persiste el trigger de Supabase (migracion SQL adjunta);
+ *           no modifica registerRunner ni el flujo de dorsal, pago o kit.
+ *
  * CHANGELOG V37.7 (evoluciona sobre V37.6):
  * [V37.7-1] Prefetch de pages/DorsalLed mientras el usuario llena el
  *           formulario de una carrera LED: descarga el chunk y, al evaluarse,
@@ -69,7 +76,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2, AlertCircle, Banknote,
   ChevronRight, Flag, Timer, Dog, Calendar, Check, Copy, Zap, ShieldAlert,
-  Footprints, // [V37.4-3]
+  Footprints, Shirt, // [V37.4-3] + [V37.8]
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -570,6 +577,10 @@ function RegistrationFormActive({
 }) {
   const navigate           = useNavigate();
   const isCaninataRaceType = cfg.tipo === "caninata";
+  // Solamente la CANINATA del 18/OCT/2026. Supabase aplica la fecha de corte.
+  const franelaPostCarreraActiva = isCaninataRaceType
+    && String(race.date).slice(0, 10) === "2026-10-18"
+    && Date.now() >= new Date("2026-10-15T00:00:00-04:00").getTime();
   // [V37.3-4] accentColor dinámico por tipo
   const accentColor        = getAccentColor(cfg, race.name);
   // [V37.5-4] Detector LED para selección de dorsal en /dorsal
@@ -601,6 +612,7 @@ function RegistrationFormActive({
   const [copiedField,        setCopiedField]        = useState<string | null>(null);
   const [uploading,          setUploading]          = useState(false);
   const [formError,          setFormError]          = useState<string | null>(null);
+  const [aceptaEntregaPost, setAceptaEntregaPost] = useState(false); // [V37.8]
 
   // [V37.4-2] 5K en carrera tipo "carrera" = caminata recreativa (LED Coro)
   const isCaminata5K = !isCaninataRaceType && modalidad === "5K";
@@ -671,6 +683,14 @@ function RegistrationFormActive({
 
     if (!nombre || !apellido || !cedula || !email || !referencia) {
       setFormError("Por favor completa todos los campos obligatorios.");
+      return;
+    }
+    if (franelaPostCarreraActiva && !telefono.trim()) {
+      setFormError("Para coordinar la entrega posterior de la franela, introduce un número de teléfono de contacto.");
+      return;
+    }
+    if (franelaPostCarreraActiva && !aceptaEntregaPost) {
+      setFormError("Debes confirmar que la franela de esta inscripción se entregará después de la Caninata.");
       return;
     }
     if (isCaninataRaceType && modalidad === "5K" && !nombrePerro.trim()) {
@@ -788,6 +808,31 @@ function RegistrationFormActive({
             </div>
           )}
 
+          {/* [V37.8] AVISO SOLO CANINATA 18/OCT/2026: el flag real se escribe en BD. */}
+          {franelaPostCarreraActiva && (
+            <div
+              role="note"
+              className="rounded-2xl border border-amber-400/40 bg-amber-400/[0.08] p-5 sm:p-6 space-y-3"
+            >
+              <div className="flex items-center gap-2 text-amber-300">
+                <Shirt className="h-5 w-5 shrink-0" />
+                <span className="text-xs font-black uppercase tracking-wider">Aviso importante · Franela post carrera</span>
+              </div>
+              <p className="text-sm leading-relaxed text-white/90">
+                Para las inscripciones realizadas <strong>desde el 15 de octubre de 2026</strong>,
+                la franela de la Caninata del <strong>18 de octubre</strong> se entregará
+                <strong> después del evento</strong>, en los días posteriores.
+              </p>
+              <p className="text-xs leading-relaxed text-white/70">
+                La organización se comunicará contigo al teléfono o correo que registres
+                para coordinar la entrega. El resto del kit se gestiona por separado.
+              </p>
+              <p className="text-[11px] font-bold text-amber-200/90">
+                Conserva tus datos de contacto actualizados. La entrega de franela quedará identificada en tu inscripción.
+              </p>
+            </div>
+          )}
+
           {/* SELECTOR DE MODALIDAD */}
           <div className="space-y-2 pb-2">
             <label className="text-xs font-bold uppercase text-white/60 block">
@@ -853,9 +898,12 @@ function RegistrationFormActive({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Teléfono</label>
+              <label className="text-xs font-bold uppercase text-white/60 mb-1 block">
+                Teléfono {franelaPostCarreraActiva && <span className="text-amber-300">* Obligatorio para contactarte</span>}
+              </label>
               <input
-                type="text" value={telefono} onChange={e => setTelefono(e.target.value)}
+                type="tel" value={telefono} onChange={e => setTelefono(e.target.value)}
+                required={franelaPostCarreraActiva} autoComplete="tel"
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-white/30"
               />
             </div>
@@ -1203,10 +1251,28 @@ function RegistrationFormActive({
             </div>
           </div>
 
+          {/* [V37.8] Confirmación expresa. No cambia aceptación de deslinde. */}
+          {franelaPostCarreraActiva && (
+            <label className="flex items-start gap-3 p-4 rounded-xl border border-amber-400/30 bg-amber-400/[0.05] cursor-pointer">
+              <input
+                type="checkbox"
+                required
+                checked={aceptaEntregaPost}
+                onChange={e => setAceptaEntregaPost(e.target.checked)}
+                className="mt-0.5 h-5 w-5 shrink-0 accent-amber-400 cursor-pointer"
+              />
+              <span className="text-xs leading-relaxed text-white/85">
+                <strong>Confirmo que estoy informado/a:</strong> mi franela se entregará
+                después de la Caninata. La organización me contactará posteriormente
+                para coordinarla.
+              </span>
+            </label>
+          )}
+
           {/* BOTÓN SUBMIT */}
           <button
             type="submit"
-            disabled={uploading || mutation.isPending || !!genderMismatchWarning}
+            disabled={uploading || mutation.isPending || !!genderMismatchWarning || (franelaPostCarreraActiva && !aceptaEntregaPost)}
             className="w-full py-4 rounded-xl font-black uppercase text-sm tracking-wider flex items-center justify-center gap-2 transition-all mt-6 disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: accentColor, color: "#03070b" }}
           >

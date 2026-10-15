@@ -4,6 +4,13 @@
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
+ * CHANGELOG V1.6 (evolución de V1.5):
+ * [V1.6-1] Indicador persistido de entrega de franela POST CARRERA.
+ * [V1.6-2] Columna independiente con corrección manual, contador y filtro.
+ * [V1.6-3] Alerta visible al localizar dorsal para entregar kit sin franela.
+ * [V1.6-4] Conserva estados de pago, kit, comprobantes y cronometraje.
+ * REQUIERE: 20261015_caninata_franela_post_carrera.sql antes del deploy.
+ *
  * CHANGELOG V1.5 (evolución de V1.4, Dirección de carrera):
  * [V1.5-1] Reinicio de pruebas exclusivamente desde Dirección de Carrera.
  * [V1.5-2] Vista previa, doble confirmación, respaldo transaccional en servidor.
@@ -66,7 +73,7 @@ import {
   Eye, EyeOff, Lock, Phone, Gift, Shield,
   X, FileText, ExternalLink, ShieldAlert, Package, AlertTriangle, // [V1.3]
   Activity, ArrowRight, Check, CheckCircle2, Clock3, Flag, Gauge,
-  LockKeyhole, Smartphone, Timer, Wifi, WifiOff, Zap, RotateCcw, Archive,
+  LockKeyhole, Smartphone, Timer, Wifi, WifiOff, Zap, RotateCcw, Archive, Shirt,
 } from "lucide-react";
 
 // [V1.4] Autocontenido: ningún import CSS adicional, no afecta otros módulos.
@@ -424,11 +431,13 @@ interface Atleta {
   apellido         : string;
   cedula           : string;
   telefono?        : string;
+  email?           : string; // [V1.6] Contacto para coordinar franela
   modalidad?       : string;
   categoria?       : string;
   bib_number?      : string | number;
   pago_verificado  : boolean;
   kit_entregado    : boolean;
+  franela_post_carrera?: boolean; // [V1.6] Es independiente del kit
   talla_camiseta?  : string;
   created_at       : string;
   referencia_pago? : string | null;  // [V1.3-1]
@@ -930,6 +939,7 @@ const ComprobanteModal = ({
 
           {[
             ["Teléfono",   atleta.telefono ?? "—"],
+            ["Correo",     atleta.email ?? "—"],
             ["Modalidad",  atleta.modalidad ?? "—"],
             ["Categoría",  atleta.categoria ?? "—"],
             ["Talla",      atleta.talla_camiseta ?? "N/A"],
@@ -944,6 +954,18 @@ const ComprobanteModal = ({
               <p className="text-xs font-bold text-white break-all">{val}</p>
             </div>
           ))}
+
+          {/* [V1.6] La entrega de franela NO está ligada al botón de kit. */}
+          {atleta.franela_post_carrera && (
+            <div className="rounded-xl px-4 py-3 flex items-start gap-2"
+              style={{ background: "rgba(249,115,22,0.12)", border: "1px solid rgba(251,146,60,0.4)", color: "#fdba74" }}>
+              <Shirt size={16} className="shrink-0 mt-0.5" />
+              <div>
+                <p className="text-[11px] font-black uppercase">Franela: entrega post carrera</p>
+                <p className="text-[10px] mt-1 leading-relaxed">Entregar el resto del kit sin franela. La organización contactará al participante posteriormente.</p>
+              </div>
+            </div>
+          )}
 
           {/* Origen del comprobante */}
           {hit && (
@@ -1081,8 +1103,10 @@ const EntregaKitsCaninata = ({ atletas, loading, togglingKit, onToggleKit }: Ent
     }
     setTargetId(found[0].id);
     setMsg(found[0].kit_entregado
-      ? { text: `El kit del dorsal #${q} ya fue entregado.`, type: "error" }
-      : { text: "Atleta identificado. Confirma la entrega.", type: "info" });
+      ? { text: `El kit del dorsal #${q} ya fue entregado${found[0].franela_post_carrera ? "; la franela está pendiente para después de la carrera" : ""}.`, type: "error" }
+      : { text: found[0].franela_post_carrera
+          ? "Atleta identificado. IMPORTANTE: entrega el kit SIN FRANELA; la franela se coordinará después de la carrera."
+          : "Atleta identificado. Confirma la entrega.", type: "info" });
   };
 
   const handleToggle = async () => {
@@ -1096,7 +1120,7 @@ const EntregaKitsCaninata = ({ atletas, loading, togglingKit, onToggleKit }: Ent
     setMsg({
       text: wasDelivered
         ? `Entrega revertida · #${target.bib_number}`
-        : `Kit entregado · #${target.bib_number} ${target.nombre} ${target.apellido}`,
+        : `Kit entregado · #${target.bib_number} ${target.nombre} ${target.apellido}${target.franela_post_carrera ? " · FRANELA PENDIENTE POST CARRERA" : ""}`,
       type: wasDelivered ? "info" : "success",
     });
     setTargetId(null);
@@ -1180,6 +1204,18 @@ const EntregaKitsCaninata = ({ atletas, loading, togglingKit, onToggleKit }: Ent
                 <p className="text-3xl font-black italic text-amber-400">{target.talla_camiseta ?? "N/A"}</p>
               </div>
             </div>
+
+            {target.franela_post_carrera && (
+              <div role="alert" className="p-4 rounded-xl flex items-start gap-3"
+                style={{ background: "rgba(249,115,22,0.13)", border: "2px solid rgba(251,146,60,0.55)", color: "#fed7aa" }}>
+                <Shirt size={22} className="shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-black uppercase">Entrega de franela POST CARRERA</p>
+                  <p className="text-xs leading-relaxed mt-1">Entrega el kit <strong>SIN FRANELA</strong>. La franela se entregará días después y la organización contactará al participante.</p>
+                  <p className="text-[11px] font-bold mt-2">Teléfono: {target.telefono || "NO REGISTRADO"} · Talla: {target.talla_camiseta || "N/A"}</p>
+                </div>
+              </div>
+            )}
 
             {!target.pago_verificado && !target.kit_entregado && (
               <div className="p-3 rounded-xl text-xs font-bold flex items-start gap-2" style={msgStyle("error")}>
@@ -1340,10 +1376,12 @@ const CaninataDashboardMain = ({ onLogout }: { onLogout: () => void }) => {
   const [atletas,          setAtletas]          = useState<Atleta[]>([]);
   const [loading,          setLoading]          = useState(true);
   const [searchTerm,       setSearchTerm]       = useState("");
+  const [soloPostCarrera,   setSoloPostCarrera]   = useState(false); // [V1.6]
   const [activeTab,        setActiveTab]        = useState<"atletas" | "kits" | "config" | "timing">("atletas"); // [V1.3-7] + "kits"
   const [error,            setError]            = useState<string | null>(null);
   const [togglingPago,     setTogglingPago]     = useState<string | null>(null);  // [V1.2-1]
   const [togglingKit,      setTogglingKit]      = useState<string | null>(null);  // [V1.2-2]
+  const [togglingFranela,  setTogglingFranela]  = useState<string | null>(null);  // [V1.6]
   const [inspectId,        setInspectId]        = useState<string | null>(null);  // [V1.3-4]
 
   // [V1.3-4] Atleta inspeccionado derivado del estado — los toggles se reflejan sin sincronización manual
@@ -1452,21 +1490,48 @@ const CaninataDashboardMain = ({ onLogout }: { onLogout: () => void }) => {
     }
   };
 
+  // [V1.6] Corrección manual de excepciones (ej. inscrito antiguo sin stock).
+  // Independiente de pago_verificado y kit_entregado.
+  const toggleFranela = async (id: string, current: boolean): Promise<boolean> => {
+    if (!race || togglingFranela) return false;
+    setTogglingFranela(id);
+    const next = !current;
+    setAtletas(prev => prev.map(a => a.id === id ? { ...a, franela_post_carrera: next } : a));
+    try {
+      const { data, error: updateError } = await supabase
+        .from("runners")
+        .update({ franela_post_carrera: next })
+        .eq("id", id)
+        .eq("race_id", race.id)
+        .select("id,franela_post_carrera")
+        .single();
+      if (updateError || !data || data.franela_post_carrera !== next) throw updateError || new Error("No se confirmó el cambio");
+      return true;
+    } catch {
+      setAtletas(prev => prev.map(a => a.id === id ? { ...a, franela_post_carrera: current } : a));
+      setError("No se pudo actualizar la entrega post carrera. Comprueba permisos o migración SQL.");
+      return false;
+    } finally {
+      setTogglingFranela(null);
+    }
+  };
+
   const closeInspect = useCallback(() => setInspectId(null), []); // [V1.3-4]
 
   const filtered = useMemo(() => {
-    if (!searchTerm) return atletas;
-    const t = searchTerm.toLowerCase();
+    const t = searchTerm.trim().toLowerCase();
     return atletas.filter(a =>
-      `${a.nombre} ${a.apellido} ${a.cedula} ${a.categoria ?? ""} ${a.telefono ?? ""} ${a.bib_number ?? ""} ${a.modalidad ?? ""}`.toLowerCase().includes(t)
+      (!soloPostCarrera || !!a.franela_post_carrera) &&
+      (!t || `${a.nombre} ${a.apellido} ${a.cedula} ${a.categoria ?? ""} ${a.telefono ?? ""} ${a.bib_number ?? ""} ${a.modalidad ?? ""}`.toLowerCase().includes(t))
     );
-  }, [atletas, searchTerm]);
+  }, [atletas, searchTerm, soloPostCarrera]);
 
   const total    = atletas.length;
   const pagados  = atletas.filter(a => a.pago_verificado).length;
   const kits     = atletas.filter(a => a.kit_entregado).length;
   const count10k = atletas.filter(a => a.modalidad === "10K").length;
   const count5k  = atletas.filter(a => a.modalidad === "5K").length;
+  const franelasPost = atletas.filter(a => a.franela_post_carrera).length;
 
   return (
     <div className="rcgl-dashboard min-h-screen font-sans" style={{ background: BG, color: "#ffffff" }}>
@@ -1512,12 +1577,13 @@ const CaninataDashboardMain = ({ onLogout }: { onLogout: () => void }) => {
         )}
 
         {/* CONTADORES */}
-        <div className="rcgl-stats grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="rcgl-stats grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {[
             { label: "Total inscritos",   value: total,                      color: YELLOW    },
             { label: "Pagos verificados", value: `${pagados} / ${total}`,    color: "#22c55e" },
             { label: "Kits entregados",   value: `${kits} / ${total}`,       color: "#f59e0b" },
             { label: "10K / 5K",          value: `${count10k} / ${count5k}`, color: YELLOW    },
+            { label: "Franela post carrera", value: franelasPost,            color: "#fb923c" },
           ].map(({ label, value, color }) => (
             <div
               key={label}
@@ -1579,7 +1645,8 @@ const CaninataDashboardMain = ({ onLogout }: { onLogout: () => void }) => {
               className="p-4 border-b"
               style={{ borderColor: `${YELLOW}10`, background: "rgba(255,255,255,0.01)" }}
             >
-              <div className="relative max-w-sm">
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              <div className="relative max-w-sm flex-1">
                 <Search
                   size={13}
                   className="absolute left-3 top-1/2 -translate-y-1/2"
@@ -1597,11 +1664,23 @@ const CaninataDashboardMain = ({ onLogout }: { onLogout: () => void }) => {
                   }}
                 />
               </div>
+              <button
+                type="button"
+                aria-pressed={soloPostCarrera}
+                onClick={() => setSoloPostCarrera(v => !v)}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-[10px] font-black uppercase rounded-xl"
+                style={soloPostCarrera
+                  ? { background: "rgba(251,146,60,0.22)", border: "1px solid #fb923c", color: "#fdba74" }
+                  : { background: "rgba(251,146,60,0.07)", border: "1px solid rgba(251,146,60,0.25)", color: "#fdba74" }}
+              >
+                <Shirt size={15} /> {soloPostCarrera ? "Ver todos" : `Solo post carrera (${franelasPost})`}
+              </button>
+              </div>
             </div>
 
             {/* Leyenda botones */}
             <div
-              className="px-4 py-2 flex items-center gap-4 border-b text-[9px] font-black uppercase"
+              className="px-4 py-2 flex flex-wrap items-center gap-4 border-b text-[9px] font-black uppercase"
               style={{ borderColor: `${YELLOW}08`, background: "rgba(255,255,255,0.005)", color: "rgba(255,255,255,0.25)" }}
             >
               {/* [V1.3-8] */}
@@ -1614,7 +1693,10 @@ const CaninataDashboardMain = ({ onLogout }: { onLogout: () => void }) => {
               <span className="flex items-center gap-1">
                 <Gift size={10} style={{ color: "#f59e0b" }} /> Marcar kit
               </span>
-              <span className="ml-auto">Toca el ícono para cambiar estado</span>
+              <span className="flex items-center gap-1">
+                <Shirt size={10} style={{ color: "#fb923c" }} /> Franela post carrera
+              </span>
+              <span className="ml-auto">Toca el ícono para corregir estado</span>
             </div>
 
             {/* Tabla */}
@@ -1622,7 +1704,7 @@ const CaninataDashboardMain = ({ onLogout }: { onLogout: () => void }) => {
               <table className="w-full">
                 <thead>
                   <tr style={{ background: "rgba(255,255,255,0.02)" }}>
-                    {["Atleta", "Teléfono", "Dorsal", "Modalidad", "Categoría", "Talla", "Comprobante", "Pago", "Kit"].map(h => ( /* [V1.3-8] + Comprobante */
+                    {["Atleta", "Teléfono", "Dorsal", "Modalidad", "Categoría", "Talla", "Comprobante", "Pago", "Kit", "Franela"].map(h => ( /* [V1.3-8] + Comprobante */
                       <th
                         key={h}
                         className="px-4 py-3 text-left text-[9px] uppercase font-black tracking-widest whitespace-nowrap"
@@ -1636,7 +1718,7 @@ const CaninataDashboardMain = ({ onLogout }: { onLogout: () => void }) => {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={9} className="py-16 text-center">
+                      <td colSpan={10} className="py-16 text-center">
                         <Loader2
                           className="animate-spin mx-auto"
                           style={{ color: YELLOW, width: 28, height: 28 }}
@@ -1646,11 +1728,11 @@ const CaninataDashboardMain = ({ onLogout }: { onLogout: () => void }) => {
                   ) : filtered.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={9}
+                        colSpan={10}
                         className="py-16 text-center text-[10px] uppercase font-black"
                         style={{ color: "rgba(255,255,255,0.2)" }}
                       >
-                        {searchTerm ? "Sin coincidencias" : "No hay atletas inscritos aún"}
+                        {searchTerm || soloPostCarrera ? "Sin coincidencias" : "No hay atletas inscritos aún"}
                       </td>
                     </tr>
                   ) : filtered.map((a, i) => {
@@ -1672,6 +1754,11 @@ const CaninataDashboardMain = ({ onLogout }: { onLogout: () => void }) => {
                         <p className="text-xs font-black uppercase text-white whitespace-nowrap">
                           {a.nombre} {a.apellido}
                         </p>
+                        {a.franela_post_carrera && (
+                          <span className="inline-flex items-center gap-1 text-[9px] uppercase font-black mt-1" style={{ color: "#fdba74" }}>
+                            <Shirt size={10} /> Franela post carrera
+                          </span>
+                        )}
                         <p
                           className="text-[9px] font-mono mt-0.5"
                           style={{ color: "rgba(255,255,255,0.35)" }}
@@ -1798,6 +1885,28 @@ const CaninataDashboardMain = ({ onLogout }: { onLogout: () => void }) => {
                           </span>
                         </button>
                       </td>
+
+                      {/* [V1.6] La franela tiene estado independiente del KIT */}
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => toggleFranela(a.id, !!a.franela_post_carrera)}
+                          disabled={togglingFranela === a.id}
+                          aria-label={a.franela_post_carrera ? "Cambiar franela a entrega normal" : "Marcar franela post carrera"}
+                          title={a.franela_post_carrera ? "ENTREGA POST CARRERA · Clic para corregir" : "Franela en kit · Clic para marcar entrega post carrera"}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all disabled:opacity-40 active:scale-95"
+                          style={a.franela_post_carrera
+                            ? { background: "rgba(249,115,22,0.16)", border: "1px solid rgba(251,146,60,0.55)", color: "#fdba74" }
+                            : { background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.45)" }}
+                        >
+                          {togglingFranela === a.id
+                            ? <RefreshCw size={12} className="animate-spin" />
+                            : <Shirt size={12} />}
+                          <span className="text-[9px] font-black uppercase whitespace-nowrap">
+                            {a.franela_post_carrera ? "POST CARRERA" : "EN KIT"}
+                          </span>
+                        </button>
+                      </td>
                     </tr>
                     );
                   })}
@@ -1814,7 +1923,7 @@ const CaninataDashboardMain = ({ onLogout }: { onLogout: () => void }) => {
                   borderTop: "1px solid rgba(255,255,255,0.04)",
                 }}
               >
-                Mostrando {filtered.length} de {total} atletas
+                Mostrando {filtered.length} de {total} atletas · {franelasPost} con franela post carrera
               </div>
             )}
           </div>
