@@ -4,6 +4,12 @@
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
+ * CHANGELOG V1.7 (evolución de V1.6):
+ * [V1.7-1] Marcas del monitor ordenadas por tiempo ascendente; Meta antes que KM5.
+ * [V1.7-2] Publicación controlada de resultados/certificados desde Dirección.
+ * [V1.7-3] Conserva inscripciones, pago, kit, franela, fast-tap y reinicio.
+ * REQUIERE: 20261015_caninata_results_publication.sql (después de staging).
+ *
  * CHANGELOG V1.6 (evolución de V1.5):
  * [V1.6-1] Indicador persistido de entrega de franela POST CARRERA.
  * [V1.6-2] Columna independiente con corrección manual, contador y filtro.
@@ -2109,6 +2115,9 @@ function CaninataTiming({ raceId }: { raceId: string }) {
   const [captureMode, setCaptureMode] = useState<"direct" | "fast">("direct");
   const [busyControl, setBusyControl] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
+  // [V1.7] Resultados públicos: desactivados hasta aprobación explícita de Dirección.
+  const [resultsPublished, setResultsPublished] = useState<boolean | null>(null);
+  const [publishingResults, setPublishingResults] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [resetPreview, setResetPreview] = useState<ResetPreview | null>(null);
   const [resetPhrase, setResetPhrase] = useState("");
@@ -2151,6 +2160,36 @@ function CaninataTiming({ raceId }: { raceId: string }) {
     }).catch(e => { if (valid) setNotice({ kind: "error", text: msgError(e) }); });
     return () => { valid = false; };
   }, [userId, raceId]);
+
+  // Una sola lectura por cambio de sesión; no añade polling intensivo.
+  useEffect(() => {
+    if (assignment?.role !== 'admin' || !clock) { setResultsPublished(null); return; }
+    let valid = true;
+    void call<{published:boolean}>('rc_timing_results_board', {p_race_id:raceId})
+      .then(data => { if(valid) setResultsPublished(data.published === true); })
+      .catch(() => { if(valid) setResultsPublished(null); });
+    return () => { valid=false; };
+  }, [assignment?.role, raceId, clock?.status, clock?.started_at]);
+
+  const updateResultsPublication = async () => {
+    if (assignment?.role !== 'admin' || !clock || publishingResults) return;
+    const next = !resultsPublished;
+    if (next && (clock.status !== 'closed' || pendingReview.length > 0)) {
+      setNotice({kind:'warn',text:'Cierra el evento y revisa todas las marcas antes de publicar.'});
+      return;
+    }
+    if (!window.confirm(next
+      ? '¿PUBLICAR resultados de Caninata? Los tiempos serán visibles al público y permitirán descargar certificados.'
+      : '¿OCULTAR los resultados públicos de Caninata?')) return;
+    setPublishingResults(true);
+    try {
+      await call('rc_timing_publish_results',{p_race_id:raceId,p_published:next});
+      setResultsPublished(next);
+      setNotice({kind:'ok',text:next?'Resultados oficiales publicados.':'Resultados públicos ocultos.'});
+    } catch(e) {
+      setNotice({kind:'error',text:`No se pudo cambiar la publicación: ${msgError(e)}`});
+    } finally {setPublishingResults(false);}
+  };
 
   useEffect(() => {
     if (!userId) return;
@@ -2498,7 +2537,20 @@ function CaninataTiming({ raceId }: { raceId: string }) {
   const elapsed = startedMs == null ? 0 : Math.max(0, (clock?.closed_at ? new Date(clock.closed_at).getTime() : nowMs) - startedMs);
   const activeRole: Role | null = assignment?.role || null;
   const myPoint: Point = activeRole === "km5" ? "km5" : "finish";
-  const registered = marks.filter(m => m.checkpoint === myPoint);
+  // [V1.7] Orden de llegada ascendente. No altera rc_timing_list ni los registros en BD.
+  const sortByArrival = (a: Mark, b: Mark) => {
+    const va = Number(a.elapsed_ms);
+    const vb = Number(b.elapsed_ms);
+    const ta = Number.isFinite(va) && va >= 0 ? va : Number.POSITIVE_INFINITY;
+    const tb = Number.isFinite(vb) && vb >= 0 ? vb : Number.POSITIVE_INFINITY;
+    if (ta !== tb) return ta - tb;
+    return (a.corrected_at || a.captured_at).localeCompare(b.corrected_at || b.captured_at) || a.bib.localeCompare(b.bib);
+  };
+  const registered = useMemo(() => marks.filter(m => m.checkpoint === myPoint).sort(sortByArrival), [marks, myPoint]);
+  const rankedMonitor = useMemo(() => [...marks].sort((a, b) => {
+    if (a.checkpoint !== b.checkpoint) return a.checkpoint === 'finish' ? -1 : 1;
+    return sortByArrival(a,b);
+  }), [marks]);
   const pendingReview = marks.filter(m => m.needs_review);
   const isAdmin = activeRole === "admin";
   const isOperator = activeRole === "km5" || activeRole === "finish";
@@ -2571,6 +2623,19 @@ function CaninataTiming({ raceId }: { raceId: string }) {
                 <p className="rc-dir-note">{clock?.status === "running" ? "Primero pulsa ‘Cerrar evento’, espera 15 s y desconecta los puestos." : "Disponible únicamente para Dirección y tras una doble confirmación."}</p>
               </div>
             </section>}
+            {isAdmin && <section className="rc-glass rc-dir-card rc-results-publish" aria-label="Publicación de resultados de Caninata">
+              <div className="rc-dir-heading"><div className="rc-dir-icon"><Flag size={22}/></div><div>
+                <div className="rc-dir-kicker">RESULTADOS / APROBACIÓN DE DIRECCIÓN</div>
+                <h3>Clasificación y certificados</h3>
+                <p>Los resultados permanecen privados hasta cerrar la sesión, revisar las marcas y autorizar su publicación. Al reiniciar una prueba, se ocultan automáticamente los resultados anteriores.</p>
+              </div></div>
+              <div className="rc-dir-meta"><span className="rc-dir-pill">{resultsPublished ? 'PUBLICADOS' : resultsPublished === false ? 'NO PUBLICADOS' : 'CONFIGURACIÓN PENDIENTE'}</span><span className="rc-dir-pill">{pendingReview.length} marcas por revisar</span></div>
+              <button type="button" className="rc-dir-btn" onClick={() => void updateResultsPublication()}
+                disabled={publishingResults || resultsPublished === null || (resultsPublished === false && (clock?.status !== 'closed' || pendingReview.length > 0))}>
+                <Flag size={17}/> {publishingResults ? 'GUARDANDO…' : resultsPublished ? 'OCULTAR RESULTADOS' : 'PUBLICAR RESULTADOS'}
+              </button>
+              {resultsPublished === null && <p className="rc-dir-note">Instala y prueba primero la migración de publicación de resultados; no modifica tiempos ni inscritos.</p>}
+            </section>}
             {isOperator && <section className="rc-glass rc-capture">
               <div className="rc-capture-heading"><div><p className="rc-eyebrow"><Smartphone size={14} /> {myPoint === "km5" ? "SPLIT STATION 05" : "FINISH LINE"}</p><h2>{myPoint === "km5" ? "Control KM 5" : "Línea de meta"}</h2><p className="rc-muted">Escribe el dorsal y pulsa Registrar en el instante exacto del paso.</p></div><span className="rc-point-icon">{myPoint === "km5" ? "05" : <Flag size={32} />}</span></div>
               <div className="rc-capture-modes"><button type="button" className={captureMode === "direct" ? "active" : ""} onClick={() => setCaptureMode("direct")}>Dorsal + marca</button><button type="button" className={captureMode === "fast" ? "active" : ""} onClick={() => setCaptureMode("fast")}>Fast-tap · marcar primero</button></div>
@@ -2578,11 +2643,11 @@ function CaninataTiming({ raceId }: { raceId: string }) {
               : <div className="rc-fast-capture"><button className="rc-fast-tap" type="button" disabled={clock?.status !== "running"} onClick={fastTap}><Clock3 size={30} /><strong>MARCAR CRUCE</strong><small>Pulsa por cada persona al cruzar. Asocia los dorsales después.</small></button><div className="rc-fast-list"><div className="rc-fast-list-title">CRUCES SIN ASIGNAR <span>{taps.length}</span></div>{taps.slice().sort((a,b) => a.observed_at.localeCompare(b.observed_at)).map((t,i) => <div className="rc-fast-row" key={t.request_id}><div className="rc-fast-stamp"><small>#{i+1} · {t.stored ? "En servidor" : "Pendiente de envío"}</small><strong>{formatMs(startedMs ? new Date(t.observed_at).getTime()-startedMs : 0)}</strong></div><form onSubmit={e => {e.preventDefault();assignTap(t);}}><input aria-label={`Dorsal del cruce ${i+1}`} inputMode="numeric" placeholder="Dorsal" value={tapBib[t.request_id] ?? t.bib ?? ""} onChange={e=>setTapBib(o=>({...o,[t.request_id]:e.target.value}))} /><button className="rc-btn rc-btn-primary" type="submit">ASIGNAR</button></form></div>)}{taps.length===0 && <p className="rc-muted">Los cruces capturados aparecerán aquí para asociar el dorsal sin perder la hora.</p>}</div></div>}
               <div className="rc-operation-hint">{clock?.status !== "running" ? <><AlertTriangle size={16} /> Espera a que dirección inicie la salida.</> : <><CheckCircle2 size={16} /> Hora capturada en el toque. Cada dorsal se acepta una sola vez por punto.</>}{pending.length > 0 && <button className="rc-text-button" onClick={() => void flushQueue(pending)}>Reintentar {pending.length} en cola</button>}</div>
             </section>}
-            <section className="rc-glass rc-table-card"><div className="rc-table-head"><div><p className="rc-eyebrow"><Activity size={13} /> LIVE ACTIVITY</p><h2>{isAdmin ? "Monitor general" : "Últimos registros"}</h2></div><button className="rc-btn rc-btn-subtle" onClick={() => { void refreshMarks(); void syncClock(); }}><RefreshCw size={15} /> Actualizar</button></div>
+            <section className="rc-glass rc-table-card"><div className="rc-table-head"><div><p className="rc-eyebrow"><Activity size={13} /> LIVE ACTIVITY</p><h2>{isAdmin ? "Llegadas ordenadas por tiempo" : "Registros ordenados por tiempo"}</h2></div><button className="rc-btn rc-btn-subtle" onClick={() => { void refreshMarks(); void syncClock(); }}><RefreshCw size={15} /> Actualizar</button></div>
               <div className="rc-table-scroll"><table className="rc-table"><thead><tr><th>Dorsal</th><th>Atleta</th><th>Distancia</th><th>Punto</th><th>Tiempo</th><th>Estado</th>{isAdmin && <th>Acción</th>}</tr></thead><tbody>
-                {(isAdmin ? marks : registered).slice(0, 100).map(m => <tr key={m.id}><td><strong className="rc-bib">#{m.bib}</strong></td><td>{m.name}</td><td><span className="rc-chip">{m.modality}</span></td><td>{m.checkpoint === "finish" ? "Meta" : "KM 5"}</td><td className="rc-time-cell">{formatMs(Number(m.elapsed_ms))}</td><td><span className={`rc-mark-status ${m.needs_review ? "review" : "confirmed"}`}>{m.needs_review ? "Revisar" : "Confirmado"}</span></td>{isAdmin && <td><button className="rc-text-button" onClick={() => { setEditMark(m); setEditTime(""); setEditReason(""); }}>Auditar / corregir</button></td>}</tr>)}
-                {(isAdmin ? marks : registered).length === 0 && <tr><td colSpan={isAdmin ? 7 : 6} className="rc-empty-cell">Todavía no hay marcas registradas.</td></tr>}
-              </tbody></table></div><div className="rc-table-foot">Muestra los últimos 100 registros · Actualización cada 4,5 s · {marks.length} marcas en base de datos</div>
+                {(isAdmin ? rankedMonitor : registered).slice(0, 100).map(m => <tr key={m.id}><td><strong className="rc-bib">#{m.bib}</strong></td><td>{m.name}</td><td><span className="rc-chip">{m.modality}</span></td><td>{m.checkpoint === "finish" ? "Meta" : "KM 5"}</td><td className="rc-time-cell">{formatMs(Number(m.elapsed_ms))}</td><td><span className={`rc-mark-status ${m.needs_review ? "review" : "confirmed"}`}>{m.needs_review ? "Revisar" : "Confirmado"}</span></td>{isAdmin && <td><button className="rc-text-button" onClick={() => { setEditMark(m); setEditTime(""); setEditReason(""); }}>Auditar / corregir</button></td>}</tr>)}
+                {(isAdmin ? rankedMonitor : registered).length === 0 && <tr><td colSpan={isAdmin ? 7 : 6} className="rc-empty-cell">Todavía no hay marcas registradas.</td></tr>}
+              </tbody></table></div><div className="rc-table-foot">Primeras 100 marcas por tiempo ascendente (Meta y luego KM5) · Actualización cada 4,5 s · {marks.length} marcas en base de datos</div>
             </section>
           </>}
           <footer className="rc-footer">RAYOCERO TIMING SYSTEM <span>•</span> VALKYRON GROUP <span>•</span> CAPTURA MANUAL CON AUDITORÍA</footer>

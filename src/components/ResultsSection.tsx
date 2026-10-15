@@ -2,6 +2,10 @@
  * RAYOCERO — RESULTS SECTION V4.6 · 499 RUN CORO · TACTICAL CERTIFICATE ENGINE
  * CEO: Lualdo Sciscioli | Valkyron Group
  *
+ * EVOLUCIÓN V4.7: Selector de evento Coro / Caninata. Coro V4.6 íntegro.
+ * AJUSTE V4.7.1: Posición y responsive del selector, sin tocar navegación global.
+ * Caninata usa RPC de cronometraje publicada, certificado 5K / 10K.
+ *
  * CHANGELOG V4.6:
  * ─ Fuera la franja de estadísticas (finishers / masculino / femenino / categorías)
  *   y la línea de conteo sobre la tabla. Quedan podio + buscador + tabla.
@@ -64,6 +68,8 @@ import type { GeoPoint } from '@/components/RouteMapStrava';
 import mapImg  from '@/assets/IMG_4003.jpg';
 import logoImg from '@/assets/logo.png';
 import RESULTADOS_JSON from '@/data/resultados_499_coro_2026.json';
+import caninataCert5K from '@/assets/caninata-cert-5k.png';
+import caninataCert10K from '@/assets/caninata-cert-10k.png';
 
 const RouteMapStrava = lazy(() => import('@/components/RouteMapStrava'));
 
@@ -772,7 +778,7 @@ const TablaGeneral = () => {
 /* MAIN                                                           */
 /* ────────────────────────────────────────────────────────────── */
 
-export default function ResultsSectionCoro() {
+function ResultsSectionCoroOriginal() {
   const [tab, setTab]               = useState<'individual' | 'tabla'>('individual');
   const [bib, setBib]               = useState('');
   const [loading, setLoading]       = useState(false);
@@ -1264,4 +1270,272 @@ export default function ResultsSectionCoro() {
       </div>
     </>
   );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * V4.7: CANINATA RESULTS / Por defecto no muestra pruebas al público.
+ * Una única llamada de lectura agregada con cadencia de 60 s, sin llamadas
+ * por atleta. Los datos proceden de la misma tabla rc_timing_marks.
+ * ═══════════════════════════════════════════════════════════════════════ */
+type CaninataResultRow = {
+  bib: string;
+  nombre: string;
+  apellido: string;
+  modalidad: string;
+  categoria: string;
+  genero: string;
+  distance_km: number | null;
+  finish_ms: number | null;
+  km5_ms: number | null;
+  ranking_general: number | null;
+  ranking_categoria: number | null;
+};
+type CaninataBoard = {published:boolean;session_status:string;rows:CaninataResultRow[]};
+const CANINATA_RACE_ID = import.meta.env.VITE_RACE_ID_CANINATA || 'faef662a-8a97-4867-aef2-d91d9b71b937';
+const normalizeCaninataBib = (v:string|number) => String(v).trim().replace(/^0+/,'') || '0';
+const showCaninataBib = (v:string|number) => String(v).padStart(4,'0');
+const caninataTime = (value:number|null) => {
+  if (value == null || !Number.isFinite(value) || value < 0) return '—';
+  const n=Math.round(value);
+  return `${String(Math.floor(n/3600000)).padStart(2,'0')}:${String(Math.floor(n/60000)%60).padStart(2,'0')}:${String(Math.floor(n/1000)%60).padStart(2,'0')}.${String(n%1000).padStart(3,'0')}`;
+};
+const caninataPace = (r:CaninataResultRow) => {
+  if (!r.finish_ms || !r.distance_km) return '—';
+  const s=Math.round(r.finish_ms/1000/r.distance_km);
+  return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')} min/km`;
+};
+const caninataSpeed = (r:CaninataResultRow) =>
+  r.finish_ms && r.distance_km ? `${(3600000*r.distance_km/r.finish_ms).toFixed(2)} km/h` : '—';
+const caninataSort = (a:CaninataResultRow,b:CaninataResultRow) => {
+  if (a.finish_ms === null && b.finish_ms === null) return a.bib.localeCompare(b.bib, 'es', {numeric:true});
+  if (a.finish_ms === null) return 1;
+  if (b.finish_ms === null) return -1;
+  return a.finish_ms-b.finish_ms || a.bib.localeCompare(b.bib,'es',{numeric:true});
+};
+
+function CaninataResults() {
+  const [board,setBoard]=useState<CaninataBoard|null>(null);
+  const [boardError,setBoardError]=useState('');
+  const [loadingBoard,setLoadingBoard]=useState(false);
+  const [bib,setBib]=useState('');
+  const [filter,setFilter]=useState('');
+  const [selected,setSelected]=useState<CaninataResultRow|null>(null);
+  const [section,setSection]=useState<'individual'|'tabla'>('individual');
+  const [exporting,setExporting]=useState(false);
+  const [downloadError,setDownloadError]=useState('');
+  const certRef=useRef<HTMLDivElement|null>(null);
+  const loadingRef=useRef(false);
+
+  const refresh=useCallback(async()=>{
+    if (loadingRef.current) return;
+    loadingRef.current=true; setLoadingBoard(true);
+    try {
+      const {data,error}=await supabase.rpc('rc_timing_results_board',{p_race_id:CANINATA_RACE_ID});
+      if (error) throw error;
+      const result=data as CaninataBoard | null;
+      if (!result || !Array.isArray(result.rows)) throw new Error('Respuesta de resultados inválida. Verifica la migración de Caninata.');
+      const ordered=[...result.rows].sort(caninataSort);
+      setBoard({...result,rows:ordered});
+      setBoardError('');
+      setSelected(old => old ? ordered.find(r=>normalizeCaninataBib(r.bib)===normalizeCaninataBib(old.bib)) || null : null);
+    }catch(e){
+      setBoardError(e instanceof Error?e.message:'No fue posible cargar los resultados.');
+    }finally{ loadingRef.current=false;setLoadingBoard(false); }
+  },[]);
+  useEffect(()=>{
+    void refresh();
+    const poll=window.setInterval(()=>{if(!document.hidden)void refresh();},60000);
+    return ()=>clearInterval(poll);
+  },[refresh]);
+
+  const rows=board?.published ? board.rows : [];
+  const sortedRows=useMemo(()=>[...rows].sort(caninataSort),[rows]);
+  const finishers=useMemo(()=>sortedRows.filter(r=>r.finish_ms!==null),[sortedRows]);
+  const filteredRows=useMemo(()=>{
+    const q=filter.toLocaleLowerCase('es').trim();
+    if (!q) return sortedRows;
+    return sortedRows.filter(r=>[r.bib, r.nombre, r.apellido, r.categoria, r.modalidad].some(x=>x.toLocaleLowerCase('es').includes(q)));
+  },[sortedRows,filter]);
+  const search=(e:React.FormEvent)=>{
+    e.preventDefault();setDownloadError('');
+    const n=normalizeCaninataBib(bib);
+    if(!/^\d{1,10}$/.test(n)||n==='0'){setSelected(null);setDownloadError('Introduce un dorsal válido.');return;}
+    const matching=rows.filter(r=>normalizeCaninataBib(r.bib)===n);
+    if(matching.length!==1){setSelected(null);setDownloadError(matching.length>1?'Dorsal duplicado: consulta a Dirección.':'No se encontró el dorsal en los resultados publicados.');return;}
+    setSelected(matching[0]);
+    setSection('individual');
+  };
+  const exportCert=async()=>{
+    if(!selected||selected.finish_ms===null||exporting||!certRef.current||!board?.published)return;
+    setExporting(true);setDownloadError('');
+    try{
+      await document.fonts.ready;
+      // Esperamos a cargar la imagen. HTML-to-image necesita el certificado visible en el DOM.
+      const img=certRef.current.querySelector('img');
+      if(img&&!img.complete) await new Promise<void>((resolve,reject)=>{
+        img.addEventListener('load',()=>resolve(),{once:true});
+        img.addEventListener('error',()=>reject(new Error('No cargó la plantilla del certificado.')),{once:true});
+      });
+      const url=await toPng(certRef.current,{pixelRatio:1,cacheBust:false,backgroundColor:'#fff'});
+      const a=document.createElement('a');a.href=url;
+      a.download=`CANINATA_${selected.modalidad}_${showCaninataBib(selected.bib)}.png`;
+      document.body.appendChild(a);a.click();a.remove();
+    }catch(e){setDownloadError(e instanceof Error?e.message:'No se pudo generar el certificado.');}
+    finally{setExporting(false);}
+  };
+  const podium=(modalidad:string)=>finishers.filter(r=>r.modalidad.toUpperCase().trim()===modalidad).slice(0,3);
+
+  return <section className="rcres-page">
+    <div className="rcres-shell">
+      <header className="rcres-hero">
+        <div className="rcres-kicker">RAYOCERO / VALKYRON GROUP · 2026</div>
+        <h1>CANINATA <span>RESULTS.</span></h1>
+        <p>Caninata 5K y Carrera 10K · Clasificación de meta por tiempo oficial validado.</p>
+        <button type="button" className="rcres-refresh" onClick={()=>void refresh()} disabled={loadingBoard}>{loadingBoard?'Actualizando…':'Actualizar resultados ↻'}</button>
+      </header>
+      <nav className="rcres-tabs" aria-label="Vista de resultados de Caninata">
+        <button type="button" className={section==='individual'?'active':''} onClick={()=>setSection('individual')}>Consulta por dorsal</button>
+        <button type="button" className={section==='tabla'?'active':''} onClick={()=>setSection('tabla')}>Clasificación general</button>
+      </nav>
+      {boardError&&<p className="rcres-alert" role="alert">{boardError}. Los resultados de Coro permanecen independientes.</p>}
+      {!board?.published&&<div className="rcres-pending"><strong>RESULTADOS AÚN NO PUBLICADOS</strong><p>{board?.session_status==='closed'?'Dirección debe revisar las marcas y autorizar la publicación.':'Los resultados aparecerán después del cierre oficial y la aprobación de Dirección.'}</p></div>}
+      {section==='individual'&&<div className="rcres-panel">
+        <form className="rcres-form" onSubmit={search}>
+          <label htmlFor="rcres-bib">BUSCA TU DORSAL</label>
+          <div className="rcres-search"><input id="rcres-bib" type="text" inputMode="numeric" value={bib} placeholder="0001" onChange={e=>setBib(e.target.value)} maxLength={10}/><button type="submit" disabled={!board?.published}>CONSULTAR</button></div>
+        </form>
+        {downloadError&&<p className="rcres-alert" role="alert">{downloadError}</p>}
+        {selected&&board?.published&&<div className="rcres-result">
+          <div className="rcres-athlete"><div><small>RESULTADO OFICIAL / {selected.modalidad}</small><h2>{selected.nombre} {selected.apellido}</h2><p>{selected.categoria||'Participante'} · Dorsal #{showCaninataBib(selected.bib)}</p></div><b>#{showCaninataBib(selected.bib)}</b></div>
+          <div className="rcres-metrics">
+            <div><small>TIEMPO EN META</small><strong>{caninataTime(selected.finish_ms)}</strong></div>
+            <div><small>RITMO MEDIO</small><strong>{caninataPace(selected)}</strong></div>
+            <div><small>VELOCIDAD MEDIA</small><strong>{caninataSpeed(selected)}</strong></div>
+            <div><small>POSICIÓN EN {selected.modalidad}</small><strong>{selected.ranking_general??'—'}</strong></div>
+            <div><small>POSICIÓN CATEGORÍA</small><strong>{selected.ranking_categoria??'—'}</strong></div>
+            <div><small>PARCIAL KM 5</small><strong>{selected.modalidad==='10K'?caninataTime(selected.km5_ms):'—'}</strong></div>
+          </div>
+          {selected.finish_ms!==null?<button className="rcres-cert-btn" type="button" onClick={()=>void exportCert()} disabled={exporting}>{exporting?'GENERANDO CERTIFICADO…':'DESCARGAR CERTIFICADO PNG ↓'}</button>:<p className="rcres-note">Este dorsal todavía no tiene una marca de meta validada. No se emite certificado sin tiempo oficial.</p>}
+        </div>}
+      </div>}
+      {section==='tabla'&&board?.published&&<div className="rcres-panel">
+        <div className="rcres-podiums">{(['5K','10K'] as const).map(mod=><div className="rcres-podium" key={mod}><h3>PODIO {mod}</h3>{podium(mod).length?podium(mod).map((r,i)=><div className="rcres-podium-row" key={r.bib}><b>{i+1}º</b><span>{r.nombre} {r.apellido}<small>#{showCaninataBib(r.bib)} · {r.categoria}</small></span><strong>{caninataTime(r.finish_ms)}</strong></div>):<p>Sin llegadas aprobadas.</p>}</div>)}</div>
+        <label className="rcres-filter">Filtrar corredores<input value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Nombre, dorsal, categoría…"/></label>
+        <div className="rcres-scroll"><table><thead><tr><th>POS.</th><th>ATLETA</th><th>MOD.</th><th>CATEGORÍA</th><th>TIEMPO</th><th>RITMO</th></tr></thead><tbody>
+          {filteredRows.map(r=><tr key={`${r.modalidad}-${r.bib}`} onClick={()=>{setSelected(r);setBib(r.bib);setSection('individual');}}><td>{r.ranking_general??'—'}</td><td><strong>{r.nombre} {r.apellido}</strong><small>#{showCaninataBib(r.bib)}</small></td><td>{r.modalidad}</td><td>{r.categoria||'—'}</td><td>{caninataTime(r.finish_ms)}</td><td>{caninataPace(r)}</td></tr>)}
+          {!filteredRows.length&&<tr><td colSpan={6}>Sin corredores para ese filtro.</td></tr>}
+        </tbody></table></div>
+        <p className="rcres-note">Tiempo de menor a mayor por llegada a meta. Clasificación general separada por distancia (5K/10K). Las marcas pendientes de revisión no se publican.</p>
+      </div>}
+      <footer className="rcres-footer">RAYOCERO TIMING SYSTEM · POWERED BY VALKYRON GROUP</footer>
+    </div>
+    {selected&&board?.published&&selected.finish_ms!==null&&<div className="rcres-offscreen" aria-hidden="true">
+      <div className="rcres-cert" ref={certRef}>
+        <img className="rcres-cert-template" alt="" src={selected.modalidad==='10K'?caninataCert10K:caninataCert5K}/>
+        <div className="rcres-cert-name">{selected.nombre} {selected.apellido}</div>
+        <div className="rcres-cert-bib">DORSAL #{showCaninataBib(selected.bib)} · {selected.categoria}</div>
+        <div className="rcres-cert-value" style={{top:330}}>{selected.modalidad}</div>
+        <div className="rcres-cert-value" style={{top:471}}>{caninataPace(selected)}</div>
+        <div className="rcres-cert-value" style={{top:606}}>{caninataTime(selected.finish_ms)}</div>
+        <div className="rcres-cert-position">POSICIÓN {selected.ranking_general ?? '—'} · {selected.modalidad}</div>
+      </div>
+    </div>}
+    <style>{CANINATA_RESULTS_STYLES}</style>
+  </section>;
+}
+
+const CANINATA_RESULTS_STYLES = `
+.rcres-page{background:#090d0b;color:#f9faf9;min-height:65vh;padding:24px 12px 55px;font-family:Inter,system-ui,sans-serif}
+.rcres-page *{box-sizing:border-box}.rcres-shell{max-width:1160px;margin:auto}.rcres-hero{position:relative;padding:clamp(23px,5vw,56px);border:1px solid #ffffff20;background:radial-gradient(circle at 95% 0%,#ff224825,transparent 50%),#151a17;border-radius:24px}
+.rcres-kicker{color:#ff5470;letter-spacing:.18em;font-size:10px;font-weight:900}.rcres-hero h1{font-size:clamp(29px,7vw,66px);letter-spacing:-.06em;line-height:1;margin:18px 0}.rcres-hero h1 span{color:#ff355e}.rcres-hero p{color:#ddd9;font-size:13px;line-height:1.6}.rcres-refresh{border:1px solid #ffffff33;border-radius:12px;background:#ffffff0d;color:#fff;padding:11px 14px;cursor:pointer;margin-top:8px}
+.rcres-tabs{display:flex;gap:9px;margin:20px 0}.rcres-tabs button{flex:1;background:#1a211d;color:#fff;border:1px solid #ffffff20;padding:14px 8px;border-radius:12px;cursor:pointer;font-weight:800}.rcres-tabs .active{background:#ff3159;color:#fff;border-color:#ff3159}
+.rcres-panel{border:1px solid #ffffff21;background:#ffffff09;border-radius:22px;padding:clamp(18px,4vw,33px)}.rcres-pending{border:1px solid #f7bf4b55;background:#f7bf4b13;border-radius:17px;padding:22px;margin-bottom:17px}.rcres-pending strong{font-size:13px;color:#ffda84}.rcres-pending p{font-size:12px;color:#fff9;line-height:1.6;margin:8px 0 0}.rcres-form label,.rcres-filter{display:block;letter-spacing:.12em;color:#ff6a84;font-weight:800;font-size:11px;margin-bottom:13px}.rcres-search{display:flex;gap:10px}.rcres-search input,.rcres-filter input{min-width:0;border:1px solid #ffffff30;background:#ffffff0b;border-radius:12px;color:#fff;padding:14px;font-size:17px}.rcres-search input{flex:1}.rcres-search button,.rcres-cert-btn{border:0;background:#ff3159;border-radius:12px;color:#fff;font-weight:900;padding:14px 22px;cursor:pointer}.rcres-search button:disabled,.rcres-cert-btn:disabled{opacity:.5;cursor:not-allowed}.rcres-alert{background:#ff49621f;border:1px solid #ff496240;border-radius:12px;color:#ffb8c3;padding:13px;margin:12px 0}
+.rcres-result{margin-top:20px;border-top:1px solid #ffffff27;padding-top:20px}.rcres-athlete{display:flex;justify-content:space-between;align-items:start;gap:14px;flex-wrap:wrap}.rcres-athlete small{color:#ff5470;font-weight:900;letter-spacing:.08em}.rcres-athlete h2{font-size:clamp(22px,4vw,34px);margin:9px 0 5px}.rcres-athlete p{font-size:12px;color:#fff9}.rcres-athlete>b{font-size:22px;color:#ff5470}.rcres-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0}.rcres-metrics>div{padding:18px;border:1px solid #ffffff15;background:#ffffff0a;border-radius:14px;min-width:0}.rcres-metrics small{font-size:10px;color:#ff7b92;font-weight:900;letter-spacing:.07em;display:block}.rcres-metrics strong{font-size:clamp(14px,2.4vw,24px);display:block;margin-top:9px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}.rcres-note{font-size:11px;color:#fffc;line-height:1.6}
+.rcres-podiums{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.rcres-podium{border:1px solid #ffffff1f;border-radius:15px;padding:18px;background:#ffffff0a}.rcres-podium h3{margin:0 0 12px;color:#ff6483}.rcres-podium p{color:#fffa;font-size:12px}.rcres-podium-row{display:grid;grid-template-columns:35px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 0;border-top:1px solid #ffffff16;font-size:12px}.rcres-podium-row>b{color:#ff3159;font-size:18px}.rcres-podium-row span{min-width:0;overflow-wrap:anywhere}.rcres-podium-row small{display:block;color:#fff8;margin-top:5px}.rcres-podium-row strong{font-variant-numeric:tabular-nums;white-space:nowrap}
+.rcres-filter{margin-top:28px}.rcres-filter input{display:block;margin-top:9px;width:100%}.rcres-scroll{max-width:100%;overflow-x:auto}.rcres-scroll table{width:100%;min-width:780px;border-collapse:collapse;text-align:left}.rcres-scroll th,.rcres-scroll td{border-bottom:1px solid #ffffff15;padding:15px 11px}.rcres-scroll th{font-size:10px;color:#ff7b92;letter-spacing:.09em}.rcres-scroll td{font-size:12px}.rcres-scroll td small{display:block;margin-top:5px;color:#fff8}.rcres-scroll tr{cursor:pointer}.rcres-scroll tbody tr:hover{background:#ffffff10}.rcres-footer{text-align:center;color:#fff6;font-size:10px;margin-top:22px;letter-spacing:.07em}
+.rcres-offscreen{position:fixed;left:-12000px;top:0;width:1080px;height:1350px;pointer-events:none;z-index:-1}.rcres-cert{width:1080px;height:1350px;position:relative;background:#fff;overflow:hidden;color:#141414;font-family:Inter,Arial,sans-serif}.rcres-cert-template{position:absolute;inset:0;width:1080px;height:1350px;object-fit:fill}.rcres-cert-name{position:absolute;top:183px;left:80px;width:920px;text-align:center;font-size:39px;line-height:1.15;font-weight:900;text-transform:uppercase;overflow-wrap:anywhere}.rcres-cert-bib{position:absolute;top:238px;left:80px;width:920px;text-align:center;font-size:19px;font-weight:850;color:#414141}.rcres-cert-value{position:absolute;left:40px;width:1000px;text-align:center;font-size:42px;font-weight:900;color:#191919;white-space:nowrap}.rcres-cert-position{position:absolute;top:1017px;left:50px;width:980px;text-align:center;font-weight:850;font-size:23px;color:#fe2752}
+@media(max-width:750px){.rcres-podiums{grid-template-columns:1fr}.rcres-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:440px){.rcres-search{flex-direction:column}.rcres-search button{min-height:46px}.rcres-metrics{grid-template-columns:1fr}.rcres-tabs button{font-size:11px}.rcres-podium-row{grid-template-columns:30px minmax(0,1fr);}.rcres-podium-row strong{grid-column:2}.rcres-hero h1{overflow-wrap:anywhere}}
+@media(prefers-reduced-motion:reduce){.rcres-page *{animation:none!important;transition:none!important}}
+`;
+
+/**
+ * Página de resultados única. La sección original 499 RUN Coro V4.6 NO se modifica:
+ * sólo se monta o desmonta según el selector. Este componente conserva export default.
+ */
+export default function ResultsSectionCoro() {
+  const getInitialEvent = (): 'coro'|'caninata' => {
+    if (typeof window==='undefined') return 'coro';
+    const event=new URLSearchParams(window.location.search).get('evento');
+    return event==='caninata' || window.location.pathname.toLowerCase().includes('caninata')?'caninata':'coro';
+  };
+  const [event,setEvent]=useState<'coro'|'caninata'>(getInitialEvent);
+  return <>
+    {/* V4.7.1 — El selector de evento se ubica DEBAJO del navbar global,
+        sin modificar la navegación principal ni el motor de resultados. */}
+    <div className="rcres-layout">
+      <nav className="rcres-event-nav" aria-label="Seleccionar evento de resultados">
+        <button type="button" className={event==='coro'?'active':''} aria-current={event==='coro'?'page':undefined} onClick={()=>setEvent('coro')}>499 RUN · CORO</button>
+        <button type="button" className={event==='caninata'?'active':''} aria-current={event==='caninata'?'page':undefined} onClick={()=>setEvent('caninata')}>CANINATA BARQUISIMETO</button>
+      </nav>
+      {event==='coro'?<ResultsSectionCoroOriginal/>:<CaninataResults/>}
+    </div>
+    <style>{`
+      /* Sólo el contenedor de resultados: no afecta al navbar global. */
+      .rcres-layout {
+        position: relative;
+        min-width: 0;
+        padding-top: clamp(125px, 10vw, 160px);
+        background: #070b09;
+      }
+      .rcres-event-nav {
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: stretch;
+        gap: 12px;
+        flex-wrap: wrap;
+        width: min(100% - 32px, 1080px);
+        margin: 0 auto 24px;
+        padding: 12px;
+        border: 1px solid rgba(255, 255, 255, .13);
+        border-radius: 22px;
+        background: rgba(24, 28, 27, .86);
+        box-shadow: 0 14px 36px rgba(0, 0, 0, .30);
+      }
+      .rcres-event-nav button {
+        flex: 1 1 230px;
+        min-width: 0;
+        min-height: 52px;
+        padding: 13px 18px;
+        border: 1px solid rgba(255, 255, 255, .18);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, .035);
+        color: rgba(255, 255, 255, .8);
+        font: 800 12px Inter, system-ui, sans-serif;
+        letter-spacing: .065em;
+        text-align: center;
+        cursor: pointer;
+        transition: background .18s ease, border-color .18s ease, color .18s ease;
+      }
+      .rcres-event-nav button:hover { background: rgba(255, 255, 255, .10); }
+      .rcres-event-nav button.active {
+        background: #fd325b;
+        border-color: #fd325b;
+        color: #fff;
+        box-shadow: 0 6px 20px rgba(253, 50, 91, .18);
+      }
+      .rcres-event-nav button:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 3px;
+      }
+      @media (max-width: 600px) {
+        .rcres-layout { padding-top: 118px; }
+        .rcres-event-nav { width: calc(100% - 24px); padding: 9px; gap: 8px; margin-bottom: 18px; border-radius: 18px; }
+        .rcres-event-nav button { flex: 1 1 100%; min-height: 48px; padding: 12px 10px; font-size: 11px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .rcres-event-nav button { transition: none; }
+      }
+    `}</style>
+  </>;
 }
