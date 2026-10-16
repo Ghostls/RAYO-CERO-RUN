@@ -1,10 +1,27 @@
 /**
- * RAYOCERO — RESULTS SECTION V4.6 · 499 RUN CORO · TACTICAL CERTIFICATE ENGINE
+ * RAYOCERO — RESULTS SECTION V4.8 · MULTI-EVENTO · TACTICAL CERTIFICATE ENGINE
  * CEO: Lualdo Sciscioli | Valkyron Group
  *
+ * EVOLUCIÓN V4.8: Selector inicial "¿Qué carrera quieres consultar?" + evento WE RUN RAYOCERO.
  * EVOLUCIÓN V4.7: Selector de evento Coro / Caninata. Coro V4.6 íntegro.
  * AJUSTE V4.7.1: Posición y responsive del selector, sin tocar navegación global.
  * Caninata usa RPC de cronometraje publicada, certificado 5K / 10K.
+ *
+ * CHANGELOG V4.8:
+ * ─ Al abrir el módulo sin `?evento=` en la URL se muestra el selector de carrera
+ *   (WE RUN RAYOCERO · 499 RUN CORO · CANINATA). La elección se escribe en la URL
+ *   (`?evento=werun|coro|caninata`) con history.replaceState, preservando history.state
+ *   para no desincronizar el router. Enlaces existentes con `?evento=` siguen funcionando.
+ * ─ El motor 499 RUN Coro V4.6 pasa a ser MULTI-EVENTO vía `RaceConfig` + `RaceCtx`.
+ *   Coro conserva exactamente su comportamiento: mismos datos, mismo orden por chip,
+ *   mismos textos, mismo certificado. Sus constantes originales alimentan CORO_CONFIG.
+ * ─ WE RUN RAYOCERO 10K (Barquisimeto) desde src/data/resultados_werun10k_barquisimeto_2026.json.
+ *   Clasificación OFICIAL (tiempo pistola, posiciones del cronometraje): la tabla y el
+ *   podio absoluto respetan `posicion_general` / `posicion_genero` del JSON y muestran
+ *   tiempo oficial. Evita que una lectura de chip anómala altere el podio.
+ * ─ Carrera cerrada (WE RUN): dorsal sin tiempo → estado "SIN TIEMPO" (no "EN LARGADA")
+ *   y no se emite certificado. Sin VITE_RACE_ID_WERUN no hay llamadas a Supabase.
+ * ─ Enlace "Compartir" incluye `evento` para abrir directamente la carrera correcta.
  *
  * CHANGELOG V4.6:
  * ─ Fuera la franja de estadísticas (finishers / masculino / femenino / categorías)
@@ -57,9 +74,12 @@
  * ASSETS REQUERIDOS (ya presentes en el repo, sustituibles por los de Coro):
  *   CERT_BG_IMG  → @/assets/IMG_4003.jpg   (cambiar por mapa aéreo de Coro cuando esté)
  *   CERT_LOGO_IMG→ @/assets/logo.png       (cambiar por logo-499.png cuando esté)
+ *
+ * DATA REQUERIDA V4.8:
+ *   @/data/resultados_werun10k_barquisimeto_2026.json  (608 registros, 604 con tiempo)
  */
 
-import { useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, lazy, Suspense, createContext, useContext } from 'react'; // V4.8: + createContext, useContext
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { toPng } from 'html-to-image';
@@ -68,6 +88,7 @@ import type { GeoPoint } from '@/components/RouteMapStrava';
 import mapImg  from '@/assets/IMG_4003.jpg';
 import logoImg from '@/assets/logo.png';
 import RESULTADOS_JSON from '@/data/resultados_499_coro_2026.json';
+import RESULTADOS_WERUN_JSON from '@/data/resultados_werun10k_barquisimeto_2026.json'; // V4.8
 import caninataCert5K from '@/assets/caninata-cert-5k.png';
 import caninataCert10K from '@/assets/caninata-cert-10k.png';
 
@@ -88,6 +109,26 @@ const RACE_CITY       = 'CORO, FALCÓN';
 /** Assets del certificado — punto único de cambio. */
 const CERT_BG_IMG   = mapImg;
 const CERT_LOGO_IMG = logoImg;
+
+/* ────────────────────────────────────────────────────────────── */
+/* V4.8 — CONFIGURACIÓN DE CARRERA — WE RUN RAYOCERO 10K          */
+/* ────────────────────────────────────────────────────────────── */
+
+/**
+ * @brief race_id de WE RUN en la tabla `races` de Supabase.
+ * @note  Si VITE_RACE_ID_WERUN no está definido (o viene vacío), la consulta resuelve
+ *        SOLO desde el JSON oficial: carrera cerrada, cero llamadas de red por dorsal.
+ */
+const RACE_ID_WERUN: string | null = import.meta.env.VITE_RACE_ID_WERUN || null;
+
+const WERUN_NAME_LONG  = 'WE RUN RAYOCERO · BARQUISIMETO, LARA';
+const WERUN_NAME_SHORT = 'WE RUN RAYOCERO';
+const WERUN_DATE       = '2026';
+const WERUN_CITY       = 'BARQUISIMETO, LARA';
+
+/** Assets del certificado WE RUN — mapa aéreo de Barquisimeto y logo Rayocero. */
+const WERUN_CERT_BG_IMG   = mapImg;
+const WERUN_CERT_LOGO_IMG = logoImg;
 
 type Modalidad = '10K' | '4K';
 
@@ -143,6 +184,54 @@ interface JsonAtleta {
   total_categoria: number;       // total inscritos en la categoría (misma modalidad)
 }
 
+/**
+ * @brief V4.8 — Criterio de clasificación del evento.
+ *  - 'chip'    → orden y podio por tiempo neto (Coro, comportamiento V4.3–V4.6).
+ *  - 'oficial' → orden y podio por las posiciones oficiales del cronometraje (tiempo
+ *                pistola). Es el criterio reglamentario y el que publica WE RUN.
+ */
+type ClasificacionModo = 'chip' | 'oficial';
+
+/** @brief V4.8 — Eventos servidos por el motor JSON (Caninata usa RPC propia). */
+type EventoJsonId = 'coro' | 'werun';
+
+/**
+ * @brief V4.8 — Dataset precalculado de un evento. Se construye UNA vez al cargar el
+ *        módulo (O(n log n)), nunca durante el render.
+ */
+interface RaceDataset {
+  resultados: JsonAtleta[];
+  published: boolean;
+  index: Map<number, JsonAtleta>;
+  categoryCounts: Record<string, number>;
+  podioM: JsonAtleta[];
+  podioF: JsonAtleta[];
+  ordenados: JsonAtleta[];
+}
+
+/** @brief V4.8 — Configuración completa de un evento para el motor de resultados. */
+interface RaceConfig {
+  id: EventoJsonId;
+  /** race_id en Supabase. null → sin consulta de red, el JSON es la única fuente. */
+  raceId: string | null;
+  nameLong: string;
+  nameShort: string;
+  date: string;
+  city: string;
+  /** Texto de distancias del eyebrow ('10K & 4K', '10K'). */
+  distanciasLabel: string;
+  certBg: string;
+  certLogo: string;
+  /** Prefijo del watermark del certificado (antes "RAYOCERO · 499 RUN" fijo). */
+  certWatermark: string;
+  /** Prefijo del archivo PNG descargado (antes "499CORO" fijo). */
+  filePrefix: string;
+  clasificacion: ClasificacionModo;
+  /** true → un dorsal sin tiempo es "SIN TIEMPO" y no recibe certificado. */
+  carreraCerrada: boolean;
+  data: RaceDataset;
+}
+
 /* ────────────────────────────────────────────────────────────── */
 /* ÍNDICE Y CONTEOS — POR MODALIDAD                               */
 /* ────────────────────────────────────────────────────────────── */
@@ -181,8 +270,12 @@ const CATEGORY_COUNTS: Record<string, number> = (() => {
   return out;
 })();
 
-const getCatTotal = (mod: Modalidad, cat: string): number =>
-  CATEGORY_COUNTS[catKey(mod, cat)] ?? 0;
+/**
+ * @brief Total de la categoría dentro de su modalidad.
+ * @param counts V4.8 — tabla de conteos del evento activo. Por defecto Coro (firma V4.0 intacta).
+ */
+const getCatTotal = (mod: Modalidad, cat: string, counts: Record<string, number> = CATEGORY_COUNTS): number =>
+  counts[catKey(mod, cat)] ?? 0;
 
 /* ────────────────────────────────────────────────────────────── */
 /* HELPERS                                                        */
@@ -238,6 +331,7 @@ const statusLabel = (status: string) => {
     case 'completed':   return { text: 'CLASIFICADO', cls: 'finished' };
     case 'in_progress': return { text: 'EN CARRERA',  cls: 'pending'  };
     case 'waiting':     return { text: 'EN LARGADA',  cls: 'pending'  };
+    case 'no_time':     return { text: 'SIN TIEMPO',  cls: 'notime'   }; // V4.8 — carrera cerrada sin marca de meta
     default:            return { text: status.toUpperCase(), cls: 'pending' };
   }
 };
@@ -346,6 +440,9 @@ const CSS = `
   .rs-status-badge.finished { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.25); color: #22c55e; }
   .rs-status-badge.pending { background: rgba(0,242,255,0.06); border: 1px solid rgba(0,242,255,0.2); color: rgba(0,242,255,0.8); animation: rs-pending-pulse 2s ease infinite; }
   @keyframes rs-pending-pulse { 0%,100%{box-shadow:0 0 0 rgba(0,242,255,0)} 50%{box-shadow:0 0 16px rgba(0,242,255,0.15)} }
+  /* V4.8 — dorsal sin marca de meta en carrera cerrada: estado neutro, sin pulso */
+  .rs-status-badge.notime { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.14); color: rgba(255,255,255,0.5); }
+  .rs-notime-note { font-size: 9px; font-weight: 700; letter-spacing: 0.18em; color: rgba(255,255,255,0.3); text-transform: uppercase; line-height: 1.6; max-width: 32ch; }
 
   .rs-action-btns { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-start; margin-top: 8px; }
   .rs-share-btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; background: transparent; border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; color: rgba(255,255,255,0.4); font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-size: 7.5px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; transition: border-color 0.2s, color 0.2s, background 0.2s, transform 0.2s; }
@@ -468,6 +565,7 @@ const CSS = `
     .rs-athlete-row { grid-template-columns: 1fr auto; gap: 2.5rem; }
     .rs-athlete-name-first, .rs-athlete-name-last { font-size: clamp(3rem, 8vw, 6rem); }
     .rs-status-col { align-items: flex-end; gap: 0.75rem; padding-top: 1rem; }
+    .rs-notime-note { text-align: right; }
     .rs-action-btns { justify-content: flex-end; gap: 8px; }
     .rs-share-btn { padding: 10px 18px; font-size: 9px; letter-spacing: 0.18em; }
     .rs-share-btn:hover:not(:disabled) { border-color: rgba(0,242,255,0.3); color: #00f2ff; background: rgba(0,242,255,0.04); }
@@ -635,20 +733,186 @@ const rowPace = (r: JsonAtleta): string => {
   return t ? formatPace(t, DIST_KM[r.modalidad]) : '—';
 };
 
+/* ────────────────────────────────────────────────────────────── */
+/* V4.8 — MOTOR MULTI-EVENTO                                      */
+/* Coro conserva sus constantes V4.6 tal cual; WE RUN se construye */
+/* con los mismos criterios parametrizados por ClasificacionModo.  */
+/* ────────────────────────────────────────────────────────────── */
+
+/**
+ * @brief V4.8 — Tiempo oficial (pistola) en segundos. null si el atleta no tiene marca.
+ */
+const timeOfOficial = (r: JsonAtleta): number | null =>
+  r.sin_tiempo ? null : parseTimeToSeconds(r.tiempo_oficial || r.tiempo_bruto || r.tiempo_chip);
+
+/**
+ * @brief V4.8 — Tiempo que se muestra en podio y tabla según el criterio del evento.
+ *  - 'chip'    → neto (idéntico a V4.6).
+ *  - 'oficial' → pistola: la clasificación reglamentaria se hace por tiempo de pistola.
+ */
+const tiempoMostrado = (r: JsonAtleta, modo: ClasificacionModo): string =>
+  modo === 'oficial'
+    ? (r.tiempo_oficial || r.tiempo_bruto || r.tiempo_chip)
+    : (r.tiempo_chip || r.tiempo_neto || r.tiempo_bruto);
+
+/**
+ * @brief V4.8 — Conteo por (modalidad, categoría). Misma regla que CATEGORY_COUNTS:
+ *        prioriza `total_categoria` declarado; si viene en 0, cae al conteo real.
+ */
+const contarCategorias = (lista: JsonAtleta[]): Record<string, number> => {
+  const declared: Record<string, number> = {};
+  const counted:  Record<string, number> = {};
+  for (const r of lista) {
+    const k = catKey(r.modalidad, r.categoria);
+    counted[k] = (counted[k] ?? 0) + 1;
+    if (!declared[k] && r.total_categoria) declared[k] = r.total_categoria;
+  }
+  const out: Record<string, number> = {};
+  for (const k of Object.keys(counted)) out[k] = declared[k] || counted[k];
+  return out;
+};
+
+/**
+ * @brief V4.8 — Podio absoluto 1·2·3 por género.
+ *  - 'chip'    → los 3 mejores tiempos netos (regla V4.4).
+ *  - 'oficial' → posiciones 1..3 de género publicadas por el cronometraje. Una lectura
+ *                de chip anómala no puede colarse en el podio.
+ */
+const podioLista = (lista: JsonAtleta[], gen: string, modo: ClasificacionModo): JsonAtleta[] => {
+  if (modo === 'oficial') {
+    return lista
+      .filter(r => r.genero === gen && !r.sin_tiempo && r.posicion_genero >= 1 && r.posicion_genero <= 3)
+      .sort((a, b) => a.posicion_genero - b.posicion_genero || a.dorsal - b.dorsal)
+      .slice(0, 3);
+  }
+  return lista
+    .filter(r => r.genero === gen && timeOf(r) !== null)
+    .sort((a, b) => timeOf(a)! - timeOf(b)!)
+    .slice(0, 3);
+};
+
+/**
+ * @brief V4.8 — Lista maestra ordenada. Sin tiempo al final, por dorsal.
+ *  - 'chip'    → tiempo neto ascendente (regla V4.3).
+ *  - 'oficial' → posición general oficial; desempate por tiempo pistola y dorsal.
+ */
+const ordenarLista = (lista: JsonAtleta[], modo: ClasificacionModo): JsonAtleta[] => {
+  const t = modo === 'oficial' ? timeOfOficial : timeOf;
+  return [...lista].sort((a, b) => {
+    const ta = t(a), tb = t(b);
+    if (ta === null && tb === null) return a.dorsal - b.dorsal;
+    if (ta === null) return 1;
+    if (tb === null) return -1;
+    if (modo === 'oficial') {
+      const pa = a.posicion_general > 0 ? a.posicion_general : Number.MAX_SAFE_INTEGER;
+      const pb = b.posicion_general > 0 ? b.posicion_general : Number.MAX_SAFE_INTEGER;
+      if (pa !== pb) return pa - pb;
+    }
+    return ta - tb || a.dorsal - b.dorsal;
+  });
+};
+
+/**
+ * @brief V4.8 — Construye el dataset de un evento a partir de su JSON publicado.
+ * @param raw  Contenido del JSON (array de JsonAtleta). Cualquier otra cosa → dataset vacío.
+ * @param modo Criterio de clasificación del evento.
+ */
+const construirDataset = (raw: unknown, modo: ClasificacionModo): RaceDataset => {
+  const resultados: JsonAtleta[] = (Array.isArray(raw) ? (raw as JsonAtleta[]) : []).map(r => ({
+    ...r,
+    modalidad: normModalidad(r.modalidad),
+  }));
+  return {
+    resultados,
+    published: resultados.length > 0,
+    index: new Map<number, JsonAtleta>(resultados.map(r => [r.dorsal, r])),
+    categoryCounts: contarCategorias(resultados),
+    podioM: podioLista(resultados, 'M', modo),
+    podioF: podioLista(resultados, 'F', modo),
+    ordenados: ordenarLista(resultados, modo),
+  };
+};
+
+/** @brief V4.8 — Dataset Coro: referencia directa a las constantes V4.6 (cero recálculo). */
+const CORO_DATASET: RaceDataset = {
+  resultados: RESULTADOS,
+  published: RESULTS_PUBLISHED,
+  index: RESULTADOS_INDEX,
+  categoryCounts: CATEGORY_COUNTS,
+  podioM: PODIO_M,
+  podioF: PODIO_F,
+  ordenados: RESULTADOS_ORDENADOS,
+};
+
+/** @brief V4.8 — Dataset WE RUN RAYOCERO: clasificación oficial del cronometraje. */
+const WERUN_DATASET: RaceDataset = construirDataset(RESULTADOS_WERUN_JSON, 'oficial');
+
+/** @brief V4.8 — 499 RUN Coro: todos los valores son los literales V4.6. */
+const CORO_CONFIG: RaceConfig = {
+  id: 'coro',
+  raceId: RACE_ID_CORO,
+  nameLong: RACE_NAME_LONG,
+  nameShort: RACE_NAME_SHORT,
+  date: RACE_DATE,
+  city: RACE_CITY,
+  distanciasLabel: '10K & 4K',
+  certBg: CERT_BG_IMG,
+  certLogo: CERT_LOGO_IMG,
+  certWatermark: 'RAYOCERO · 499 RUN',
+  filePrefix: '499CORO',
+  clasificacion: 'chip',
+  carreraCerrada: false,
+  data: CORO_DATASET,
+};
+
+/** @brief V4.8 — WE RUN RAYOCERO 10K · Barquisimeto, Lara. */
+const WERUN_CONFIG: RaceConfig = {
+  id: 'werun',
+  raceId: RACE_ID_WERUN,
+  nameLong: WERUN_NAME_LONG,
+  nameShort: WERUN_NAME_SHORT,
+  date: WERUN_DATE,
+  city: WERUN_CITY,
+  distanciasLabel: '10K',
+  certBg: WERUN_CERT_BG_IMG,
+  certLogo: WERUN_CERT_LOGO_IMG,
+  certWatermark: 'RAYOCERO · WE RUN',
+  filePrefix: 'WERUN10K',
+  clasificacion: 'oficial',
+  carreraCerrada: true,
+  data: WERUN_DATASET,
+};
+
+/** @brief V4.8 — Registro de eventos del motor JSON. */
+const RACE_CONFIGS: Record<EventoJsonId, RaceConfig> = {
+  coro: CORO_CONFIG,
+  werun: WERUN_CONFIG,
+};
+
+/**
+ * @brief V4.8 — Contexto del evento activo. Default = Coro, de modo que cualquier
+ *        consumidor montado fuera del provider se comporta exactamente como V4.6.
+ */
+const RaceCtx = createContext<RaceConfig>(CORO_CONFIG);
+const useRace = (): RaceConfig => useContext(RaceCtx);
+
 /** Tarjeta de podio — posición 1..3 dentro de su género. */
-const PodioCard = ({ r, pos }: { r: JsonAtleta; pos: number }) => (
-  <div className={`rs-podio-card p${pos}`}>
-    <div className="rs-podio-medal">{medalEmoji(pos)}</div>
-    <div style={{ minWidth: 0 }}>
-      <div className="rs-podio-nombre">{r.nombre_completo}</div>
-      <div className="rs-podio-meta">#{bib4(r.dorsal)} · {r.categoria}</div>
+const PodioCard = ({ r, pos }: { r: JsonAtleta; pos: number }) => {
+  const race = useRace(); // V4.8
+  return (
+    <div className={`rs-podio-card p${pos}`}>
+      <div className="rs-podio-medal">{medalEmoji(pos)}</div>
+      <div style={{ minWidth: 0 }}>
+        <div className="rs-podio-nombre">{r.nombre_completo}</div>
+        <div className="rs-podio-meta">#{bib4(r.dorsal)} · {r.categoria}</div>
+      </div>
+      <div>
+        <div className="rs-podio-time">{tiempoMostrado(r, race.clasificacion)}</div>{/* V4.8 */}
+        <div className="rs-podio-pace">{rowPace(r)} MIN/KM</div>
+      </div>
     </div>
-    <div>
-      <div className="rs-podio-time">{r.tiempo_chip || r.tiempo_neto || r.tiempo_bruto}</div>
-      <div className="rs-podio-pace">{rowPace(r)} MIN/KM</div>
-    </div>
-  </div>
-);
+  );
+};
 
 /** Columna de podio por género. */
 const PodioCol = ({ titulo, color, atletas }: { titulo: string; color: string; atletas: JsonAtleta[] }) => (
@@ -665,14 +929,18 @@ const PodioCol = ({ titulo, color, atletas }: { titulo: string; color: string; a
 );
 
 /** Bloque completo: masculino y femenino lado a lado. */
-const PodioAbsoluto = () => (
-  <div className="rs-podio">
-    <PodioCol titulo="Absoluto masculino" color="rgba(0,242,255,0.55)"  atletas={PODIO_M}/>
-    <PodioCol titulo="Absoluto femenino"  color="rgba(232,121,249,0.6)" atletas={PODIO_F}/>
-  </div>
-);
+const PodioAbsoluto = () => {
+  const race = useRace(); // V4.8 — podio del evento activo
+  return (
+    <div className="rs-podio">
+      <PodioCol titulo="Absoluto masculino" color="rgba(0,242,255,0.55)"  atletas={race.data.podioM}/>
+      <PodioCol titulo="Absoluto femenino"  color="rgba(232,121,249,0.6)" atletas={race.data.podioF}/>
+    </div>
+  );
+};
 
 const TablaRow = ({ r }: { r: JsonAtleta }) => {
+  const race   = useRace(); // V4.8
   const accent = catColor(r.categoria);
   return (
     <div className="rs-tbl-row">
@@ -685,7 +953,7 @@ const TablaRow = ({ r }: { r: JsonAtleta }) => {
           {r.categoria}
         </span>
       </div>
-      <div className="rs-tbl-time">{r.sin_tiempo ? 'Sin tiempo' : (r.tiempo_chip || r.tiempo_neto || r.tiempo_bruto)}</div>
+      <div className="rs-tbl-time">{r.sin_tiempo ? 'Sin tiempo' : tiempoMostrado(r, race.clasificacion)}</div>{/* V4.8 */}
       <div className="rs-tbl-pace">{rowPace(r)}</div>
     </div>
   );
@@ -696,6 +964,7 @@ const TablaRow = ({ r }: { r: JsonAtleta }) => {
 /* ────────────────────────────────────────────────────────────── */
 
 const TablaGeneral = () => {
+  const race                  = useRace(); // V4.8 — evento activo
   const [query, setQuery]     = useState('');
   const [visible, setVisible] = useState(80);
   const loaderRef             = useRef<HTMLDivElement>(null);
@@ -712,17 +981,17 @@ const TablaGeneral = () => {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return RESULTADOS_ORDENADOS;
-    return RESULTADOS_ORDENADOS.filter(r =>
+    if (!q) return race.data.ordenados;                       // V4.8
+    return race.data.ordenados.filter(r =>                    // V4.8
       String(r.dorsal).includes(q) ||
       r.nombre_completo.toLowerCase().includes(q) ||
       r.categoria.toLowerCase().includes(q)
     );
-  }, [query]);
+  }, [query, race]);
 
   const shown = useMemo(() => filtered.slice(0, visible), [filtered, visible]);
 
-  if (!RESULTS_PUBLISHED) {
+  if (!race.data.published) {                                 // V4.8
     return (
       <div className="rs-tabla-empty">
         Resultados en procesamiento — la tabla se publica al cierre de la carrera
@@ -756,7 +1025,7 @@ const TablaGeneral = () => {
       <div className="rs-tbl-head">
         <span className="rs-th">Atleta</span>
         <span className="rs-th">Categoría</span>
-        <span className="rs-th r">Tiempo chip</span>
+        <span className="rs-th r">{race.clasificacion === 'oficial' ? 'Tiempo oficial' : 'Tiempo chip'}</span>{/* V4.8 */}
         <span className="rs-th r">Ritmo</span>
       </div>
 
@@ -778,7 +1047,13 @@ const TablaGeneral = () => {
 /* MAIN                                                           */
 /* ────────────────────────────────────────────────────────────── */
 
-function ResultsSectionCoroOriginal() {
+/**
+ * @brief Motor de resultados JSON (V4.6 Coro). V4.8: multi-evento vía `config`.
+ * @param config Evento a renderizar. Sin prop → 499 RUN Coro, idéntico a V4.7.
+ * @note  Montar con `key` distinto por evento para reiniciar todo el estado local.
+ */
+function ResultsSectionCoroOriginal({ config = CORO_CONFIG }: { config?: RaceConfig }) {
+  const race = config;                                        // V4.8 — evento activo
   const [tab, setTab]               = useState<'individual' | 'tabla'>('individual');
   const [bib, setBib]               = useState('');
   const [loading, setLoading]       = useState(false);
@@ -792,9 +1067,10 @@ function ResultsSectionCoroOriginal() {
   const certRef = useRef<HTMLDivElement>(null);
 
   /**
-   * Búsqueda de dorsal — SCOPED A CORO.
+   * Búsqueda de dorsal — SCOPED AL EVENTO ACTIVO.
    * 1) JSON publicado (fuente oficial post-carrera).
-   * 2) Fallback Supabase con .eq('race_id', RACE_ID_CORO) → un dorsal de Lara nunca resuelve.
+   * 2) Fallback Supabase con .eq('race_id', race.raceId) → un dorsal de otra carrera nunca resuelve.
+   * V4.8: si el evento no tiene race_id (carrera cerrada) no hay llamada de red.
    */
   const handleSearch = useCallback(async () => {
     const bibNum = parseInt(bib.trim());
@@ -802,16 +1078,20 @@ function ResultsSectionCoroOriginal() {
     setLoading(true); setError(null); setRunner(null);
     setRaceResult(null); setJsonAtleta(null); setSearched(true);
 
-    const jsonData = RESULTADOS_INDEX.get(bibNum) ?? null;
+    const jsonData = race.data.index.get(bibNum) ?? null;    // V4.8
     setJsonAtleta(jsonData);
+    const raceId = race.raceId;                               // V4.8
 
     try {
-      const { data: runnerData, error: runnerErr } = await supabase
-        .from('runners')
-        .select('bib_number, nombre, apellido, categoria, genero, modalidad, race_status, finish_time_seconds, start_time, finish_time, split_time_seconds, gps_track')
-        .eq('bib_number', bibNum)
-        .eq('race_id', RACE_ID_CORO)
-        .maybeSingle();
+      // V4.8 — sin race_id configurado se omite Supabase: el JSON oficial es la única fuente.
+      const { data: runnerData, error: runnerErr } = raceId
+        ? await supabase
+            .from('runners')
+            .select('bib_number, nombre, apellido, categoria, genero, modalidad, race_status, finish_time_seconds, start_time, finish_time, split_time_seconds, gps_track')
+            .eq('bib_number', bibNum)
+            .eq('race_id', raceId)
+            .maybeSingle()
+        : { data: null, error: null };
 
       if (runnerErr || !runnerData) {
         // Sin registro vivo en Supabase → se reconstruye el atleta desde el JSON oficial.
@@ -827,7 +1107,8 @@ function ResultsSectionCoroOriginal() {
             categoria: jsonData.categoria,
             genero: jsonData.genero,
             modalidad: jsonData.modalidad,
-            race_status: jsonData.sin_tiempo ? 'waiting' : 'completed',
+            // V4.8 — en carrera cerrada, sin tiempo = SIN TIEMPO (no "EN LARGADA")
+            race_status: jsonData.sin_tiempo ? (race.carreraCerrada ? 'no_time' : 'waiting') : 'completed',
             finish_time_seconds,
             start_time: null, finish_time: null,
             split_time_seconds: null, gps_track: null,
@@ -839,7 +1120,7 @@ function ResultsSectionCoroOriginal() {
           });
           setLoading(false); return;
         }
-        setError(`DORSAL #${bib4(bibNum)} NO ENCONTRADO EN ${RACE_NAME_SHORT}`);
+        setError(`DORSAL #${bib4(bibNum)} NO ENCONTRADO EN ${race.nameShort}`); // V4.8
         setLoading(false); return;
       }
 
@@ -855,12 +1136,12 @@ function ResultsSectionCoroOriginal() {
           ranking_categoria: jsonData.posicion_categoria || null,
           velocidad_kmh: jsonData.velocidad_kmh || null,
         });
-      } else {
+      } else if (raceId) {                                    // V4.8 — guard de tipo y de red
         const { data: raceData } = await supabase
           .from('race_results')
           .select('ranking_general, ranking_categoria, velocidad_kmh')
           .eq('bib_number', bibNum)
-          .eq('race_id', RACE_ID_CORO)
+          .eq('race_id', raceId)
           .maybeSingle();
         if (raceData) setRaceResult(raceData as RaceResult);
       }
@@ -869,12 +1150,13 @@ function ResultsSectionCoroOriginal() {
     } finally {
       setLoading(false);
     }
-  }, [bib]);
+  }, [bib, race]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => { if (e.key === 'Enter') handleSearch(); };
 
   const handleShare = () => {
-    const url = `${window.location.origin}/resultados?bib=${runner?.bib_number}`;
+    // V4.8 — el enlace incluye el evento para abrir directamente la carrera correcta
+    const url = `${window.location.origin}/resultados?evento=${race.id}&bib=${runner?.bib_number}`;
     navigator.clipboard.writeText(url).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   };
 
@@ -906,11 +1188,11 @@ function ResultsSectionCoroOriginal() {
       const dataUrl = await renderCert();
       if (dataUrl) {
         const a = document.createElement('a');
-        a.download = `499CORO_${bib4(runner.bib_number)}_${runner.apellido.replace(/\s/g,'_').toUpperCase()}.png`;
+        a.download = `${race.filePrefix}_${bib4(runner.bib_number)}_${runner.apellido.replace(/\s/g,'_').toUpperCase()}.png`; // V4.8
         a.href = dataUrl; a.click();
       }
     } finally { setIsExporting(false); }
-  }, [runner, renderCert]);
+  }, [runner, renderCert, race]);
 
   const handlePrintCert = useCallback(async () => {
     if (!runner) return;
@@ -920,12 +1202,12 @@ function ResultsSectionCoroOriginal() {
       if (dataUrl) {
         const pw = window.open('', '_blank');
         if (pw) {
-          pw.document.write(`<!DOCTYPE html><html><head><title>CERTIFICADO ${RACE_NAME_SHORT} #${bib4(runner.bib_number)}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh}img{max-width:100%;max-height:100vh;object-fit:contain}@media print{@page{margin:0;size:portrait}body{background:#fff}img{width:100%;height:100vh;object-fit:contain}}</style></head><body><img src="${dataUrl}" onload="window.print();window.close();"/></body></html>`);
+          pw.document.write(`<!DOCTYPE html><html><head><title>CERTIFICADO ${race.nameShort} #${bib4(runner.bib_number)}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh}img{max-width:100%;max-height:100vh;object-fit:contain}@media print{@page{margin:0;size:portrait}body{background:#fff}img{width:100%;height:100vh;object-fit:contain}}</style></head><body><img src="${dataUrl}" onload="window.print();window.close();"/></body></html>`);
           pw.document.close();
         }
       }
     } finally { setIsExporting(false); }
-  }, [runner, renderCert]);
+  }, [runner, renderCert, race]);
 
   /* ── Derivados ── */
   const modalidad = runner?.modalidad ?? jsonAtleta?.modalidad ?? '10K';
@@ -938,6 +1220,9 @@ function ResultsSectionCoroOriginal() {
   const gpsPoints = runner ? parseGpsTrack(runner.gps_track) : [];
   const paceDisplay = pace ? normalizePace(pace) : normalizePace(jsonAtleta?.pace ?? null);
 
+  /** V4.8 — sin marca de meta en carrera cerrada no se emite certificado. */
+  const certDisponible = runner?.race_status !== 'no_time';
+
   const gunTime  = jsonAtleta?.tiempo_oficial && !jsonAtleta.sin_tiempo
     ? jsonAtleta.tiempo_oficial
     : hasTime ? formatTime(runner!.finish_time_seconds!) : '--:--:--';
@@ -949,7 +1234,7 @@ function ResultsSectionCoroOriginal() {
       : '--:--:--';
 
   const totalCat = jsonAtleta?.total_categoria
-    || (runner ? getCatTotal(modalidad, runner.categoria) : 0);
+    || (runner ? getCatTotal(modalidad, runner.categoria, race.data.categoryCounts) : 0); // V4.8
   const posCat   = raceResult?.ranking_categoria ?? jsonAtleta?.posicion_categoria ?? null;
 
   const velocidad = raceResult?.velocidad_kmh
@@ -959,7 +1244,7 @@ function ResultsSectionCoroOriginal() {
     : null;
 
   return (
-    <>
+    <RaceCtx.Provider value={race}>{/* V4.8 — podio y tabla leen el evento activo */}
       <style>{CSS}</style>
       <div className="rs-root">
         <div className="rs-glow-1"/><div className="rs-glow-2"/>
@@ -968,7 +1253,7 @@ function ResultsSectionCoroOriginal() {
         <div className="rs-header">
           <div className="rs-eyebrow">
             <span className="rs-eyebrow-dot"/>
-            <span className="rs-eyebrow-text">{RACE_NAME_LONG} · 10K & 4K · {RACE_DATE}</span>
+            <span className="rs-eyebrow-text">{race.nameLong} · {race.distanciasLabel} · {race.date}</span>{/* V4.8 */}
           </div>
           <h1 className="rs-title">
             <span style={{ display:'block' }}>MIS</span>
@@ -990,11 +1275,11 @@ function ResultsSectionCoroOriginal() {
           {tab === 'individual' && (
             <motion.div key="individual" initial={{ opacity:0,y:12 }} animate={{ opacity:1,y:0 }} exit={{ opacity:0,y:-8 }} transition={{ duration:0.22 }}>
 
-              {!RESULTS_PUBLISHED && (
+              {!race.data.published && (
                 <div className="rs-notice">
                   <span className="rs-eyebrow-dot"/>
                   <span className="rs-notice-text">
-                    Resultados oficiales en procesamiento. Consulta tu dorsal de {RACE_NAME_SHORT} para ver tu estado en vivo.
+                    Resultados oficiales en procesamiento. Consulta tu dorsal de {race.nameShort} para ver tu estado en vivo.
                   </span>
                 </div>
               )}
@@ -1023,7 +1308,7 @@ function ResultsSectionCoroOriginal() {
                       </svg>
                       <p className="rs-error-text">{error}</p>
                       <p style={{ fontSize:'11px', color:'rgba(255,255,255,0.2)', letterSpacing:'0.1em' }}>
-                        Esta consulta solo cubre dorsales de {RACE_NAME_LONG}. Verifica el número e intenta de nuevo.
+                        Esta consulta solo cubre dorsales de {race.nameLong}. Verifica el número e intenta de nuevo.
                       </p>
                     </div>
                   </motion.div>
@@ -1055,7 +1340,7 @@ function ResultsSectionCoroOriginal() {
 
                         <div className="rs-status-col">
                           <div className={`rs-status-badge ${status?.cls}`}>
-                            <span style={{ width:6, height:6, borderRadius:'50%', background: status?.cls === 'finished' ? '#22c55e' : '#00f2ff', display:'inline-block', animation: status?.cls === 'pending' ? 'rs-blink 1.5s infinite' : 'none' }}/>
+                            <span style={{ width:6, height:6, borderRadius:'50%', background: status?.cls === 'finished' ? '#22c55e' : status?.cls === 'notime' ? 'rgba(255,255,255,0.35)' : '#00f2ff', display:'inline-block', animation: status?.cls === 'pending' ? 'rs-blink 1.5s infinite' : 'none' }}/>{/* V4.8: + notime */}
                             {status?.text}
                           </div>
                           <div className="rs-action-btns">
@@ -1066,29 +1351,36 @@ function ResultsSectionCoroOriginal() {
                               </svg>
                               {copied ? 'COPIADO ✓' : 'COMPARTIR'}
                             </button>
-                            <button className="rs-share-btn primary" onClick={handleDownloadCert} disabled={isExporting}>
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                <polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                              </svg>
-                              {isExporting ? 'GENERANDO...' : 'CERTIFICADO'}
-                            </button>
-                            <button className="rs-share-btn" onClick={handlePrintCert} disabled={isExporting}>
-                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="6,9 6,2 18,2 18,9"/>
-                                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
-                                <rect x="6" y="14" width="12" height="8"/>
-                              </svg>
-                              IMPRIMIR
-                            </button>
+                            {certDisponible && (/* V4.8 — certificado solo con marca de meta */
+                              <>
+                                <button className="rs-share-btn primary" onClick={handleDownloadCert} disabled={isExporting}>
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                                  </svg>
+                                  {isExporting ? 'GENERANDO...' : 'CERTIFICADO'}
+                                </button>
+                                <button className="rs-share-btn" onClick={handlePrintCert} disabled={isExporting}>
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polyline points="6,9 6,2 18,2 18,9"/>
+                                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                                    <rect x="6" y="14" width="12" height="8"/>
+                                  </svg>
+                                  IMPRIMIR
+                                </button>
+                              </>
+                            )}
                           </div>
+                          {!certDisponible && (
+                            <div className="rs-notime-note">Sin marca de meta registrada. No se emite certificado.</div>
+                          )}
                         </div>
                       </div>
 
                       {/* Tiempos hero */}
                       <div className="rs-time-hero">
                         <div>
-                          <div className="rs-time-label">TIEMPO PISTOLA · {RACE_NAME_SHORT} {modalidad}</div>
+                          <div className="rs-time-label">TIEMPO PISTOLA · {race.nameShort} {modalidad}</div>{/* V4.8 */}
                           <div className={`rs-time-value ${(jsonAtleta?.tiempo_oficial || hasTime) ? 'has-time' : ''}`}>
                             {gunTime}
                           </div>
@@ -1137,7 +1429,7 @@ function ResultsSectionCoroOriginal() {
                             <RouteMapStrava
                               points={gpsPoints}
                               athleteName={`${runner.nombre} ${runner.apellido}`}
-                              eventName={`${RACE_NAME_LONG} · ${modalidad}`}
+                              eventName={`${race.nameLong} · ${modalidad}`}
                               showShareCard={true}
                             />
                           </Suspense>
@@ -1163,13 +1455,14 @@ function ResultsSectionCoroOriginal() {
         {/* ═══════════════════════════════════════════════════════ */}
         {/* CERTIFICADO OFF-SCREEN — portrait 1080×1920            */}
         {/* V4.0: sin logos de sponsors, header con tag del evento  */}
+        {/* V4.8: assets, ciudad y watermark salen del evento activo */}
         {/* ═══════════════════════════════════════════════════════ */}
-        {runner && (
+        {runner && certDisponible && (
           <div className="rs-cert-offscreen-wrapper">
             <div ref={certRef} className="rs-cert-canvas">
 
               {/* Fondo mapa con filtro táctico */}
-              <div className="rs-cert-map-bg" style={{ backgroundImage: `url(${CERT_BG_IMG})` }}/>
+              <div className="rs-cert-map-bg" style={{ backgroundImage: `url(${race.certBg})` }}/>
               <div className="rs-cert-overlay"/>
 
               <div className="rs-cert-content">
@@ -1177,11 +1470,11 @@ function ResultsSectionCoroOriginal() {
                 {/* Header — logo + tag del evento (sponsors retirados) */}
                 <div className="rs-cert-header">
                   <div className="rs-cert-logo">
-                    <img src={CERT_LOGO_IMG} alt="RAYOCERO"/>
+                    <img src={race.certLogo} alt="RAYOCERO"/>
                   </div>
                   <div className="rs-cert-eventtag">
                     <div className="rs-cert-eventtag-line1">{modalidad}</div>
-                    <div className="rs-cert-eventtag-line2">{RACE_CITY} · {RACE_DATE}</div>
+                    <div className="rs-cert-eventtag-line2">{race.city} · {race.date}</div>
                   </div>
                 </div>
 
@@ -1189,7 +1482,7 @@ function ResultsSectionCoroOriginal() {
                 <div className="rs-cert-athlete">
                   <div className="rs-cert-athlete-meta">
                     <span style={{ display:'inline-block', width:12, height:12, background:'#00f2ff', borderRadius:'50%' }}/>
-                    {RACE_NAME_SHORT} · DORSAL #{bib4(runner.bib_number)}
+                    {race.nameShort} · DORSAL #{bib4(runner.bib_number)}
                   </div>
                   <div className="rs-cert-name">{runner.nombre}</div>
                   <div className="rs-cert-surname">{runner.apellido}</div>
@@ -1255,7 +1548,7 @@ function ResultsSectionCoroOriginal() {
 
                 {/* Footer */}
                 <div className="rs-cert-footer">
-                  <div className="rs-cert-watermark">RAYOCERO · 499 RUN · {RACE_CITY} {RACE_DATE}</div>
+                  <div className="rs-cert-watermark">{race.certWatermark} · {race.city} {race.date}</div>{/* V4.8 */}
                   <div className="rs-cert-powered">
                     <span className="rs-cert-powered-lbl">POWERED BY</span>
                     <span className="rs-cert-powered-val">VALKYRON GROUP</span>
@@ -1268,7 +1561,7 @@ function ResultsSectionCoroOriginal() {
         )}
 
       </div>
-    </>
+    </RaceCtx.Provider>
   );
 }
 
@@ -1458,26 +1751,99 @@ const CANINATA_RESULTS_STYLES = `
 @media(prefers-reduced-motion:reduce){.rcres-page *{animation:none!important;transition:none!important}}
 `;
 
+/* ═══════════════════════════════════════════════════════════════════════
+ * V4.8: CATÁLOGO DE EVENTOS Y SELECTOR INICIAL
+ * El orden de EVENTOS define tanto el selector inicial como la navegación.
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+/** @brief V4.8 — Identificador de evento consultable. */
+type EventoId = 'coro' | 'caninata' | 'werun';
+
+/** @brief V4.8 — Metadatos de presentación de cada evento. */
+interface EventoMeta {
+  id: EventoId;
+  /** Texto del botón de la barra de eventos (V4.7). */
+  label: string;
+  /** Nombre en la tarjeta del selector inicial. */
+  nombre: string;
+  lugar: string;
+  distancias: string;
+}
+
+const EVENTOS: EventoMeta[] = [
+  { id: 'coro',     label: '499 RUN · CORO',        nombre: '499 RUN Coro',          lugar: 'Coro, Falcón',       distancias: '10K y 4K' },
+  { id: 'caninata', label: 'CANINATA BARQUISIMETO', nombre: 'Caninata Barquisimeto', lugar: 'Barquisimeto, Lara', distancias: '5K y 10K' },
+  { id: 'werun',    label: 'WE RUN RAYOCERO',       nombre: 'WE RUN Rayocero',       lugar: 'Barquisimeto, Lara', distancias: '10K' },
+];
+
+/** @brief V4.8 — Type guard para el parámetro `?evento=` de la URL. */
+const isEventoId = (v: string | null): v is EventoId =>
+  v === 'coro' || v === 'caninata' || v === 'werun';
+
 /**
- * Página de resultados única. La sección original 499 RUN Coro V4.6 NO se modifica:
- * sólo se monta o desmonta según el selector. Este componente conserva export default.
+ * Página de resultados única. La sección original 499 RUN Coro V4.6 NO se modifica en su
+ * comportamiento: sólo se monta o desmonta según el selector. Este componente conserva export default.
+ * V4.8: sin evento explícito en la URL se pregunta primero qué carrera consultar.
  */
 export default function ResultsSectionCoro() {
-  const getInitialEvent = (): 'coro'|'caninata' => {
-    if (typeof window==='undefined') return 'coro';
+  const getInitialEvent = (): EventoId | null => {
+    if (typeof window==='undefined') return null;
     const event=new URLSearchParams(window.location.search).get('evento');
-    return event==='caninata' || window.location.pathname.toLowerCase().includes('caninata')?'caninata':'coro';
+    if (isEventoId(event)) return event;                                   // V4.8 — coro | caninata | werun
+    const path=window.location.pathname.toLowerCase();
+    if (path.includes('caninata')) return 'caninata';
+    if (path.includes('werun') || path.includes('we-run')) return 'werun'; // V4.8
+    return null;                                                           // V4.8 — mostrar selector inicial
   };
-  const [event,setEvent]=useState<'coro'|'caninata'>(getInitialEvent);
+  const [event,setEvent]=useState<EventoId|null>(getInitialEvent);
+
+  /**
+   * @brief V4.8 — Fija el evento y lo refleja en la URL (`?evento=`) sin navegar.
+   * @note  Se preserva window.history.state para no romper el índice del router.
+   */
+  const elegirEvento = useCallback((id: EventoId) => {
+    setEvent(id);
+    if (typeof window === 'undefined') return;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('evento', id);
+      window.history.replaceState(window.history.state, '', url.toString());
+    } catch { /* noop — la URL es cosmética, el estado ya cambió */ }
+  }, []);
+
   return <>
     {/* V4.7.1 — El selector de evento se ubica DEBAJO del navbar global,
         sin modificar la navegación principal ni el motor de resultados. */}
     <div className="rcres-layout">
-      <nav className="rcres-event-nav" aria-label="Seleccionar evento de resultados">
-        <button type="button" className={event==='coro'?'active':''} aria-current={event==='coro'?'page':undefined} onClick={()=>setEvent('coro')}>499 RUN · CORO</button>
-        <button type="button" className={event==='caninata'?'active':''} aria-current={event==='caninata'?'page':undefined} onClick={()=>setEvent('caninata')}>CANINATA BARQUISIMETO</button>
-      </nav>
-      {event==='coro'?<ResultsSectionCoroOriginal/>:<CaninataResults/>}
+      {event === null ? (
+        /* V4.8 — Selector inicial: el usuario elige la carrera antes de ver resultados */
+        <section className="rcres-picker" aria-labelledby="rcres-picker-title">
+          <p className="rcres-picker-kicker">Resultados oficiales Rayocero</p>
+          <h2 id="rcres-picker-title" className="rcres-picker-title">¿Qué carrera quieres consultar?</h2>
+          <p className="rcres-picker-sub">Elige el evento para buscar tu dorsal, ver la clasificación general y descargar tu certificado.</p>
+          <div className="rcres-picker-grid">
+            {EVENTOS.map(ev => (
+              <button key={ev.id} type="button" className="rcres-picker-card" onClick={() => elegirEvento(ev.id)}>
+                <span className="rcres-picker-dist">{ev.distancias}</span>
+                <span className="rcres-picker-name">{ev.nombre}</span>
+                <span className="rcres-picker-place">{ev.lugar}</span>
+                <span className="rcres-picker-cta">Ver resultados</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : (
+        <>
+          <nav className="rcres-event-nav" aria-label="Seleccionar evento de resultados">
+            {EVENTOS.map(ev => (/* V4.8 — botones generados desde EVENTOS (+ WE RUN RAYOCERO) */
+              <button key={ev.id} type="button" className={event===ev.id?'active':''} aria-current={event===ev.id?'page':undefined} onClick={()=>elegirEvento(ev.id)}>{ev.label}</button>
+            ))}
+          </nav>
+          {event==='caninata'
+            ? <CaninataResults/>
+            : <ResultsSectionCoroOriginal key={event} config={RACE_CONFIGS[event]}/>}{/* V4.8 — key reinicia estado al cambiar de carrera */}
+        </>
+      )}
     </div>
     <style>{`
       /* Sólo el contenedor de resultados: no afecta al navbar global. */
@@ -1528,6 +1894,74 @@ export default function ResultsSectionCoro() {
         outline: 2px solid #fff;
         outline-offset: 3px;
       }
+
+      /* ── V4.8 — SELECTOR INICIAL DE CARRERA (mobile first) ── */
+      .rcres-picker {
+        width: min(100% - 24px, 1080px);
+        margin: 0 auto 56px;
+        padding: 28px 18px;
+        border: 1px solid rgba(255, 255, 255, .13);
+        border-radius: 22px;
+        background: rgba(24, 28, 27, .86);
+        box-shadow: 0 14px 36px rgba(0, 0, 0, .30);
+        color: #f9faf9;
+        font-family: Inter, system-ui, sans-serif;
+      }
+      .rcres-picker-kicker { margin: 0 0 10px; font-size: 13px; font-weight: 700; color: #ff6a84; }
+      .rcres-picker-title { margin: 0; font-size: clamp(27px, 7.5vw, 48px); line-height: 1.05; letter-spacing: -.035em; font-weight: 900; color: #fff; }
+      .rcres-picker-sub { margin: 12px 0 26px; max-width: 56ch; font-size: 14px; line-height: 1.6; color: rgba(255, 255, 255, .66); }
+      .rcres-picker-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+      .rcres-picker-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas: "name dist" "place cta";
+        align-items: baseline;
+        gap: 6px 14px;
+        min-height: 88px;
+        padding: 18px;
+        border: 1px solid rgba(255, 255, 255, .18);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, .035);
+        color: #fff;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+        transition: background .18s ease, border-color .18s ease;
+      }
+      .rcres-picker-name { grid-area: name; min-width: 0; font-size: 19px; font-weight: 900; letter-spacing: -.01em; overflow-wrap: anywhere; }
+      .rcres-picker-place { grid-area: place; min-width: 0; font-size: 13px; color: rgba(255, 255, 255, .6); }
+      .rcres-picker-dist {
+        grid-area: dist;
+        justify-self: end;
+        padding: 4px 10px;
+        border: 1px solid rgba(253, 50, 91, .45);
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+        color: #ff8aa0;
+        white-space: nowrap;
+      }
+      .rcres-picker-cta { grid-area: cta; justify-self: end; font-size: 13px; font-weight: 800; color: #fd325b; white-space: nowrap; }
+      .rcres-picker-card:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+      .rcres-picker-card:active { background: rgba(253, 50, 91, .14); border-color: #fd325b; }
+      @media (hover: hover) {
+        .rcres-picker-card:hover { background: rgba(253, 50, 91, .10); border-color: #fd325b; }
+      }
+      @media (min-width: 720px) {
+        .rcres-picker { padding: 44px; margin-bottom: 72px; }
+        .rcres-picker-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+        .rcres-picker-card {
+          grid-template-columns: minmax(0, 1fr);
+          grid-template-areas: "dist" "name" "place" "cta";
+          align-content: start;
+          min-height: 200px;
+          padding: 22px;
+        }
+        .rcres-picker-name { font-size: 22px; margin-top: 14px; }
+        .rcres-picker-dist { justify-self: start; }
+        .rcres-picker-cta { justify-self: start; align-self: end; margin-top: 22px; }
+      }
+
       @media (max-width: 600px) {
         .rcres-layout { padding-top: 118px; }
         .rcres-event-nav { width: calc(100% - 24px); padding: 9px; gap: 8px; margin-bottom: 18px; border-radius: 18px; }
@@ -1535,6 +1969,7 @@ export default function ResultsSectionCoro() {
       }
       @media (prefers-reduced-motion: reduce) {
         .rcres-event-nav button { transition: none; }
+        .rcres-picker-card { transition: none; }
       }
     `}</style>
   </>;
