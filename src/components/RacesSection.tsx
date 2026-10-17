@@ -1,10 +1,41 @@
 /**
- * RAYOCERO — RACE CALENDAR (EVOLUTION V10.12 — LED RUN RENAME-SAFE)
+ * RAYOCERO — RACE CALENDAR (EVOLUTION V10.14 — CTA ALIGNMENT)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
- * CHANGELOG V10.12 (evoluciona sobre V10.11):
+ * CHANGELOG V10.14 (evoluciona sobre V10.13):
+ * [V10.14-1] Sistema de estilos CTA unificado (CTA_BASE / CTA_ACTIVE /
+ *            CTA_DISABLED / CTA_ICON). Altura fija h-14 en TODOS los botones
+ *            y estados → mismas alturas dentro de la tarjeta y entre tarjetas
+ *            de la misma fila. Antes: py-5 + h-full mezclados (COMPLETADA no
+ *            tenía h-full) → alturas distintas.
+ * [V10.14-2] Labels largos ("INSCRIPCIONES CERRADAS", "VER RESULTADOS") hacen
+ *            wrap centrado (leading-tight + text-center) dentro de h-14, sin
+ *            desalinear al botón vecino. Icono con shrink-0 para que no se
+ *            comprima en el wrap.
+ * [V10.14-3] <Link><button/></Link> reemplazado por <Link> estilizado como
+ *            botón. Botón anidado en <a> es HTML inválido (contenido
+ *            interactivo anidado) y rompía el foco por teclado.
+ * [V10.14-4] Focus ring visible (focus-visible) en todos los CTAs.
+ *            type="button" explícito en los botones.
+ * [V10.14-5] border-white/8 → border-white/[0.08] en CTAs (el valor 8 no está
+ *            en la escala de opacidad por defecto de Tailwind v3).
+ *            Colores, gradientes y rutas de navegación: sin cambios.
+ *
+ * CHANGELOG V10.13 (base intacta):
+ * [V10.13-1] Loop: Caninata deja de forzar inscripcionesAbiertas = true.
+ *            Lee race.inscripciones_abiertas de Supabase en modo FAIL-CLOSED:
+ *            solo un `true` explícito abre; null/undefined = cerrada.
+ *            No usa el fallback global INSCRIPCIONES_ABIERTAS (pertenece a Coro).
+ * [V10.13-2] getStatusConfig: la rama Caninata respeta el flag.
+ *            - Abierta → badge ámbar (idéntico a V10.12).
+ *            - Cerrada → "Inscripciones Cerradas" directo, sin pasar por la rama
+ *              "Próximamente" (independiente del texto de race.status).
+ *            - isDefinitivelyClosed = false → reabrible solo con el flag.
+ *            Completada sigue teniendo prioridad (cae a la rama general).
+ *
+ * CHANGELOG V10.12 (base intacta):
  * [V10.12-1] isLedRunRace: además de "led", reconoce "we run" + "coro".
  *            La carrera se renombra en Supabase a "WE RUN RAYOCERO 10K - 5K CORO"
  *            (sin "LED"). Sin este fix caía en isCoroRace → imagen del flyer 499,
@@ -73,6 +104,32 @@ const isCoroRace = (name: string = ""): boolean => {
     && !isLedRunRace(name)
   );
 };
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/* CTA — SISTEMA DE ESTILOS                                                    */
+/* ─────────────────────────────────────────────────────────────────────────── */
+/**
+ * [V10.14-1] Base común para TODOS los CTAs de la tarjeta.
+ * - h-14 fija: misma altura en todos los estados y entre tarjetas de la fila.
+ * - [V10.14-2] leading-tight + text-center: si el label hace wrap a 2 líneas
+ *   (p. ej. "INSCRIPCIONES CERRADAS" en layout md de 2 columnas) queda
+ *   centrado y contenido dentro de los 56px.
+ * - min-w-0: un label largo no empuja la columna del grid.
+ * - [V10.14-4] focus-visible ring para navegación por teclado.
+ */
+const CTA_BASE =
+  "w-full h-14 min-w-0 px-3 rounded-2xl text-[9px] font-black italic tracking-[0.18em] uppercase " +
+  "leading-tight text-center flex items-center justify-center gap-2 transition-all duration-300 " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30";
+
+/** [V10.14-1] CTA interactivo (Link o botón activo). */
+const CTA_ACTIVE = `${CTA_BASE} active:scale-95`;
+
+/** [V10.14-1] CTA deshabilitado. */
+const CTA_DISABLED = `${CTA_BASE} cursor-not-allowed select-none`;
+
+/** [V10.14-2] Icono de CTA — no se comprime cuando el label hace wrap. */
+const CTA_ICON = "h-3 w-3 shrink-0";
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 /* IMAGEN                                                                      */
@@ -145,14 +202,27 @@ const getStatusConfig = (
 ) => {
   const s = rawStatus?.toLowerCase().trim() ?? "";
 
-  // Caninata siempre abierta salvo completada
+  // [V10.13-2] Caninata: el flag de Supabase decide (antes: siempre abierta).
+  // Completada sigue teniendo prioridad → cae a la rama general.
   if (isCaninata && s !== "completada" && s !== "completed") {
+    if (inscripcionesAbiertas) {
+      return {
+        key: "inscripciones_abiertas" as StatusKey,
+        label: "Inscripciones Abiertas",
+        badgeClass: "bg-[#FDD454]/10 border-[#FDD454]/30 text-[#FDD454] shadow-[0_0_15px_rgba(253,212,84,0.2)]",
+        dotColor: "bg-[#FDD454]",
+        isCompleted: false, isClosed: false, isComingSoon: false, isDefinitivelyClosed: false,
+      };
+    }
+
+    // [V10.13-2] Cerrada — directa, aislada del texto "próximamente".
+    // isDefinitivelyClosed=false: se reabre solo con races.inscripciones_abiertas=true.
     return {
-      key: "inscripciones_abiertas" as StatusKey,
-      label: "Inscripciones Abiertas",
-      badgeClass: "bg-[#FDD454]/10 border-[#FDD454]/30 text-[#FDD454] shadow-[0_0_15px_rgba(253,212,84,0.2)]",
-      dotColor: "bg-[#FDD454]",
-      isCompleted: false, isClosed: false, isComingSoon: false, isDefinitivelyClosed: false,
+      key: "inscripciones_cerradas" as StatusKey,
+      label: "Inscripciones Cerradas",
+      badgeClass: "bg-red-500/10 border-red-500/25 text-red-400 shadow-[0_0_12px_rgba(255,60,60,0.15)]",
+      dotColor: "bg-red-400",
+      isCompleted: false, isClosed: true, isComingSoon: false, isDefinitivelyClosed: false,
     };
   }
 
@@ -434,9 +504,12 @@ const RacesSection = () => {
               const caninata = isCaninataRace(race.name ?? "");
               const ledRun   = isLedRunRace(race.name ?? "");
 
-              // [V10.10-2] Flag por carrera — Caninata siempre true
+              // [V10.10-2] Flag por carrera.
+              // [V10.13-1] Caninata lee su propio flag de Supabase (fail-closed:
+              //            solo `true` explícito abre). Sin fallback global —
+              //            INSCRIPCIONES_ABIERTAS pertenece a Coro, no a Caninata.
               const inscripcionesAbiertas: boolean = caninata
-                ? true
+                ? race.inscripciones_abiertas === true
                 : (race.inscripciones_abiertas ?? INSCRIPCIONES_ABIERTAS);
 
               const cfg    = getStatusConfig(race.status ?? "", inscripcionesAbiertas, caninata, race.name ?? "");
@@ -495,7 +568,7 @@ const RacesSection = () => {
                       {race.name}
                     </h3>
 
-                    {/* Countdown — solo si abierta o caninata, no completada ni cerrada */}
+                    {/* Countdown — solo si abierta, no completada ni cerrada (aplica también a Caninata desde V10.13) */}
                     {!cfg.isCompleted && !cfg.isClosed && race.date && (
                       <CountdownChip
                         date={race.date}
@@ -573,98 +646,122 @@ const RacesSection = () => {
                         ))}
                     </div>
 
-                    {/* ── CTAs ── */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-auto">
+                    {/* ── CTAs ── [V10.14] altura fija h-14, Link estilizado (sin <button> anidado) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-auto items-stretch">
 
                       {/* COMPLETADA */}
                       {cfg.isCompleted ? (
                         <>
-                          <Link to={`/carrera/${race.id}`} className="w-full">
-                            <button className="w-full py-5 bg-white/[0.03] hover:bg-white/[0.06] border border-white/8 rounded-2xl text-[9px] font-black text-white/50 italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase backdrop-blur-md active:scale-95">
-                              <Info className="h-3 w-3 text-white/30" /> DETALLES
-                            </button>
+                          <Link
+                            to={`/carrera/${race.id}`}
+                            className={`${CTA_ACTIVE} bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] text-white/50 backdrop-blur-md`}
+                          >
+                            <Info className={`${CTA_ICON} text-white/30`} />
+                            <span>DETALLES</span>
                           </Link>
-                          <Link to="/resultados" className="w-full">
-                            <button
-                              className="w-full py-5 rounded-2xl text-[9px] font-black italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase active:scale-95"
-                              style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", color: "#FCD34D" }}
-                            >
-                              <Trophy className="h-3 w-3" /> VER RESULTADOS
-                            </button>
+                          <Link
+                            to="/resultados"
+                            className={CTA_ACTIVE}
+                            style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.25)", color: "#FCD34D" }}
+                          >
+                            <Trophy className={CTA_ICON} />
+                            <span>VER RESULTADOS</span>
                           </Link>
                         </>
 
                       ) : cfg.isComingSoon ? (
                         /* PRÓXIMAMENTE */
                         <>
-                          <button disabled
-                            className="w-full h-full py-5 rounded-2xl text-[9px] font-black italic tracking-[0.2em] flex items-center justify-center gap-2 uppercase cursor-not-allowed select-none"
-                            style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.15)" }}>
-                            <Info className="h-3 w-3" /> DETALLES
+                          <button
+                            type="button"
+                            disabled
+                            className={CTA_DISABLED}
+                            style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.15)" }}
+                          >
+                            <Info className={CTA_ICON} />
+                            <span>DETALLES</span>
                           </button>
-                          <button disabled
-                            className="w-full h-full py-5 rounded-2xl text-[9px] font-black italic tracking-[0.2em] flex items-center justify-center gap-2 uppercase cursor-not-allowed select-none"
-                            style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.15)" }}>
-                            <Zap className="h-3 w-3" /> PRÓXIMAMENTE
+                          <button
+                            type="button"
+                            disabled
+                            className={CTA_DISABLED}
+                            style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.15)" }}
+                          >
+                            <Zap className={CTA_ICON} />
+                            <span>PRÓXIMAMENTE</span>
                           </button>
                         </>
 
                       ) : cfg.isClosed ? (
-                        /* CERRADAS */
+                        /* CERRADAS — incluye Caninata desde V10.13 */
                         <>
-                          <Link to={`/carrera/${race.id}`} className="w-full">
-                            <button className="w-full h-full py-5 bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 rounded-2xl text-[9px] font-black text-white italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase backdrop-blur-md active:scale-95">
-                              <Info className="h-3 w-3 text-red-400" /> VER RUTA
-                            </button>
+                          <Link
+                            to={`/carrera/${race.id}`}
+                            className={`${CTA_ACTIVE} bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-white backdrop-blur-md`}
+                          >
+                            <Info className={`${CTA_ICON} text-red-400`} />
+                            <span>VER RUTA</span>
                           </Link>
-                          <button disabled
-                            className="w-full h-full py-5 rounded-2xl text-[9px] font-black italic tracking-[0.2em] flex items-center justify-center gap-2 uppercase cursor-not-allowed"
-                            style={{ background: "rgba(255,40,40,0.06)", border: "1px solid rgba(255,60,60,0.2)", color: "rgba(248,113,113,0.5)" }}>
-                            <XCircle className="h-3 w-3" /> INSCRIPCIONES CERRADAS
+                          <button
+                            type="button"
+                            disabled
+                            className={CTA_DISABLED}
+                            style={{ background: "rgba(255,40,40,0.06)", border: "1px solid rgba(255,60,60,0.2)", color: "rgba(248,113,113,0.5)" }}
+                          >
+                            <XCircle className={CTA_ICON} />
+                            <span>INSCRIPCIONES CERRADAS</span>
                           </button>
                         </>
 
                       ) : (
                         /* ABIERTAS — Caninata / LED Run / Genérica */
                         <>
-                          <Link to={`/carrera/${race.id}`} className="w-full">
-                            <button className="w-full h-full py-5 bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 rounded-2xl text-[9px] font-black text-white italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase backdrop-blur-md active:scale-95">
-                              <Info
-                                className="h-3 w-3"
-                                style={{ color: caninata ? "#FDD454" : ledRun ? ledAccent : "#22d3ee" }}
-                              /> DETALLES
-                            </button>
+                          <Link
+                            to={`/carrera/${race.id}`}
+                            className={`${CTA_ACTIVE} bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 text-white backdrop-blur-md`}
+                          >
+                            <Info
+                              className={CTA_ICON}
+                              style={{ color: caninata ? "#FDD454" : ledRun ? ledAccent : "#22d3ee" }}
+                            />
+                            <span>DETALLES</span>
                           </Link>
 
                           {caninata ? (
                             <button
+                              type="button"
                               onClick={(e) => handleRegistrationClick(e, race)}
-                              className="w-full h-full py-5 rounded-2xl text-[9px] font-black text-[#050801] italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase active:scale-95 group/btn"
+                              className={`${CTA_ACTIVE} text-[#050801] group/btn`}
                               style={{
                                 background: "linear-gradient(135deg, #D09644, #FDD454)",
                                 boxShadow:  "0 0 20px rgba(253,212,84,0.15)",
                               }}
                             >
-                              INSCRIBIRME <Dog className="h-3 w-3 transition-transform group-hover/btn:scale-110" />
+                              <span>INSCRIBIRME</span>
+                              <Dog className={`${CTA_ICON} transition-transform group-hover/btn:scale-110`} />
                             </button>
                           ) : ledRun ? (
                             <button
+                              type="button"
                               onClick={(e) => handleRegistrationClick(e, race)}
-                              className="w-full h-full py-5 rounded-2xl text-[9px] font-black italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase active:scale-95 group/btn"
+                              className={`${CTA_ACTIVE} group/btn`}
                               style={{
                                 background: `linear-gradient(135deg, #e6b800, ${ledAccent})`,
                                 color:       "#03070b",
                                 boxShadow:  `0 0 20px ${ledAccent}25`,
                               }}
                             >
-                              INSCRIBIRME <Zap className="h-3 w-3 fill-current transition-transform group-hover/btn:scale-110" />
+                              <span>INSCRIBIRME</span>
+                              <Zap className={`${CTA_ICON} fill-current transition-transform group-hover/btn:scale-110`} />
                             </button>
                           ) : (
                             <button
+                              type="button"
                               onClick={(e) => handleRegistrationClick(e, race)}
-                              className="w-full h-full py-5 bg-cyan-500 hover:bg-cyan-400 rounded-2xl text-[9px] font-black text-black italic tracking-[0.2em] transition-all flex items-center justify-center gap-2 uppercase active:scale-95 shadow-[0_0_20px_rgba(0,242,255,0.15)] group/btn"
+                              className={`${CTA_ACTIVE} bg-cyan-500 hover:bg-cyan-400 text-black shadow-[0_0_20px_rgba(0,242,255,0.15)] group/btn`}
                             >
-                              INSCRIBIRME <Zap className="h-3 w-3 fill-current transition-transform group-hover/btn:scale-110" />
+                              <span>INSCRIBIRME</span>
+                              <Zap className={`${CTA_ICON} fill-current transition-transform group-hover/btn:scale-110`} />
                             </button>
                           )}
                         </>
