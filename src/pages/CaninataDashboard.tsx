@@ -4,6 +4,15 @@
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
+ * CHANGELOG V1.9 (evolución de V1.8 — CLASIFICACIÓN POR DISTANCIA):
+ * [V1.9-1] Monitor con filtro General / 5K / 10K (píldoras con contador).
+ *          "General" conserva exactamente la vista de V1.8.
+ * [V1.9-2] Clasificación por distancia: solo llegadas (Meta; en 5K también el
+ *          arco KM5 cuando Dirección activó "KM5 = meta 5K"), UNA por dorsal
+ *          (la primera), orden por tiempo oficial (corregido si fue auditado),
+ *          columna "Pos." con podio 1-2-3 resaltado. Sin tope de 100 filas.
+ * [V1.9-3] Solo lectura: no cambia RPC, marcas, publicación ni resultados públicos.
+ *
  * CHANGELOG V1.8 (evolución de V1.7 — RACE DAY HARDENING + RACE DAY UI):
  * Objetivo: que el cronometraje no sature Supabase y que NINGUNA hora capturada
  * se pierda cuando la base responde lento o con error. Mismos RPC, mismos
@@ -507,6 +516,16 @@ const CANINATA_GLASS_STYLES = String.raw`/* RAYOCERO | LIQUID GLASS UI — scope
 .rc-fast-row.rescued{border-color:rgba(253,212,84,.5);background:rgba(253,212,84,.08)}
 .rc-fast-row.blocked{border-color:rgba(255,128,96,.55);background:rgba(255,128,96,.09)}
 .rc-fast-reason{color:#ffc49a!important;white-space:normal;max-width:46ch;line-height:1.4}
+/* V1.9 · filtro de distancia y podio */
+.rc-table-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.rc-dist-filter{display:inline-flex;gap:6px;padding:4px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)}
+.rc-dist-filter button{border:0;cursor:pointer;border-radius:999px;padding:9px 14px;min-height:38px;font-size:11px;font-weight:900;letter-spacing:.06em;color:rgba(255,255,255,.62);background:transparent;white-space:nowrap}
+.rc-dist-filter button.active{background:linear-gradient(110deg,#FDD454,#D9FC6B);color:#142014}
+.rc-dist-filter button:focus-visible{outline:2px solid #FDD454;outline-offset:2px}
+.rc-pos{display:inline-grid;place-items:center;min-width:30px;height:30px;padding:0 6px;border-radius:999px;font-size:13px;font-weight:900;color:rgba(255,255,255,.75);background:rgba(255,255,255,.06);font-variant-numeric:tabular-nums}
+.rc-pos.podium{background:linear-gradient(120deg,#FDD454,#D9FC6B);color:#142014}
+.rc-podium-row td{background:rgba(253,212,84,.045)}
+@media(max-width:700px){.rc-table-head{flex-direction:column;align-items:stretch}.rc-table-tools{justify-content:space-between}.rc-dist-filter{flex:1}.rc-dist-filter button{flex:1;padding:9px 8px}}
 @media(max-width:860px){
   .rcx-hero{grid-template-columns:1fr;align-items:start}
   .rcx-hero-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -2366,6 +2385,7 @@ function CaninataTiming({ raceId }: { raceId: string }) {
   const [editMark, setEditMark] = useState<Mark | null>(null);
   const [editReason, setEditReason] = useState("");
   const [editTime, setEditTime] = useState("");
+  const [distFilter, setDistFilter] = useState<"all" | "5K" | "10K">("all"); // [V1.9-1]
   const inputRef = useRef<HTMLInputElement | null>(null);
   const offsetRef = useRef(0); // servidor - reloj local, en ms
   const rttRef = useRef<number | null>(null);
@@ -2935,8 +2955,39 @@ function CaninataTiming({ raceId }: { raceId: string }) {
     if (a.checkpoint !== b.checkpoint) return a.checkpoint === 'finish' ? -1 : 1;
     return sortByArrival(a,b);
   }), [marks]);
+  /**
+   * [V1.9-2] Clasificación por distancia.
+   * - Llegada 10K: marca "finish".
+   * - Llegada 5K: marca "finish"; si Dirección activó "KM5 = meta 5K", también "km5".
+   * - Una llegada por dorsal (la de menor tiempo), orden por elapsed_ms del servidor.
+   */
+  const fiveKAtKm5 = !!clock?.five_k_finish_at_km5;
+  const classification = useMemo(() => {
+    const normMod = (m: Mark) => String(m.modality ?? "").toUpperCase().replace(/\s+/g, "");
+    const build = (dist: "5K" | "10K") => {
+      const seen = new Set<string>();
+      return marks
+        .filter(m => normMod(m) === dist &&
+          (m.checkpoint === "finish" || (dist === "5K" && fiveKAtKm5 && m.checkpoint === "km5")))
+        .sort(sortByArrival)
+        .filter(m => {
+          const key = m.bib.replace(/\D/g, "").replace(/^0+(?=\d)/, "") || m.bib;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .map((m, i) => ({ ...m, pos: i + 1 }));
+    };
+    return { "5K": build("5K"), "10K": build("10K") };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marks, fiveKAtKm5]);
   const pendingReview = marks.filter(m => m.needs_review);
   const isAdmin = activeRole === "admin";
+  // [V1.9-1] Filas del monitor según filtro. "General" = vista V1.8 sin cambios.
+  const monitorRows: (Mark & { pos?: number })[] = distFilter === "all"
+    ? (isAdmin ? rankedMonitor : registered).slice(0, 100)
+    : classification[distFilter];
+  const monitorCols = (isAdmin ? 7 : 6) + (distFilter === "all" ? 0 : 1);
   const isOperator = activeRole === "km5" || activeRole === "finish";
   const dateDisplay = clock?.started_at ? new Date(clock.started_at).toLocaleString("es-VE", { dateStyle: "medium", timeStyle: "medium" }) : "Esperando salida";
 
@@ -3030,11 +3081,11 @@ function CaninataTiming({ raceId }: { raceId: string }) {
               {(captureMode === "fast" || taps.length > 0) && <div className="rc-fast-list"><div className="rc-fast-list-title">CRUCES SIN ASIGNAR <span>{taps.length}</span></div>{taps.slice().sort((a,b) => a.observed_at.localeCompare(b.observed_at)).map((t,i) => <div className={`rc-fast-row${t.blocked ? " blocked" : t.origin_bib ? " rescued" : ""}`} key={t.request_id}><div className="rc-fast-stamp"><small>#{i+1} · {t.blocked ? "NO ACEPTADO · anotar en planilla" : t.stored ? "En servidor" : "Pendiente de envío"}{t.origin_bib ? ` · rechazado como #${t.origin_bib}` : ""}</small><strong>{formatMs(startedMs ? new Date(t.observed_at).getTime()-startedMs : 0)}</strong>{(t.blocked || t.reason) && <small className="rc-fast-reason">{t.blocked || t.reason}</small>}</div><form onSubmit={e => {e.preventDefault();assignTap(t);}}><input aria-label={`Dorsal del cruce ${i+1}`} inputMode="numeric" placeholder={t.origin_bib ? `Era #${t.origin_bib}` : "Dorsal"} value={tapBib[t.request_id] ?? t.bib ?? ""} onChange={e=>setTapBib(o=>({...o,[t.request_id]:e.target.value}))} /><button className="rc-btn rc-btn-primary" type="submit">ASIGNAR</button></form></div>)}{taps.length===0 && <p className="rc-muted">Los cruces capturados aparecerán aquí para asociar el dorsal sin perder la hora.</p>}</div>}
               <div className="rc-operation-hint">{clock?.status !== "running" ? <><AlertTriangle size={16} /> Espera a que dirección inicie la salida.</> : <><CheckCircle2 size={16} /> Hora capturada en el toque. Cada dorsal se acepta una sola vez por punto.</>}{pending.length > 0 && <button className="rc-text-button" onClick={() => void flushQueue(pending)}>Reintentar {pending.length} en cola</button>}</div>
             </section>}
-            <section className="rc-glass rc-table-card"><div className="rc-table-head"><div><p className="rc-eyebrow"><Activity size={13} /> LIVE ACTIVITY</p><h2>{isAdmin ? "Llegadas ordenadas por tiempo" : "Registros ordenados por tiempo"}</h2></div><button className="rc-btn rc-btn-subtle" onClick={() => { void refreshMarks(); void syncClock(); }}><RefreshCw size={15} /> Actualizar</button></div>
-              <div className="rc-table-scroll"><table className="rc-table"><thead><tr><th>Dorsal</th><th>Atleta</th><th>Distancia</th><th>Punto</th><th>Tiempo</th><th>Estado</th>{isAdmin && <th>Acción</th>}</tr></thead><tbody>
-                {(isAdmin ? rankedMonitor : registered).slice(0, 100).map(m => <tr key={m.id}><td><strong className="rc-bib">#{m.bib}</strong></td><td>{m.name}</td><td><span className="rc-chip">{m.modality}</span></td><td>{m.checkpoint === "finish" ? "Meta" : "KM 5"}</td><td className="rc-time-cell">{formatMs(Number(m.elapsed_ms))}</td><td><span className={`rc-mark-status ${m.needs_review ? "review" : "confirmed"}`}>{m.needs_review ? "Revisar" : "Confirmado"}</span></td>{isAdmin && <td><button className="rc-text-button" onClick={() => { setEditMark(m); setEditTime(""); setEditReason(""); }}>Auditar / corregir</button></td>}</tr>)}
-                {(isAdmin ? rankedMonitor : registered).length === 0 && <tr><td colSpan={isAdmin ? 7 : 6} className="rc-empty-cell">Todavía no hay marcas registradas.</td></tr>}
-              </tbody></table></div><div className="rc-table-foot">Primeras 100 marcas por tiempo ascendente (Meta y luego KM5) · Actualización cada 4,5 s · {marks.length} marcas en base de datos</div>
+            <section className="rc-glass rc-table-card"><div className="rc-table-head"><div><p className="rc-eyebrow"><Activity size={13} /> LIVE ACTIVITY</p><h2>{distFilter === "all" ? (isAdmin ? "Llegadas ordenadas por tiempo" : "Registros ordenados por tiempo") : `Clasificación ${distFilter}`}</h2></div><div className="rc-table-tools"><div className="rc-dist-filter" role="tablist" aria-label="Filtrar por distancia">{(["all", "5K", "10K"] as const).map(d => <button key={d} type="button" role="tab" aria-selected={distFilter === d} className={distFilter === d ? "active" : ""} onClick={() => setDistFilter(d)}>{d === "all" ? "General" : `${d} · ${classification[d].length}`}</button>)}</div><button className="rc-btn rc-btn-subtle" onClick={() => { void refreshMarks(); void syncClock(); }}><RefreshCw size={15} /> Actualizar</button></div></div>
+              <div className="rc-table-scroll"><table className="rc-table"><thead><tr>{distFilter !== "all" && <th>Pos.</th>}<th>Dorsal</th><th>Atleta</th><th>Distancia</th><th>Punto</th><th>Tiempo</th><th>Estado</th>{isAdmin && <th>Acción</th>}</tr></thead><tbody>
+                {monitorRows.map(m => <tr key={m.id} className={m.pos != null && m.pos <= 3 ? "rc-podium-row" : undefined}>{distFilter !== "all" && <td><strong className={`rc-pos${m.pos != null && m.pos <= 3 ? " podium" : ""}`}>{m.pos}</strong></td>}<td><strong className="rc-bib">#{m.bib}</strong></td><td>{m.name}</td><td><span className="rc-chip">{m.modality}</span></td><td>{m.checkpoint === "finish" ? "Meta" : distFilter === "5K" ? "Meta 5K (arco KM5)" : "KM 5"}</td><td className="rc-time-cell">{formatMs(Number(m.elapsed_ms))}</td><td><span className={`rc-mark-status ${m.needs_review ? "review" : "confirmed"}`}>{m.needs_review ? "Revisar" : "Confirmado"}</span></td>{isAdmin && <td><button className="rc-text-button" onClick={() => { setEditMark(m); setEditTime(""); setEditReason(""); }}>Auditar / corregir</button></td>}</tr>)}
+                {monitorRows.length === 0 && <tr><td colSpan={monitorCols} className="rc-empty-cell">{distFilter === "all" ? "Todavía no hay marcas registradas." : `Todavía no hay llegadas ${distFilter}.`}</td></tr>}
+              </tbody></table></div><div className="rc-table-foot">{distFilter === "all" ? <>Primeras 100 marcas por tiempo ascendente (Meta y luego KM5) · Actualización cada 4,5 s · {marks.length} marcas en base de datos</> : <>Clasificación {distFilter}: {monitorRows.length} llegadas · una por dorsal · orden por tiempo oficial (corregido si fue auditado){distFilter === "5K" && fiveKAtKm5 ? " · arco KM5 cuenta como meta 5K" : ""}</>}</div>
             </section>
           </>}
           <footer className="rc-footer">RAYOCERO TIMING SYSTEM <span>•</span> VALKYRON GROUP <span>•</span> CAPTURA MANUAL CON AUDITORÍA</footer>
