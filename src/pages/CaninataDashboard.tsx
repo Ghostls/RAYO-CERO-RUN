@@ -4,6 +4,41 @@
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
  *
+ * CHANGELOG V1.8 (evolución de V1.7 — RACE DAY HARDENING + RACE DAY UI):
+ * Objetivo: que el cronometraje no sature Supabase y que NINGUNA hora capturada
+ * se pierda cuando la base responde lento o con error. Mismos RPC, mismos
+ * parámetros, misma semántica temporal (observed_at = hora servidor estimada
+ * en el instante del toque, offset NTP con 4 muestras de menor RTT).
+ * [V1.8-1] call(): RpcError conserva code (Postgres/PostgREST) y status HTTP;
+ *          timeout de cliente (12 s RPC, 6 s reloj) para que una petición
+ *          colgada no bloquee la cola de envío.
+ * [V1.8-2] Clasificación de errores. ANTES: cualquier error cuyo texto no
+ *          contuviera "network/timeout/failed to fetch" se trataba como
+ *          rechazo de validación y la captura se BORRABA de la cola. Con
+ *          Supabase degradado (503 PGRST000/001, 5xx, JWT expirado) eso
+ *          perdía tiempos. AHORA: transporte (status 0/408/429/5xx, timeout,
+ *          PGRST0xx, 08/53/57xxx) → se conserva y reintenta; rechazo de
+ *          negocio (P0xxx, 22xxx, 23xxx) → ver [V1.8-3]; resto → se conserva
+ *          y se reintenta sin bloquear las capturas que vienen detrás.
+ * [V1.8-3] Rechazo de negocio en "Dorsal + marca" (dorsal inexistente, typo):
+ *          la HORA no se descarta; pasa a "Cruces sin asignar" (Fast-tap) con
+ *          el dorsal original como referencia, para reasignarla.
+ * [V1.8-4] Sondeo anti-saturación: una sola petición en vuelo por recurso,
+ *          siguiente ciclo programado al terminar el anterior (sin solapes),
+ *          jitter ±15 %, backoff exponencial (tope 30 s marcas / 60 s reloj),
+ *          pausa con la pestaña oculta y reanudación inmediata al volver.
+ *          Marcas: 4,5 s Dirección / 8 s operadores. Reloj: 20 s (igual).
+ *          Sincronizaciones de reloj serializadas (nunca concurrentes).
+ * [V1.8-5] Cronómetro aislado en componentes propios: antes TODO el módulo
+ *          (tabla de 100 filas incluida) se re-renderizaba cada 40 ms; en
+ *          teléfonos de gama baja eso retrasa el toque de captura.
+ * [V1.8-6] Estado de conexión explícito: Online / Degradado / Sin red.
+ *          Al recuperar la red se envía de inmediato la cola pendiente.
+ * [V1.8-7] UI "Race Day" (dark sport editorial, paleta RAYOCERO): titular
+ *          display, píldoras, tarjetas glass; responsive 320 px → desktop.
+ *          Solo CSS + marcado de presentación; no toca lógica de inscritos,
+ *          pagos, kits, franela, comprobantes ni publicación de resultados.
+ *
  * CHANGELOG V1.7 (evolución de V1.6):
  * [V1.7-1] Marcas del monitor ordenadas por tiempo ascendente; Meta antes que KM5.
  * [V1.7-2] Publicación controlada de resultados/certificados desde Dirección.
@@ -70,7 +105,7 @@
  * [V1.0-3] Tabla atletas, TasaConfig, buscador, contadores.
  */
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react"; // [V1.3] + useRef
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react"; // [V1.3] + useRef · [V1.8-5] + memo
 import { createPortal } from "react-dom";                                    // [V1.3-4]
 import { supabase } from "@/lib/supabase";
 import {
@@ -413,6 +448,78 @@ const CANINATA_GLASS_STYLES = String.raw`/* RAYOCERO | LIQUID GLASS UI — scope
 .rc-reset-busy {font-size:11px;color:#fdd454;display:flex;gap:7px;align-items:center;}
 @media(max-width:800px){.rc-dir-actions{grid-template-columns:1fr}.rc-dir-card{padding:19px}.rc-dir-heading{gap:10px}.rc-reset-buttons{grid-template-columns:1fr}}
 @media(max-width:420px){.rc-reset-preview>div{padding:12px 5px}.rc-reset-preview strong{font-size:23px}.rc-dir-icon{width:39px;height:39px}}
+
+/* ═══ V1.8 · RACE DAY — editorial deportivo oscuro (ref. "Track your progress") + paleta RAYOCERO ═══ */
+.rcgl-dashboard,.rcgl-login-layout{
+  background:
+    radial-gradient(ellipse 55% 45% at 88% -4%,rgba(253,212,84,.14),transparent 70%),
+    radial-gradient(ellipse 42% 40% at -6% 104%,rgba(217,252,107,.08),transparent 75%),
+    linear-gradient(160deg,#1b1e1a 0%,#0f110e 46%,#0a0b09 100%) !important;
+}
+.rcx-display{font-family:"Archivo Black","Arial Black","Helvetica Neue",Arial,sans-serif;font-weight:900;
+  text-transform:uppercase;letter-spacing:-.045em;line-height:.9;font-style:normal}
+.rcx-hero{position:relative;overflow:hidden;border-radius:28px;padding:clamp(20px,4vw,48px);
+  display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:clamp(16px,3vw,36px);align-items:end;
+  background:linear-gradient(118deg,rgba(255,255,255,.065),rgba(255,255,255,.015) 60%,rgba(253,212,84,.04));
+  border:1px solid rgba(255,255,255,.09);box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 30px 80px rgba(0,0,0,.35)}
+.rcx-hero-glow{position:absolute;top:-55%;right:-12%;width:68%;height:190%;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(253,212,84,.20),rgba(217,252,107,.05) 55%,transparent);filter:blur(28px)}
+.rcx-hero-copy{position:relative;min-width:0}
+.rcx-kicker{display:inline-flex;align-items:center;gap:9px;margin:0 0 18px;padding:8px 14px;border-radius:999px;
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);font-size:10px;font-weight:900;
+  letter-spacing:.2em;color:rgba(255,255,255,.78)}
+.rcx-live-dot{width:8px;height:8px;border-radius:50%;background:#d9fc6b;flex:0 0 auto;
+  box-shadow:0 0 0 4px rgba(217,252,107,.12),0 0 14px #d9fc6b}
+.rcx-hero-title{margin:0;font-size:clamp(40px,8.4vw,112px);color:#f6f7f2;overflow-wrap:anywhere}
+.rcx-slash{color:#FDD454}
+.rcx-hero-cards{position:relative;display:grid;gap:12px;min-width:0}
+.rcx-mini{min-width:0;padding:16px 18px;border-radius:20px;background:rgba(12,14,11,.58);
+  border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  display:flex;flex-direction:column;gap:7px}
+.rcx-mini span{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)}
+.rcx-mini strong{font-size:clamp(28px,3.4vw,42px);font-weight:900;letter-spacing:-.045em;line-height:1;color:#fff;
+  font-variant-numeric:tabular-nums}
+.rcx-mini small{font-size:11px;color:rgba(255,255,255,.46)}
+.rcx-bar{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}
+.rcx-bar i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#FDD454,#D9FC6B);transition:width .6s ease}
+.rcx-login-title{font-size:clamp(36px,10vw,52px)!important;font-style:normal!important;letter-spacing:-.05em!important}
+/* píldoras y tarjetas */
+.rcgl-navbar{background:rgba(14,16,13,.78)!important;border-color:rgba(255,255,255,.07)!important}
+.rcgl-tab,.rcgl-tabbar>button:not(.rcgl-tab){border-radius:999px!important}
+.rcgl-stat{background:linear-gradient(140deg,rgba(255,255,255,.07),rgba(255,255,255,.02))!important;border-color:rgba(255,255,255,.09)!important}
+.rcgl-stat p:first-child{letter-spacing:.14em!important}
+.rcgl-roster,.rcgl-kits-progress,.rcgl-kits-panel,.rcgl-tarifas{background:linear-gradient(140deg,rgba(255,255,255,.06),rgba(255,255,255,.015))!important;border-color:rgba(255,255,255,.09)!important}
+/* cronometraje: lienzo grafito, cifras grandes y estables */
+.rc-glass-page{background:
+  radial-gradient(ellipse 60% 34% at 92% -4%,rgba(253,212,84,.12),transparent 72%),
+  radial-gradient(ellipse 40% 34% at 0% 60%,rgba(217,252,107,.05),transparent 80%),
+  linear-gradient(160deg,#1b1e1a,#0d0f0c 45%,#0a0b09)}
+.rc-glass{background:rgba(255,255,255,.045);border-color:rgba(255,255,255,.09)}
+.rc-section-heading h1.rcx-display{font-size:clamp(34px,6vw,76px);letter-spacing:-.05em;line-height:.9;margin-bottom:14px}
+.rc-section-heading h1.rcx-display span{color:#FDD454}
+.rc-clock-panel{background:linear-gradient(135deg,rgba(255,255,255,.08),rgba(255,255,255,.02))!important}
+.rc-primary-time{font-size:clamp(40px,6.6vw,92px);letter-spacing:-.06em;color:#fbfcf6}
+.rc-btn{border-radius:999px}
+.rc-btn-primary{background:linear-gradient(110deg,#FDD454,#D9FC6B)}
+.rc-capture-modes button{border-radius:999px}
+.rc-header-badge{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.12);color:#fff}
+.rc-connection.degraded{color:#fdd454}
+.rc-fast-row.rescued{border-color:rgba(253,212,84,.5);background:rgba(253,212,84,.08)}
+.rc-fast-row.blocked{border-color:rgba(255,128,96,.55);background:rgba(255,128,96,.09)}
+.rc-fast-reason{color:#ffc49a!important;white-space:normal;max-width:46ch;line-height:1.4}
+@media(max-width:860px){
+  .rcx-hero{grid-template-columns:1fr;align-items:start}
+  .rcx-hero-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:700px){
+  .rc-primary-time{font-size:clamp(30px,10.5vw,54px);letter-spacing:-.07em}
+  .rc-btn{border-radius:16px}
+}
+@media(max-width:380px){
+  .rcx-hero{padding:18px;border-radius:22px}
+  .rcx-mini{padding:13px}
+  .rcx-mini strong{font-size:26px}
+}
 `;
 
 // ─── CONSTANTES ──────────────────────────────────────────────────────────────
@@ -1294,7 +1401,7 @@ const PinGate = ({ onAuth }: { onAuth: () => void }) => {
             <Dog size={28} style={{ color: YELLOW }} />
           </div>
           <h1
-            className="text-2xl font-black italic uppercase leading-none mb-1"
+            className="rcx-display rcx-login-title text-2xl font-black italic uppercase leading-none mb-1" /* [V1.8-7] */
             style={{ color: "#ffffff" }}
           >
             Caninata
@@ -1538,6 +1645,7 @@ const CaninataDashboardMain = ({ onLogout }: { onLogout: () => void }) => {
   const count10k = atletas.filter(a => a.modalidad === "10K").length;
   const count5k  = atletas.filter(a => a.modalidad === "5K").length;
   const franelasPost = atletas.filter(a => a.franela_post_carrera).length;
+  const kitsPct  = total > 0 ? Math.round((kits / total) * 100) : 0; // [V1.8-7] hero
 
   return (
     <div className="rcgl-dashboard min-h-screen font-sans" style={{ background: BG, color: "#ffffff" }}>
@@ -1575,6 +1683,31 @@ const CaninataDashboardMain = ({ onLogout }: { onLogout: () => void }) => {
       </nav>
 
       <div className="rcgl-content max-w-6xl mx-auto px-4 py-8 space-y-6">
+
+        {/* [V1.8-7] HERO RACE DAY — solo presentación (lee los mismos contadores) */}
+        <section className="rcx-hero" aria-label="Resumen del día de carrera">
+          <div className="rcx-hero-glow" aria-hidden="true" />
+          <div className="rcx-hero-copy">
+            <p className="rcx-kicker"><span className="rcx-live-dot" aria-hidden="true" /> RAYOCERO · RACE DAY</p>
+            <h1 className="rcx-display rcx-hero-title">
+              Caninata<br />
+              <span className="rcx-slash">//</span> {race?.name?.replace(/caninata/i, "").trim() || "Barquisimeto"}
+            </h1>
+          </div>
+          <div className="rcx-hero-cards">
+            <div className="rcx-mini">
+              <span>Kits entregados</span>
+              <strong>{kitsPct}%</strong>
+              <div className="rcx-bar" aria-hidden="true"><i style={{ width: `${kitsPct}%` }} /></div>
+              <small>{kits} de {total} participantes</small>
+            </div>
+            <div className="rcx-mini">
+              <span>Pagos verificados</span>
+              <strong>{pagados}</strong>
+              <small>de {total} inscritos · {count10k} 10K / {count5k} 5K</small>
+            </div>
+          </div>
+        </section>
 
         {error && (
           <div className="p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-sm font-bold flex items-center gap-2">
@@ -2056,7 +2189,12 @@ type Pending = {
   rtt: number | null;
 };
 type Notice = { kind: "ok" | "error" | "warn"; text: string };
-type Tap = { request_id: string; checkpoint: Point; observed_at: string; rtt: number | null; stored?: boolean; bib?: string };
+type Tap = {
+  request_id: string; checkpoint: Point; observed_at: string; rtt: number | null; stored?: boolean; bib?: string;
+  origin_bib?: string; // [V1.8-3] dorsal tecleado originalmente (captura rechazada y rescatada)
+  reason?: string;     // [V1.8-3] motivo del rechazo devuelto por el servidor
+  blocked?: string;    // [V1.8-2] el servidor no aceptó guardar el cruce: solo existe en este dispositivo
+};
 type ResetPreview = {
   race_id: string;
   race_name: string;
@@ -2084,14 +2222,116 @@ const formatMs = (ms: number | null | undefined) => {
   const s = String(Math.floor(v / 1000) % 60).padStart(2, "0");
   return `${h}:${m}:${s}.${String(v % 1000).padStart(3, "0")}`;
 };
-const call = async <T,>(name: string, params?: Record<string, unknown>): Promise<T> => {
-  const { data, error } = await supabase.rpc(name, params || {});
-  if (error) throw new Error(error.message);
-  return data as T;
+const msgError = (e: unknown) => e instanceof Error ? e.message : String(e);
+
+/** [V1.8-1] Error RPC con el código Postgres/PostgREST y el status HTTP preservados. */
+class RpcError extends Error {
+  code: string;
+  status: number;
+  constructor(message: string, code = "", status = 0) {
+    super(message);
+    this.name = "RpcError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
+const RPC_TIMEOUT_MS         = 12_000; // [V1.8-1] captura / listado / control
+const CLOCK_TIMEOUT_MS       = 6_000;  // [V1.8-1] muestra de reloj (si tarda más, su RTT no sirve)
+const MARKS_POLL_ADMIN_MS    = 4_500;  // [V1.8-4] igual que V1.7 para Dirección
+const MARKS_POLL_OPERATOR_MS = 8_000;  // [V1.8-4] el operador ve sus capturas al instante tras enviar
+const CLOCK_SYNC_MS          = 20_000; // [V1.8-4] igual que V1.7
+
+/**
+ * [V1.8-1] RPC con timeout de cliente. La petición abandonada puede terminar en
+ * el servidor: es seguro porque cada captura viaja con su request_id y el
+ * servidor deduplica (un reintento devuelve "duplicate", nunca una segunda marca).
+ */
+const call = async <T,>(
+  name: string,
+  params?: Record<string, unknown>,
+  timeoutMs: number = RPC_TIMEOUT_MS,
+): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new RpcError(`Sin respuesta del servidor en ${Math.round(timeoutMs / 1000)} s (${name})`, "CLIENT_TIMEOUT", 0)),
+      timeoutMs,
+    );
+  });
+  try {
+    const res = await Promise.race([Promise.resolve(supabase.rpc(name, params || {})), timeout]);
+    if (res.error) {
+      throw new RpcError(res.error.message || `Error en ${name}`, res.error.code || "", res.status ?? 0);
+    }
+    return res.data as T;
+  } catch (e) {
+    if (e instanceof RpcError) throw e;
+    throw new RpcError(msgError(e), "CLIENT_NETWORK", 0);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 };
 const networkError = (e: unknown) =>
   /failed to fetch|network|timeout|offline|load failed|fetcherror/i.test(String(e));
-const msgError = (e: unknown) => e instanceof Error ? e.message : String(e);
+
+/**
+ * [V1.8-2] Fallo de transporte / servidor saturado: la captura se conserva y
+ * se reintenta. Incluye 503 de PostgREST cuando la base está "unhealthy".
+ */
+const isTransportFailure = (e: unknown): boolean => {
+  if (networkError(e)) return true;
+  if (!(e instanceof RpcError)) return true; // desconocido = conservar
+  const { status, code } = e;
+  if (code === "CLIENT_TIMEOUT" || code === "CLIENT_NETWORK") return true;
+  if (status === 0 || status === 408 || status === 429 || status >= 500) return true;
+  if (/^PGRST0/.test(code)) return true;          // conexión PostgREST ↔ Postgres
+  if (/^(08|53|57)/.test(code)) return true;      // conexión, recursos, statement timeout
+  if (code === "40001" || code === "40P01") return true; // serialización / deadlock
+  return false;
+};
+
+/**
+ * [V1.8-2] Rechazo definitivo de negocio (RAISE EXCEPTION de la función,
+ * dato inválido, restricción). Reintentar no cambia el resultado.
+ */
+const isBusinessRejection = (e: unknown): boolean =>
+  e instanceof RpcError && !isTransportFailure(e) && /^(P0|22|23)/.test(e.code);
+
+/** [V1.8-5] Hora servidor estimada (Date.now + offset NTP), refrescada solo en este nodo. */
+const useServerNow = (offsetRef: React.MutableRefObject<number>, intervalMs: number, active: boolean) => {
+  const [now, setNow] = useState(() => Date.now() + offsetRef.current);
+  useEffect(() => {
+    if (!active) return;
+    setNow(Date.now() + offsetRef.current);
+    const id = window.setInterval(() => setNow(Date.now() + offsetRef.current), intervalMs);
+    return () => window.clearInterval(id);
+  }, [offsetRef, intervalMs, active]);
+  return now;
+};
+
+/** [V1.8-5] Hora del servidor (HH:MM:SS) — 4 refrescos por segundo. */
+const ServerClockText = memo(function ServerClockText({ offsetRef }: { offsetRef: React.MutableRefObject<number> }) {
+  const now = useServerNow(offsetRef, 250, true);
+  return <span className="rc-mono">{new Date(now).toLocaleTimeString("es-VE", { hour12: false })}</span>;
+});
+
+/**
+ * [V1.8-5] Cronómetro oficial. Misma fórmula que V1.7:
+ * transcurrido = (closed_at ?? ahoraServidor) − started_at. Solo corre en "running".
+ */
+const ElapsedClock = memo(function ElapsedClock({ offsetRef, status, startedAt, closedAt }: {
+  offsetRef: React.MutableRefObject<number>;
+  status: SessionState | null;
+  startedAt: string | null;
+  closedAt: string | null;
+}) {
+  const now = useServerNow(offsetRef, 50, status === "running");
+  if (!status || status === "ready") return <>00:00:00.000</>;
+  const startedMs = startedAt ? new Date(startedAt).getTime() : null;
+  const elapsed = startedMs == null ? 0 : Math.max(0, (closedAt ? new Date(closedAt).getTime() : now) - startedMs);
+  return <>{formatMs(elapsed)}</>;
+});
 
 /** Route: /operacion/caninata/cronometraje (la ruta la define tu router). */
 function CaninataTiming({ raceId }: { raceId: string }) {
@@ -2103,7 +2343,8 @@ function CaninataTiming({ raceId }: { raceId: string }) {
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [clock, setClock] = useState<ClockState | null>(null);
   const [marks, setMarks] = useState<Mark[]>([]);
-  const [nowMs, setNowMs] = useState(Date.now());
+  // [V1.8-5] nowMs (tick de 40 ms que re-renderizaba todo el módulo) se movió a ElapsedClock / ServerClockText.
+  const [degraded, setDegraded] = useState(false); // [V1.8-6] servidor lento o con errores de transporte
   const [clockRtt, setClockRtt] = useState<number | null>(null);
   const [online, setOnline] = useState(() => navigator.onLine);
   const [bib, setBib] = useState("");
@@ -2132,6 +2373,19 @@ function CaninataTiming({ raceId }: { raceId: string }) {
   const tapFlushingRef = useRef(false);
   const readyRef = useRef(false);
   const lastClockRef = useRef<ClockState | null>(null);
+  const failStreakRef = useRef(0);                                  // [V1.8-6]
+  const marksInFlightRef = useRef<Promise<boolean> | null>(null);   // [V1.8-4] single-flight marcas
+  const marksDirtyRef = useRef(false);                              // [V1.8-4] refresco pedido durante vuelo
+  const clockChainRef = useRef<Promise<void>>(Promise.resolve());   // [V1.8-4] syncs de reloj en serie
+  const noteServerOk = useCallback(() => {                          // [V1.8-6]
+    failStreakRef.current = 0;
+    setDegraded(false);
+  }, []);
+  const noteServerFail = useCallback((e: unknown) => {              // [V1.8-6]
+    if (!isTransportFailure(e)) return;
+    failStreakRef.current += 1;
+    if (failStreakRef.current >= 2) setDegraded(true);
+  }, []);
   const queueKey = useMemo(() => `rc_timing_queue:${raceId}:${userId || "anon"}`, [raceId, userId]);
   const tapKey = useMemo(() => `rc_timing_taps:${raceId}:${userId || "anon"}`, [raceId, userId]);
   const runKey = useMemo(() => `rc_timing_run:${raceId}:${userId || "anon"}`, [raceId, userId]);
@@ -2238,23 +2492,25 @@ function CaninataTiming({ raceId }: { raceId: string }) {
     });
   }, [queueKey]);
 
-  const syncClock = useCallback(async () => {
+  const syncClockOnce = useCallback(async () => { // [V1.8-4] cuerpo original de syncClock, intacto salvo timeout/estado
     if (!assignment) return;
     // Mejor muestra de 4 RTT; sincronización aproximada tipo NTP.
     let best: { rtt: number; offset: number; data: ClockState } | null = null;
     for (let i = 0; i < 4; i++) {
       const t0 = Date.now();
       try {
-        const data = await call<ClockState>("rc_timing_clock", { p_race_id: raceId });
+        const data = await call<ClockState>("rc_timing_clock", { p_race_id: raceId }, CLOCK_TIMEOUT_MS); // [V1.8-1]
         const t1 = Date.now();
         const rtt = t1 - t0;
         const offset = new Date(data.server_now).getTime() - (t0 + t1) / 2;
         if (!best || rtt < best.rtt) best = { rtt, offset, data };
       } catch (e) {
+        noteServerFail(e); // [V1.8-6]
         if (i === 3 && !best) throw e;
       }
     }
     if (!best) return;
+    noteServerOk(); // [V1.8-6]
     offsetRef.current = best.offset;
     rttRef.current = best.rtt;
     setClockRtt(best.rtt);
@@ -2279,25 +2535,112 @@ function CaninataTiming({ raceId }: { raceId: string }) {
     setClock(best.data);
     lastClockRef.current = best.data;
     readyRef.current = true;
-  }, [assignment, raceId, queueKey, tapKey, runKey]);
+  }, [assignment, raceId, queueKey, tapKey, runKey, noteServerOk, noteServerFail]);
 
-  const refreshMarks = useCallback(async () => {
-    if (!assignment) return;
-    try { setMarks(await call<Mark[]>("rc_timing_list", { p_race_id: raceId })); }
-    catch (e) { if (navigator.onLine) setNotice({ kind: "warn", text: `No se actualizó el monitor: ${msgError(e)}` }); }
-  }, [assignment, raceId]);
+  /**
+   * [V1.8-4] Sincronizaciones de reloj SERIALIZADAS: el sondeo, "Actualizar" y
+   * las acciones de Dirección nunca lanzan dos rondas de 4 muestras a la vez.
+   * Quien llama recibe una sincronización posterior a su petición (estado fresco
+   * tras iniciar/cerrar la salida).
+   */
+  const syncClock = useCallback((): Promise<void> => {
+    const run = clockChainRef.current.then(() => syncClockOnce());
+    clockChainRef.current = run.catch(() => undefined);
+    return run;
+  }, [syncClockOnce]);
 
+  /**
+   * [V1.8-4] Single-flight: si ya hay un listado en vuelo, no se lanza otro;
+   * se marca "dirty" y se repite UNA vez al terminar (para que una captura
+   * recién enviada aparezca). Devuelve true si el último listado tuvo éxito.
+   */
+  const refreshMarks = useCallback(async (): Promise<boolean> => {
+    if (!assignment) return false;
+    if (marksInFlightRef.current) {
+      marksDirtyRef.current = true;
+      return marksInFlightRef.current;
+    }
+    const run = (async () => {
+      let ok = false;
+      do {
+        marksDirtyRef.current = false;
+        try {
+          setMarks(await call<Mark[]>("rc_timing_list", { p_race_id: raceId }));
+          ok = true;
+          noteServerOk();
+        } catch (e) {
+          ok = false;
+          noteServerFail(e);
+          // No tapar un aviso de captura (error) con el aviso del monitor.
+          if (navigator.onLine) setNotice(prev => prev?.kind === "error" ? prev : { kind: "warn", text: `No se actualizó el monitor: ${msgError(e)}` });
+        }
+      } while (ok && marksDirtyRef.current);
+      return ok;
+    })();
+    marksInFlightRef.current = run;
+    try { return await run; } finally { marksInFlightRef.current = null; }
+  }, [assignment, raceId, noteServerOk, noteServerFail]);
+
+  /**
+   * [V1.8-4] Sondeo adaptativo (sustituye a los setInterval fijos de V1.7):
+   * - El siguiente ciclo se programa al TERMINAR el anterior → nunca hay
+   *   peticiones superpuestas aunque la base responda lento.
+   * - Jitter ±15 % → los dispositivos no golpean la base en el mismo instante.
+   * - Backoff exponencial ante fallos (tope 30 s marcas, 60 s reloj) → si la
+   *   base está degradada, los clientes dejan de empujarla.
+   * - Pestaña oculta → se pausa; al volver, sincroniza de inmediato.
+   * La cola de capturas NO depende de este sondeo (ver efectos de flush).
+   */
   useEffect(() => {
     if (!assignment) return;
-    void syncClock().catch(e => setNotice({ kind: "error", text: `Error reloj: ${msgError(e)}` }));
-    void refreshMarks();
-    const pollMarks = window.setInterval(() => { void refreshMarks(); }, 4500);
-    const pollClock = window.setInterval(() => { void syncClock().catch(() => {}); }, 20000);
-    const tick = window.setInterval(() => setNowMs(Date.now() + offsetRef.current), 40);
+    let alive = true;
+    let marksTimer: number | undefined;
+    let clockTimer: number | undefined;
+    let marksFails = 0;
+    let clockFails = 0;
+    const baseMarks = assignment.role === "admin" ? MARKS_POLL_ADMIN_MS : MARKS_POLL_OPERATOR_MS;
+    const jitter = (ms: number) => Math.round(ms * (0.85 + Math.random() * 0.3));
+    const backoff = (base: number, fails: number, cap: number) => Math.min(cap, base * 2 ** Math.min(fails, 4));
+
+    const runMarks = async () => {
+      if (!alive || document.hidden) return;
+      const ok = await refreshMarks();
+      if (!alive) return;
+      marksFails = ok ? 0 : marksFails + 1;
+      window.clearTimeout(marksTimer);
+      marksTimer = window.setTimeout(() => { void runMarks(); }, jitter(backoff(baseMarks, marksFails, 30_000)));
+    };
+    const runClock = async (first = false) => {
+      if (!alive || (document.hidden && !first)) return;
+      let ok = true;
+      try { await syncClock(); }
+      catch (e) {
+        ok = false;
+        if (first) setNotice({ kind: "error", text: `Error reloj: ${msgError(e)}` });
+      }
+      if (!alive) return;
+      clockFails = ok ? 0 : clockFails + 1;
+      window.clearTimeout(clockTimer);
+      clockTimer = window.setTimeout(() => { void runClock(); }, jitter(backoff(CLOCK_SYNC_MS, clockFails, 60_000)));
+    };
+
+    void runClock(true);
+    void runMarks();
+
+    const onVisibility = () => {
+      window.clearTimeout(marksTimer);
+      window.clearTimeout(clockTimer);
+      if (document.hidden) return;
+      void runClock();
+      void runMarks();
+    };
     const onNet = () => setOnline(navigator.onLine);
+    document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("online", onNet); window.addEventListener("offline", onNet);
     return () => {
-      clearInterval(pollMarks); clearInterval(pollClock); clearInterval(tick);
+      alive = false;
+      window.clearTimeout(marksTimer); window.clearTimeout(clockTimer);
+      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("online", onNet); window.removeEventListener("offline", onNet);
     };
   }, [assignment, syncClock, refreshMarks]);
@@ -2316,6 +2659,7 @@ function CaninataTiming({ raceId }: { raceId: string }) {
             }
           );
           saveQueue(old => old.filter(x => x.request_id !== item.request_id));
+          noteServerOk(); // [V1.8-6]
           setNotice({
             kind: outcome.status === "duplicate" ? "warn" : outcome.needs_review ? "warn" : "ok",
             text: outcome.status === "duplicate"
@@ -2325,15 +2669,29 @@ function CaninataTiming({ raceId }: { raceId: string }) {
                 : `Dorsal #${outcome.bib} · ${outcome.checkpoint.toUpperCase()} · ${formatMs(outcome.elapsed_ms)} guardado.`,
           });
         } catch (e) {
-          if (networkError(e)) break; // La conexión puede recuperarse.
-          // Rechazo de validación: no insistir infinitamente, pero informar.
-          setNotice({ kind: "error", text: `Dorsal #${item.bib}: ${msgError(e)}. Verifica el registro.` });
-          saveQueue(old => old.filter(x => x.request_id !== item.request_id));
+          // [V1.8-2] Transporte / servidor saturado: la captura SE CONSERVA en cola.
+          if (isTransportFailure(e)) { noteServerFail(e); break; } // La conexión puede recuperarse.
+          if (isBusinessRejection(e)) {
+            // [V1.8-3] Rechazo de validación (p. ej. dorsal inexistente): la HORA no se
+            // pierde. Se guarda primero como cruce sin asignar y DESPUÉS se quita de la cola.
+            const rescued: Tap = {
+              request_id: crypto.randomUUID(), checkpoint: item.checkpoint,
+              observed_at: item.observed_at, rtt: item.rtt,
+              origin_bib: item.bib, reason: msgError(e),
+            };
+            saveTaps(old => [...old, rescued]);
+            setNotice({ kind: "error", text: `Dorsal #${item.bib}: ${msgError(e)}. La hora quedó en "Cruces sin asignar": escribe el dorsal correcto y pulsa ASIGNAR.` });
+            saveQueue(old => old.filter(x => x.request_id !== item.request_id));
+            continue;
+          }
+          // [V1.8-2] Error no clasificado (sesión, permisos, configuración): se conserva
+          // y se reintenta, sin bloquear las capturas que vienen detrás.
+          setNotice({ kind: "error", text: `Dorsal #${item.bib}: ${msgError(e)}. Se conserva en cola y se reintentará.` });
         }
       }
       void refreshMarks();
     } finally { flushingRef.current = false; }
-  }, [assignment, raceId, refreshMarks, saveQueue]);
+  }, [assignment, raceId, refreshMarks, saveQueue, saveTaps, noteServerOk, noteServerFail]);
 
   useEffect(() => {
     if (!assignment || !pending.length) return;
@@ -2346,6 +2704,7 @@ function CaninataTiming({ raceId }: { raceId: string }) {
     tapFlushingRef.current = true;
     try {
       for (const item of items) {
+        let stage: "store" | "attach" = "store"; // [V1.8-2] en qué paso falló
         try {
           if (!item.stored) {
             await call("rc_timing_tap", {
@@ -2353,9 +2712,11 @@ function CaninataTiming({ raceId }: { raceId: string }) {
               p_observed_at:item.observed_at, p_round_trip_ms:item.rtt,
               p_request_id:item.request_id,
             });
-            saveTaps(old => old.map(x => x.request_id === item.request_id ? {...x,stored:true} : x));
+            saveTaps(old => old.map(x => x.request_id === item.request_id ? {...x,stored:true,blocked:undefined} : x));
+            noteServerOk(); // [V1.8-6]
           }
           if (item.bib) {
+            stage = "attach";
             const result = await call<{status:string;bib:string;checkpoint:Point;needs_review?:boolean;elapsed_ms?:number}>("rc_timing_attach_tap", {
               p_race_id:raceId, p_request_id:item.request_id, p_bib:item.bib,
             });
@@ -2367,21 +2728,44 @@ function CaninataTiming({ raceId }: { raceId: string }) {
             void refreshMarks();
           }
         } catch (e) {
-          if (networkError(e)) break;
-          setNotice({kind:"error",text:`Fast-tap: ${msgError(e)}. Corrige el dorsal o revisa el registro.`});
-          // No descartar un TAP: la hora ya capturada debe poder recuperarse.
-          // Si el servidor rechazó el dorsal, quitar asignación para reintentar.
-          saveTaps(old => old.map(x => x.request_id===item.request_id ? {...x,bib:undefined} : x));
+          // [V1.8-2] Transporte / servidor saturado: el TAP y su dorsal se conservan.
+          if (isTransportFailure(e)) { noteServerFail(e); break; }
+          if (isBusinessRejection(e)) {
+            if (stage === "store") {
+              // [V1.8-2] El servidor no acepta el cruce en sí: no se reintenta en bucle,
+              // queda visible en este dispositivo para la planilla de respaldo.
+              setNotice({kind:"error",text:`Cruce no aceptado por el servidor: ${msgError(e)}. La hora sigue en pantalla: anótala en la planilla.`});
+              saveTaps(old => old.map(x => x.request_id===item.request_id ? {...x,blocked:msgError(e)} : x));
+            } else {
+              setNotice({kind:"error",text:`Fast-tap: ${msgError(e)}. Corrige el dorsal o revisa el registro.`});
+              // No descartar un TAP: la hora ya capturada debe poder recuperarse.
+              // Si el servidor rechazó el dorsal, quitar asignación para reintentar.
+              saveTaps(old => old.map(x => x.request_id===item.request_id ? {...x,bib:undefined} : x));
+            }
+            continue;
+          }
+          // [V1.8-2] Error no clasificado: se conserva TODO (hora y dorsal) y se reintenta.
+          setNotice({kind:"error",text:`Fast-tap: ${msgError(e)}. Se reintentará automáticamente.`});
         }
       }
     } finally { tapFlushingRef.current=false; }
-  }, [assignment,raceId,refreshMarks,saveTaps]);
+  }, [assignment,raceId,refreshMarks,saveTaps,noteServerOk,noteServerFail]);
 
   useEffect(() => {
     if (!assignment || !taps.length) return;
-    const timer = window.setInterval(() => { void flushTaps(taps.filter(x => !x.stored || !!x.bib)); }, 6500);
+    // [V1.8-2] Los cruces bloqueados por el servidor no se reintentan solos (se reintentan al ASIGNAR).
+    const timer = window.setInterval(() => { void flushTaps(taps.filter(x => (!x.stored && !x.blocked) || !!x.bib)); }, 6500);
     return () => clearInterval(timer);
   }, [assignment,taps,flushTaps]);
+
+  // [V1.8-6] Al recuperar la red se envía de inmediato lo pendiente (sin esperar 6,5 s).
+  useEffect(() => {
+    if (!online || !assignment) return;
+    if (pending.length) void flushQueue(pending);
+    const toSend = taps.filter(x => (!x.stored && !x.blocked) || !!x.bib);
+    if (toSend.length) void flushTaps(toSend);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online, assignment]);
 
   const fastTap = () => {
     if (!assignment || !clock || clock.status !== "running" || !readyRef.current) {
@@ -2397,7 +2781,7 @@ function CaninataTiming({ raceId }: { raceId: string }) {
     if (!/^\d{1,10}$/.test(number) || Number(number) === 0) {
       setNotice({kind:"error",text:"Introduce un dorsal numérico válido para ese cruce."}); return;
     }
-    const updated = {...item,bib:number};
+    const updated: Tap = {...item,bib:number,blocked:undefined}; // [V1.8-2] asignar = reintento manual
     saveTaps(old => old.map(x => x.request_id===item.request_id ? updated : x));
     setTapBib(old => ({...old,[item.request_id]:""}));
     void flushTaps([updated]);
@@ -2534,7 +2918,7 @@ function CaninataTiming({ raceId }: { raceId: string }) {
   };
 
   const startedMs = clock?.started_at ? new Date(clock.started_at).getTime() : null;
-  const elapsed = startedMs == null ? 0 : Math.max(0, (clock?.closed_at ? new Date(clock.closed_at).getTime() : nowMs) - startedMs);
+  // [V1.8-5] "elapsed" se calcula dentro de <ElapsedClock> (misma fórmula), sin re-renderizar el módulo.
   const activeRole: Role | null = assignment?.role || null;
   const myPoint: Point = activeRole === "km5" ? "km5" : "finish";
   // [V1.7] Orden de llegada ascendente. No altera rc_timing_list ni los registros en BD.
@@ -2583,19 +2967,19 @@ function CaninataTiming({ raceId }: { raceId: string }) {
           <div className="rc-brand"><div className="rc-brand-icon small"><Dog size={22} /></div><div><strong>RAYOCERO <span>RACE CONTROL</span></strong><small>VALKYRON GROUP / CANINATA 2026</small></div></div>
           <div className="rc-top-actions">
             <span className={`rc-status ${clock?.status === "running" ? "live" : ""}`}><span className="rc-dot" /> {clock?.status === "running" ? "EN VIVO" : clock?.status === "closed" ? "FINALIZADA" : "EN ESPERA"}</span>
-            <span className={`rc-connection ${online ? "" : "offline"}`}>{online ? <Wifi size={15} /> : <WifiOff size={15} />} <span>{online ? "Online" : "Sin red"}</span></span>
+            <span className={`rc-connection ${!online ? "offline" : degraded ? "degraded" : ""}`} title={degraded ? "El servidor responde lento o con errores. Las capturas se guardan en este dispositivo y se reenvían solas." : undefined}>{online ? <Wifi size={15} /> : <WifiOff size={15} />} <span>{!online ? "Sin red" : degraded ? "Degradado" : "Online"}</span></span>
             <button className="rc-icon-btn" onClick={() => void logout()} title="Cerrar sesión"><LogOut size={17} /></button>
           </div>
         </header>
         <main className="rc-main">
-          <div className="rc-section-heading"><div><p className="rc-eyebrow"><Activity size={14} /> EVENT TIMING SYSTEM</p><h1>Centro de <span>cronometraje.</span></h1><p className="rc-muted">{assignment?.label || "Operación RayoCero"} · {isAdmin ? "Dirección de carrera" : isOperator ? myPoint === "km5" ? "Punto de control KM 5" : "Registro de meta" : "Sin puesto asignado"}</p></div><div className="rc-header-badge"><ShieldCheck size={18} /> {activeRole?.toUpperCase() || "SIN ROL"}</div></div>
+          <div className="rc-section-heading"><div><p className="rc-eyebrow"><Activity size={14} /> EVENT TIMING SYSTEM</p><h1 className="rcx-display">Race <span>// Control</span></h1><p className="rc-muted">{assignment?.label || "Operación RayoCero"} · {isAdmin ? "Dirección de carrera" : isOperator ? myPoint === "km5" ? "Punto de control KM 5" : "Registro de meta" : "Sin puesto asignado"}</p></div><div className="rc-header-badge"><ShieldCheck size={18} /> {activeRole?.toUpperCase() || "SIN ROL"}</div></div>
           {notice && <div role="alert" className={`rc-alert ${notice.kind}`}><span>{notice.text}</span><button onClick={() => setNotice(null)} aria-label="Cerrar aviso"><X size={16} /></button></div>}
           {!assignment && <div className="rc-glass rc-empty"><AlertTriangle size={24} /> Sin asignación para esta carrera. El administrador debe crear la cuenta en Supabase Auth y asignarla en rc_timing_staff.</div>}
           {assignment && <>
             <div className="rc-clock-grid">
               <section className="rc-clock-panel rc-glass">
-                <div className="rc-card-head"><span><Clock3 size={16} /> CRONÓMETRO OFICIAL</span><span>HORA SERVIDOR <span className="rc-mono">{new Date(nowMs).toLocaleTimeString("es-VE", { hour12: false })}</span></span></div>
-                <div className="rc-primary-time" aria-live="off">{clock?.status === "ready" || !clock ? "00:00:00.000" : formatMs(elapsed)}</div>
+                <div className="rc-card-head"><span><Clock3 size={16} /> CRONÓMETRO OFICIAL</span><span>HORA SERVIDOR <ServerClockText offsetRef={offsetRef} /></span></div>
+                <div className="rc-primary-time" aria-live="off"><ElapsedClock offsetRef={offsetRef} status={clock?.status ?? null} startedAt={clock?.started_at ?? null} closedAt={clock?.closed_at ?? null} /></div>
                 <div className="rc-clock-footer"><span><Flag size={15} /> {dateDisplay}</span><span><Gauge size={15} /> RTT {clockRtt == null ? "—" : `${clockRtt} ms`}</span></div>
                 {isAdmin && <div className="rc-clock-controls">
                   {clock?.status === "ready" && <button className="rc-btn rc-btn-primary" onClick={() => void control("start")} disabled={busyControl || !online}><Zap size={18} /> INICIAR SALIDA OFICIAL</button>}
@@ -2640,7 +3024,10 @@ function CaninataTiming({ raceId }: { raceId: string }) {
               <div className="rc-capture-heading"><div><p className="rc-eyebrow"><Smartphone size={14} /> {myPoint === "km5" ? "SPLIT STATION 05" : "FINISH LINE"}</p><h2>{myPoint === "km5" ? "Control KM 5" : "Línea de meta"}</h2><p className="rc-muted">Escribe el dorsal y pulsa Registrar en el instante exacto del paso.</p></div><span className="rc-point-icon">{myPoint === "km5" ? "05" : <Flag size={32} />}</span></div>
               <div className="rc-capture-modes"><button type="button" className={captureMode === "direct" ? "active" : ""} onClick={() => setCaptureMode("direct")}>Dorsal + marca</button><button type="button" className={captureMode === "fast" ? "active" : ""} onClick={() => setCaptureMode("fast")}>Fast-tap · marcar primero</button></div>
               {captureMode === "direct" ? <form className="rc-capture-form" onSubmit={record}><label htmlFor="rc-bib">DORSAL / BIB NUMBER</label><div className="rc-entry-row"><input id="rc-bib" autoFocus ref={inputRef} type="text" inputMode="numeric" pattern="[0-9]*" autoComplete="off" placeholder="0000" value={bib} onChange={e => setBib(e.target.value)} /><button type="submit" className="rc-btn rc-btn-primary" disabled={!bib.trim() || clock?.status !== "running" || saving}><Zap size={20} /> REGISTRAR PASO</button></div></form>
-              : <div className="rc-fast-capture"><button className="rc-fast-tap" type="button" disabled={clock?.status !== "running"} onClick={fastTap}><Clock3 size={30} /><strong>MARCAR CRUCE</strong><small>Pulsa por cada persona al cruzar. Asocia los dorsales después.</small></button><div className="rc-fast-list"><div className="rc-fast-list-title">CRUCES SIN ASIGNAR <span>{taps.length}</span></div>{taps.slice().sort((a,b) => a.observed_at.localeCompare(b.observed_at)).map((t,i) => <div className="rc-fast-row" key={t.request_id}><div className="rc-fast-stamp"><small>#{i+1} · {t.stored ? "En servidor" : "Pendiente de envío"}</small><strong>{formatMs(startedMs ? new Date(t.observed_at).getTime()-startedMs : 0)}</strong></div><form onSubmit={e => {e.preventDefault();assignTap(t);}}><input aria-label={`Dorsal del cruce ${i+1}`} inputMode="numeric" placeholder="Dorsal" value={tapBib[t.request_id] ?? t.bib ?? ""} onChange={e=>setTapBib(o=>({...o,[t.request_id]:e.target.value}))} /><button className="rc-btn rc-btn-primary" type="submit">ASIGNAR</button></form></div>)}{taps.length===0 && <p className="rc-muted">Los cruces capturados aparecerán aquí para asociar el dorsal sin perder la hora.</p>}</div></div>}
+              : <div className="rc-fast-capture"><button className="rc-fast-tap" type="button" disabled={clock?.status !== "running"} onClick={fastTap}><Clock3 size={30} /><strong>MARCAR CRUCE</strong><small>Pulsa por cada persona al cruzar. Asocia los dorsales después.</small></button></div>}
+              {/* [V1.8-3] La lista de cruces sin asignar es visible en AMBOS modos: en "Dorsal + marca"
+                  aparece solo si hay horas rescatadas (dorsal rechazado) que reasignar. */}
+              {(captureMode === "fast" || taps.length > 0) && <div className="rc-fast-list"><div className="rc-fast-list-title">CRUCES SIN ASIGNAR <span>{taps.length}</span></div>{taps.slice().sort((a,b) => a.observed_at.localeCompare(b.observed_at)).map((t,i) => <div className={`rc-fast-row${t.blocked ? " blocked" : t.origin_bib ? " rescued" : ""}`} key={t.request_id}><div className="rc-fast-stamp"><small>#{i+1} · {t.blocked ? "NO ACEPTADO · anotar en planilla" : t.stored ? "En servidor" : "Pendiente de envío"}{t.origin_bib ? ` · rechazado como #${t.origin_bib}` : ""}</small><strong>{formatMs(startedMs ? new Date(t.observed_at).getTime()-startedMs : 0)}</strong>{(t.blocked || t.reason) && <small className="rc-fast-reason">{t.blocked || t.reason}</small>}</div><form onSubmit={e => {e.preventDefault();assignTap(t);}}><input aria-label={`Dorsal del cruce ${i+1}`} inputMode="numeric" placeholder={t.origin_bib ? `Era #${t.origin_bib}` : "Dorsal"} value={tapBib[t.request_id] ?? t.bib ?? ""} onChange={e=>setTapBib(o=>({...o,[t.request_id]:e.target.value}))} /><button className="rc-btn rc-btn-primary" type="submit">ASIGNAR</button></form></div>)}{taps.length===0 && <p className="rc-muted">Los cruces capturados aparecerán aquí para asociar el dorsal sin perder la hora.</p>}</div>}
               <div className="rc-operation-hint">{clock?.status !== "running" ? <><AlertTriangle size={16} /> Espera a que dirección inicie la salida.</> : <><CheckCircle2 size={16} /> Hora capturada en el toque. Cada dorsal se acepta una sola vez por punto.</>}{pending.length > 0 && <button className="rc-text-button" onClick={() => void flushQueue(pending)}>Reintentar {pending.length} en cola</button>}</div>
             </section>}
             <section className="rc-glass rc-table-card"><div className="rc-table-head"><div><p className="rc-eyebrow"><Activity size={13} /> LIVE ACTIVITY</p><h2>{isAdmin ? "Llegadas ordenadas por tiempo" : "Registros ordenados por tiempo"}</h2></div><button className="rc-btn rc-btn-subtle" onClick={() => { void refreshMarks(); void syncClock(); }}><RefreshCw size={15} /> Actualizar</button></div>
