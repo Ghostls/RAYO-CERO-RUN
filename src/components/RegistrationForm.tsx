@@ -1,9 +1,23 @@
 /**
- * RAYOCERO — REGISTRATION TERMINAL (STABLE BUILD V37.7 — PREFETCH DORSAL LED)
+ * RAYOCERO — REGISTRATION TERMINAL (V38.0 — WE CAN MOVE 3K, REGISTRO INDEPENDIENTE)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Architecture: React / TypeScript / Supabase / React Query / Framer Motion
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
+ *
+ * CHANGELOG V38.0 (evoluciona sobre V37.9):
+ * [V38.0-1] 3K gratuito se inserta en tabla independiente we_can_move_registrations.
+ * [V38.0-2] NO requiere cambiar lib/api.ts ni tocar runners, precios o dorsal LED.
+ * [V38.0-3] Un participante de 10K/5K también puede inscribirse en 3K.
+ * [V38.0-4] La BD valida evento correcto, unicidad y ausencia de kit/pago.
+ *
+ * CHANGELOG V37.9 (evoluciona sobre V37.8):
+ * [V37.9-1] Modalidad 3K WE CAN MOVE, gratuita y exclusiva de WE RUN LED Coro.
+ * [V37.9-2] Fecha propia: 21/NOV/2026, 5:00 PM, Ciudad Deportiva Universitaria.
+ * [V37.9-3] Mascota obligatoria; sin pago, comprobante, talla ni kit.
+ * [V37.9-4] Muestra confirmación propia sin dorsal pago.
+ * [V37.9-5] Protege el precio de 10K/5K sin afectar otras carreras.
+ * NOTA: ejecutar WE_CAN_MOVE.sql antes de activar la modalidad gratuita.
  *
  * CHANGELOG V37.8 (evoluciona sobre V37.7):
  * [V37.8-1] Aviso obligatorio a nuevos inscritos CANINATA 18/OCT/2026:
@@ -94,7 +108,7 @@ try { dorsalCaninataSrc = require("../assets/dorsal-caninata.png").default; } ca
 // TIPOS
 // ---------------------------------------------------------------------------
 
-type Modalidad = "10K" | "4K" | "5K";
+type Modalidad = "10K" | "4K" | "5K" | "3K";
 
 interface ActiveRace {
   id: string; name: string; slug: string | null; date: string;
@@ -248,6 +262,7 @@ function usePrecioEvento(
   raceId: string,
   modalidad: Modalidad,
   usaCosto5k: boolean = false, // [V37.4-4]
+  esGratuita: boolean = false,  // [V37.9] 3K WE CAN MOVE
 ): PrecioEvento {
   const [tasaBCV,  setTasaBCV]  = useState(0);
   const [costoUSD, setCostoUSD] = useState(0);
@@ -255,6 +270,14 @@ function usePrecioEvento(
   const [error,    setError]    = useState<string | null>(null);
 
   useEffect(() => {
+    // [V37.9] Nunca consultar costos de otra modalidad para la caminata gratuita.
+    if (esGratuita) {
+      setTasaBCV(0);
+      setCostoUSD(0);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     let cancelled = false;
     // [V37.4-4] costo_5k_usd solo se solicita cuando aplica → query idéntica
     //           a V37.3 para 499 Coro, Caninata y LED 10K.
@@ -296,7 +319,7 @@ function usePrecioEvento(
       }
     })();
     return () => { cancelled = true; };
-  }, [raceId, modalidad, usaCosto5k]); // [V37.4-4] usaCosto5k en deps
+  }, [raceId, modalidad, usaCosto5k, esGratuita]); // [V37.9] gratuito en deps
 
   return {
     tasaBCV, costoUSD,
@@ -318,6 +341,10 @@ const isCaninataRace = (name: string = ""): boolean =>
 const isLedRunRace = (name: string = ""): boolean =>
   /\bled\b/i.test(name) || /we\s*run\s*rayocero/i.test(name);
 
+// Exclusivamente WE RUN RAYOCERO Coro, no otras carreras que usen la marca LED.
+const isWeCanMoveRace = (name: string = ""): boolean =>
+  /we\s*run\s*rayocero/i.test(name) && /\bcoro\b/i.test(name);
+
 /**
  * [V37.4-3] tipo opcional: en carreras tipo "carrera" el 5K es CAMINATA.
  * Sin tipo (o tipo "caninata") conserva el comportamiento V37.3.
@@ -331,6 +358,7 @@ const getModalidadMeta = (
       return tipo === "carrera"
         ? { label: "5K CAMINATA", Icon: Footprints } // [V37.4-3]
         : { label: "5K CANINATA", Icon: Dog };
+    case "3K":  return { label: "3K MASCOTAS · GRATIS", Icon: Dog };
     case "4K":  return { label: "4K CARRERA",  Icon: Flag };
     case "10K": return { label: "10K CARRERA", Icon: Timer };
     default:    return { label: `${m} CARRERA`, Icon: Timer };
@@ -367,15 +395,15 @@ const CORO_CONFIG: RaceStaticConfig = {
 };
 
 // [V37.3-1] Config exclusiva WE RUN RAYOCERO LED CORO
-// [V37.4-1] + 5K CAMINATA RECREATIVA ($20 — costo en system_config.costo_5k_usd)
+// [V37.9] 10K/5K conservan precio/configuración previa. 3K tiene fecha separada.
 const LED_CORO_CONFIG: RaceStaticConfig = {
   tipo: "carrera",
-  modalidadesDisponibles: ["10K", "5K"], // [V37.4-1] antes: ["10K"]
+  modalidadesDisponibles: ["10K", "5K", "3K"],
   evento: {
-    nombre: "WE RUN RAYOCERO LED CORO 10K", fecha: "28 NOV 2026", hora: "07:00 PM",
-    distancia: "10K / 5K", // [V37.4-1] antes: "10K"
+    nombre: "WE RUN RAYOCERO LED CORO", fecha: "28 NOV 2026", hora: "07:00 PM",
+    distancia: "10K / 5K / 3K",
     atletas: "+500", lugar: "CORO, FALCÓN",
-    proximaEd: "TEMPORADA 2026", targetDate: new Date("2026-10-31T19:00:00"),
+    proximaEd: "TEMPORADA 2026", targetDate: new Date("2026-11-28T19:00:00"),
   },
   pago: {
     titular: "Rayocero",
@@ -385,6 +413,15 @@ const LED_CORO_CONFIG: RaceStaticConfig = {
     cuenta:   "",
   },
 };
+
+// Actividad gratuita asociada al evento LED, pero en fecha/hora distintas.
+const WE_CAN_MOVE = {
+  nombre: "WE CAN MOVE — CAMINATA CON MASCOTAS 3K",
+  fecha: "21 DE NOVIEMBRE DE 2026",
+  hora: "5:00 PM",
+  lugar: "CIUDAD DEPORTIVA UNIVERSITARIA, CORO, FALCÓN",
+  invitado: "TSUNAMI",
+} as const;
 
 const CANINATA_CONFIG: RaceStaticConfig = {
   tipo: "caninata",
@@ -404,7 +441,11 @@ const CANINATA_CONFIG: RaceStaticConfig = {
 // [V37.3-3] getRaceCfg: LED evaluado antes del fallback CORO
 const getRaceCfg = (race: ActiveRace | null): RaceStaticConfig => {
   if (race && isCaninataRace(race.name)) return CANINATA_CONFIG;
-  if (race && isLedRunRace(race.name))   return LED_CORO_CONFIG;
+  if (race && isLedRunRace(race.name)) {
+    return isWeCanMoveRace(race.name)
+      ? LED_CORO_CONFIG
+      : { ...LED_CORO_CONFIG, modalidadesDisponibles: ["10K", "5K"] };
+  }
   return CORO_CONFIG;
 };
 
@@ -502,6 +543,7 @@ export default function RegistrationForm() {
           {activeRaces.map((r) => {
             const isCan = isCaninataRace(r.name);
             const isLed = isLedRunRace(r.name);
+            const hasWeCanMove = isWeCanMoveRace(r.name);
             // [V37.3-4] color por tipo
             const color = isCan ? "#FDD454" : isLed ? "#FCD34D" : "#00f2ff";
             // [V37.3-6] badge label por tipo
@@ -509,7 +551,7 @@ export default function RegistrationForm() {
             const badgeLabel = isCan
               ? "10K CARRERA / 5K CANINATA"
               : isLed
-              ? "10K CARRERA / 5K CAMINATA"
+              ? (hasWeCanMove ? "10K CARRERA / 5K CAMINATA / 3K MASCOTAS GRATIS" : "10K CARRERA / 5K CAMINATA")
               : "CARRERA OFICIAL 10K / 4K";
 
             return (
@@ -540,6 +582,12 @@ export default function RegistrationForm() {
                       <ChevronRight className="h-3.5 w-3.5 text-white/40" />
                       {r.location || "Venezuela"}
                     </p>
+                    {hasWeCanMove && (
+                      <p className="flex items-center gap-2 text-[#FCD34D]">
+                        <Dog className="h-3.5 w-3.5" />
+                        WE CAN MOVE · 3K GRATIS · 21 NOV · 5:00 PM
+                      </p>
+                    )}
                   </div>
                 </div>
                 <button
@@ -559,6 +607,7 @@ export default function RegistrationForm() {
   const raceCfg = getRaceCfg(race);
   return (
     <RegistrationFormActive
+      key={race.id}
       race={race}
       cfg={raceCfg}
       onResetRace={() => setRace(null)}
@@ -609,15 +658,26 @@ function RegistrationFormActive({
   const [fileComprobante,    setFileComprobante]    = useState<File | null>(null);
   const [nombrePerro,        setNombrePerro]        = useState("");
   const [razaPerro,          setRazaPerro]          = useState(RAZAS_COMUNES[0]);
+  const [tipoMascota,        setTipoMascota]        = useState<"Perro" | "Gato" | "Otra especie">("Perro");
+  const [detalleMascota,     setDetalleMascota]     = useState("");
   const [copiedField,        setCopiedField]        = useState<string | null>(null);
   const [uploading,          setUploading]          = useState(false);
   const [formError,          setFormError]          = useState<string | null>(null);
   const [aceptaEntregaPost, setAceptaEntregaPost] = useState(false); // [V37.8]
+  const [aceptaMascota, setAceptaMascota] = useState(false); // [V37.9]
+  const [weCanMoveConfirmation, setWeCanMoveConfirmation] = useState<{
+    nombre: string;
+    apellido: string;
+    mascota: string;
+  } | null>(null);
 
+  // [V37.9] Solo 3K de WE RUN LED Coro: gratuito, sin kit, con mascota.
+  const isWeCanMove3K = isWeCanMoveRace(race.name) && modalidad === "3K";
+  const isMascotaForm = (isCaninataRaceType && modalidad === "5K") || isWeCanMove3K;
   // [V37.4-2] 5K en carrera tipo "carrera" = caminata recreativa (LED Coro)
   const isCaminata5K = !isCaninataRaceType && modalidad === "5K";
 
-  const precio = usePrecioEvento(race.id, modalidad, isCaminata5K); // [V37.4-4]
+  const precio = usePrecioEvento(race.id, modalidad, isCaminata5K, isWeCanMove3K);
 
   const edad = useMemo(
     () => (fechaNacimiento ? calcularEdad(fechaNacimiento) : 0),
@@ -625,13 +685,14 @@ function RegistrationFormActive({
   );
 
   const categoria = useMemo(() => {
+    if (isWeCanMove3K) return "Caminata con Mascotas WE CAN MOVE 3K";
     if (modalidad === "5K") {
       // [V37.4-5] Caninata intacta; carrera tipo "carrera" → caminata 5K
       if (isCaninataRaceType) return "Caminata Canina / Familiar";
       return "Caminata Recreativa 5K";
     }
     return calcularCategoria(edad, genero, movilidadReducida);
-  }, [edad, genero, movilidadReducida, modalidad, isCaninataRaceType]);
+  }, [edad, genero, movilidadReducida, modalidad, isCaninataRaceType, isWeCanMove3K]);
 
   const genderMismatchWarning = useMemo(
     () => validateGenderCategory(genero, categoria),
@@ -681,8 +742,27 @@ function RegistrationFormActive({
     e.preventDefault();
     setFormError(null);
 
-    if (!nombre || !apellido || !cedula || !email || !referencia) {
+    if (!nombre.trim() || !apellido.trim() || !cedula.trim() || !email.trim() ||
+        (!isWeCanMove3K && !referencia.trim())) {
       setFormError("Por favor completa todos los campos obligatorios.");
+      return;
+    }
+    if (isWeCanMove3K && !telefono.trim()) {
+      setFormError("Para WE CAN MOVE necesitamos un teléfono de contacto.");
+      return;
+    }
+    if (isWeCanMove3K && !fechaNacimiento) {
+      setFormError("Introduce tu fecha de nacimiento para completar la inscripción gratuita.");
+      return;
+    }
+    if (isWeCanMove3K && !aceptaMascota) {
+      setFormError("Confirma las condiciones de participación con tu mascota.");
+      return;
+    }
+    // [V37.9] Impedir que 10K/5K LED se registren como gratuitos si falta tarifa.
+    if (isLedRace && !isWeCanMove3K &&
+        (precio.loading || precio.error || precio.costoUSD <= 0 || precio.montoBs <= 0)) {
+      setFormError("No se pudo validar el importe de esta modalidad paga. Intenta nuevamente o contacta a la organización.");
       return;
     }
     if (franelaPostCarreraActiva && !telefono.trim()) {
@@ -693,7 +773,7 @@ function RegistrationFormActive({
       setFormError("Debes confirmar que la franela de esta inscripción se entregará después de la Caninata.");
       return;
     }
-    if (isCaninataRaceType && modalidad === "5K" && !nombrePerro.trim()) {
+    if (isMascotaForm && !nombrePerro.trim()) {
       setFormError("Por favor ingresa el nombre de tu mascota.");
       return;
     }
@@ -707,6 +787,51 @@ function RegistrationFormActive({
 
     try {
       setUploading(true);
+
+      // [V38.0] La caminata 3K usa su propia tabla y su propia política RLS.
+      // Ni el método de pago ni la API de corredores pagados se ejecutan.
+      if (isWeCanMove3K) {
+        const razaOMarca = tipoMascota === "Perro"
+          ? razaPerro
+          : detalleMascota.trim() || "Sin especificar";
+        // Cast local: permite desplegar sin regenerar tipos de Supabase.
+        // La estructura del objeto corresponde 1:1 con WE_CAN_MOVE.sql.
+        const { error: errorGratuito } = await (supabase as any)
+          .from("we_can_move_registrations")
+          .insert({
+            race_id: race.id,
+            nombre: nombre.trim(),
+            apellido: apellido.trim(),
+            cedula: cedulaNorm,
+            email: emailNorm,
+            telefono: telefono.trim(),
+            fecha_nacimiento: fechaNacimiento,
+            genero,
+            movilidad_reducida: movilidadReducida,
+            contacto_emergencia: contactoEmergencia.trim() || null,
+            telefono_emergencia: telefonoEmergencia.trim() || null,
+            nombre_mascota: nombrePerro.trim(),
+            tipo_mascota: tipoMascota,
+            raza_mascota: razaOMarca,
+            acepta_condiciones: aceptaMascota,
+          });
+
+        if (errorGratuito) {
+          if (errorGratuito.code === "23505") {
+            setFormError("Esta cédula ya está inscrita en WE CAN MOVE 3K. No debes registrarte de nuevo.");
+            return;
+          }
+          throw errorGratuito;
+        }
+
+        // Mostrar éxito solo cuando la inserción ha sido aceptada por Supabase.
+        setWeCanMoveConfirmation({
+          nombre: nombre.trim(),
+          apellido: apellido.trim(),
+          mascota: nombrePerro.trim(),
+        });
+        return;
+      }
 
       // [V37.5-3] Pre-check de cédula duplicada en esta carrera ANTES de subir
       //           el comprobante. Fail-open: si RLS bloquea el SELECT, se
@@ -751,10 +876,12 @@ function RegistrationFormActive({
         email:  emailNorm,  // [V37.5-2]
         telefono,
         fechaNacimiento: fechaNacimiento || "2000-01-01",
-        genero, talla, movilidadReducida, categoria,
+        genero,
+        talla,
+        movilidadReducida, categoria,
         monto: precio.montoBs > 0 ? String(precio.montoBs.toFixed(2)) : "0",
-        referenciaPago:     referencia,
-        comprobanteUrl:     comprobanteUrl || undefined,
+        referenciaPago: referencia,
+        comprobanteUrl: comprobanteUrl || undefined,
         contactoEmergencia: contactoEmergencia || "N/A",
         telefonoEmergencia: telefonoEmergencia || "N/A",
         aceptaDeslinde:     true,
@@ -773,6 +900,37 @@ function RegistrationFormActive({
 
   // [V37.3-5] Una sola modalidad → col-span completo
   const solaModalidad = cfg.modalidadesDisponibles.length === 1;
+
+  if (weCanMoveConfirmation) {
+    return (
+      <div className="min-h-screen bg-[#03070b] text-white pt-28 pb-20 px-4 font-sans flex justify-center">
+        <section className="w-full max-w-xl h-fit rounded-3xl border border-emerald-400/25 bg-white/[0.03] p-7 sm:p-10 space-y-5 text-center" role="status">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-emerald-400/10 flex items-center justify-center">
+            <Check className="h-8 w-8 text-emerald-400" />
+          </div>
+          <span className="inline-block text-[11px] font-black tracking-[0.2em] text-[#FCD34D] uppercase">
+            WE CAN MOVE · 3K GRATUITOS
+          </span>
+          <h1 className="text-3xl sm:text-4xl font-black uppercase">¡Inscripción registrada!</h1>
+          <p className="text-sm text-white/65 leading-relaxed">
+            {weCanMoveConfirmation.nombre} {weCanMoveConfirmation.apellido}, registramos tu participación junto a
+            {" "}<strong className="text-white">{weCanMoveConfirmation.mascota}</strong>.
+          </p>
+          <div className="rounded-2xl border border-[#FCD34D]/20 bg-[#FCD34D]/[0.05] p-5 text-left space-y-2 text-sm">
+            <p><strong>Fecha:</strong> {WE_CAN_MOVE.fecha}</p>
+            <p><strong>Hora:</strong> {WE_CAN_MOVE.hora}</p>
+            <p><strong>Lugar:</strong> {WE_CAN_MOVE.lugar}</p>
+            <p><strong>Participación:</strong> Gratis · sin kit ni franela</p>
+          </div>
+          <p className="text-xs text-white/45">Guarda una captura de esta confirmación. No necesitas comprobante bancario.</p>
+          <button type="button" onClick={() => navigate("/")}
+            className="w-full rounded-xl bg-[#FCD34D] py-3.5 text-xs font-black uppercase text-[#03070b]">
+            Volver al inicio
+          </button>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#03070b] text-white pt-24 pb-20 px-4 font-sans flex flex-col items-center">
@@ -833,13 +991,30 @@ function RegistrationFormActive({
             </div>
           )}
 
+          {/* [V37.9] Ficha informativa de 3K con fecha propia, distinta de 10K/5K. */}
+          {isWeCanMove3K && (
+            <div className="rounded-2xl border border-[#FCD34D]/35 bg-[#FCD34D]/[0.06] p-5 space-y-3" role="note">
+              <div className="flex items-center gap-2 text-[#FCD34D]">
+                <Dog className="h-5 w-5" />
+                <h2 className="text-lg font-black uppercase">WE CAN MOVE · 3K GRATIS</h2>
+              </div>
+              <p className="text-sm text-white/85">Caminata recreativa de 3 km con mascotas, con la participación de <strong>{WE_CAN_MOVE.invitado}</strong>.</p>
+              <div className="grid sm:grid-cols-2 gap-2 text-xs text-white/75">
+                <p><strong className="text-white">Fecha:</strong> {WE_CAN_MOVE.fecha}</p>
+                <p><strong className="text-white">Hora:</strong> {WE_CAN_MOVE.hora}</p>
+                <p className="sm:col-span-2"><strong className="text-white">Lugar:</strong> {WE_CAN_MOVE.lugar}</p>
+              </div>
+              <p className="text-xs text-[#FCD34D] font-bold">Inscripción totalmente gratuita. No incluye kit ni franela. No requiere transferencia ni comprobante.</p>
+            </div>
+          )}
+
           {/* SELECTOR DE MODALIDAD */}
           <div className="space-y-2 pb-2">
             <label className="text-xs font-bold uppercase text-white/60 block">
               Modalidad / Distancia
             </label>
-            {/* [V37.3-5] Una sola modalidad → col-span-1 full, varias → grid-cols-2 */}
-            <div className={`grid gap-3 ${solaModalidad ? "grid-cols-1" : "grid-cols-2"}`}>
+            {/* [V37.9] LED con 3 modalidades; responsive en pantallas pequeñas. */}
+            <div className={`grid gap-3 ${solaModalidad ? "grid-cols-1" : cfg.modalidadesDisponibles.length === 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2"}`}>
               {cfg.modalidadesDisponibles.map((m) => {
                 const isSelected      = modalidad === m;
                 const { label, Icon } = getModalidadMeta(m, cfg.tipo); // [V37.4-3]
@@ -937,24 +1112,26 @@ function RegistrationFormActive({
                 ))}
               </div>
             </div>
-            <div>
-              <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Talla de Camisa</label>
-              <select
-                value={talla}
-                onChange={e => setTalla(e.target.value as RegistrationFormData["talla"])}
-                className="w-full bg-[#0d1117] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-white/30 appearance-none cursor-pointer"
-              >
-                {(["XS","S","M","L","XL","XXL","NA"] as const).map(t => (
-                  <option key={t} value={t}>{t === "NA" ? "No aplica" : t}</option>
-                ))}
-              </select>
-            </div>
+            {!isWeCanMove3K && (
+              <div>
+                <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Talla de Camisa</label>
+                <select
+                  value={talla}
+                  onChange={e => setTalla(e.target.value as RegistrationFormData["talla"])}
+                  className="w-full bg-[#0d1117] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-white/30 appearance-none cursor-pointer"
+                >
+                  {(["XS","S","M","L","XL","XXL","NA"] as const).map(t => (
+                    <option key={t} value={t}>{t === "NA" ? "No aplica" : t}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* CATEGORY PREVIEW BADGE */}
           {/* [V37.4-6] Visible también para 5K caminata; oculto solo en 5K caninata */}
           <AnimatePresence mode="wait">
-            {fechaNacimiento && (modalidad !== "5K" || isCaminata5K) && (
+            {fechaNacimiento && (modalidad !== "5K" || isCaminata5K || isWeCanMove3K) && (
               <motion.div
                 key={`${categoria}-${genderMismatchWarning ? "warn" : "ok"}`}
                 initial={{ opacity: 0, y: -6 }}
@@ -1048,9 +1225,9 @@ function RegistrationFormActive({
             </div>
           </div>
 
-          {/* SECCIÓN MASCOTA — solo modalidad 5K caninata */}
+          {/* [V37.9] SECCIÓN MASCOTA — 5K caninata original O 3K WE CAN MOVE */}
           <AnimatePresence>
-            {isCaninataRaceType && modalidad === "5K" && (
+            {isMascotaForm && (
               <motion.div
                 key="pet-section"
                 initial={{ opacity: 0, height: 0 }}
@@ -1071,7 +1248,7 @@ function RegistrationFormActive({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="text-xs font-bold uppercase text-white/60 mb-1 block">
-                          Nombre del Perro
+                          {isWeCanMove3K ? "Nombre de tu mascota" : "Nombre del Perro"}
                         </label>
                         <input
                           type="text" value={nombrePerro}
@@ -1080,21 +1257,46 @@ function RegistrationFormActive({
                           className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FDD454]/40 transition-colors placeholder:text-white/20"
                         />
                       </div>
+                      {isWeCanMove3K && (
+                        <div>
+                          <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Tipo de mascota</label>
+                          <select value={tipoMascota}
+                            onChange={e => setTipoMascota(e.target.value as "Perro" | "Gato" | "Otra especie")}
+                            className="w-full bg-[#0d1117] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#FDD454]/40 appearance-none cursor-pointer"
+                          >
+                            <option value="Perro">Perro</option>
+                            <option value="Gato">Gato</option>
+                            <option value="Otra especie">Otra especie</option>
+                          </select>
+                        </div>
+                      )}
                       <div>
-                        <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Raza</label>
-                        <select
-                          value={razaPerro} onChange={e => setRazaPerro(e.target.value)}
-                          className="w-full bg-[#0d1117] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#FDD454]/40 transition-colors appearance-none cursor-pointer"
-                        >
-                          {RAZAS_COMUNES.map(raza => (
-                            <option key={raza} value={raza}>{raza}</option>
-                          ))}
-                        </select>
+                        <label className="text-xs font-bold uppercase text-white/60 mb-1 block">
+                          {isWeCanMove3K && tipoMascota !== "Perro" ? "Raza / descripción" : "Raza"}
+                        </label>
+                        {isWeCanMove3K && tipoMascota !== "Perro" ? (
+                          <input type="text" value={detalleMascota}
+                            onChange={e => setDetalleMascota(e.target.value)} maxLength={60}
+                            placeholder="Ej: Siamés / Mestizo"
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#FDD454]/40"
+                          />
+                        ) : (
+                          <select
+                            value={razaPerro} onChange={e => setRazaPerro(e.target.value)}
+                            className="w-full bg-[#0d1117] border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#FDD454]/40 transition-colors appearance-none cursor-pointer"
+                          >
+                            {RAZAS_COMUNES.map(raza => (
+                              <option key={raza} value={raza}>{raza}</option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                     </div>
                     <p className="text-[11px] text-white/30 flex items-start gap-1.5 pt-1">
                       <Dog className="h-3.5 w-3.5 shrink-0 mt-0.5 text-[#FDD454]/50" />
-                      Los datos de tu mascota aparecerán en el dorsal. Asegúrate de que cuente con correa.
+                      {isWeCanMove3K
+                        ? "Registraremos los datos de tu mascota para WE CAN MOVE. Llévala bajo control y con los medios de sujeción adecuados."
+                        : "Los datos de tu mascota aparecerán en el dorsal. Asegúrate de que cuente con correa."}
                     </p>
                   </div>
                 </div>
@@ -1102,7 +1304,8 @@ function RegistrationFormActive({
             )}
           </AnimatePresence>
 
-          {/* DATOS BANCARIOS */}
+          {/* [V37.9] Solo modalidades pagas muestran datos bancarios y comprobante. */}
+          {!isWeCanMove3K ? (
           <div className="pt-6 border-t border-white/10 space-y-4">
             <h3 className="text-sm font-bold uppercase text-white/80 flex items-center gap-2">
               <Banknote className="h-4 w-4 text-emerald-400" />
@@ -1250,6 +1453,20 @@ function RegistrationFormActive({
               </div>
             </div>
           </div>
+          ) : (
+            <div className="space-y-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.04] p-5">
+              <p className="text-emerald-300 font-black uppercase text-sm flex items-center gap-2">
+                <Check className="w-4 h-4" /> TOTAL A PAGAR: $0.00 USD
+              </p>
+              <p className="text-xs text-white/65">Sin pagos, sin referencia bancaria, sin comprobante y sin kit de corredor.</p>
+              <label className="flex items-start gap-3 cursor-pointer text-xs leading-relaxed text-white/80">
+                <input type="checkbox" checked={aceptaMascota}
+                  onChange={e => setAceptaMascota(e.target.checked)}
+                  required className="mt-0.5 h-4 w-4 shrink-0 accent-[#FCD34D]" />
+                <span>Confirmo que soy responsable de mi mascota, que la llevaré bajo control y con los medios de sujeción adecuados, y que cumpliré las indicaciones de seguridad del evento.</span>
+              </label>
+            </div>
+          )}
 
           {/* [V37.8] Confirmación expresa. No cambia aceptación de deslinde. */}
           {franelaPostCarreraActiva && (
@@ -1272,7 +1489,7 @@ function RegistrationFormActive({
           {/* BOTÓN SUBMIT */}
           <button
             type="submit"
-            disabled={uploading || mutation.isPending || !!genderMismatchWarning || (franelaPostCarreraActiva && !aceptaEntregaPost)}
+            disabled={uploading || mutation.isPending || !!genderMismatchWarning || (franelaPostCarreraActiva && !aceptaEntregaPost) || (isWeCanMove3K && !aceptaMascota)}
             className="w-full py-4 rounded-xl font-black uppercase text-sm tracking-wider flex items-center justify-center gap-2 transition-all mt-6 disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: accentColor, color: "#03070b" }}
           >
@@ -1282,6 +1499,8 @@ function RegistrationFormActive({
               <><Dog className="h-5 w-5" /> PROCESAR Y GENERAR DORSALES CANINATA</>
             ) : isCaninataRaceType ? (
               <><Dog className="h-5 w-5" /> {`PROCESAR INSCRIPCIÓN CANINATA (${modalidad})`}</>
+            ) : isWeCanMove3K ? (
+              <><Dog className="h-5 w-5" /> INSCRIBIRME GRATIS · WE CAN MOVE 3K</>
             ) : isCaminata5K ? (
               // [V37.4-8] 5K caminata LED Coro
               <><Footprints className="h-5 w-5" /> PROCESAR INSCRIPCIÓN CAMINATA (5K)</>
