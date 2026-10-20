@@ -1,9 +1,21 @@
 /**
- * RAYOCERO — REGISTRATION TERMINAL (V38.0 — WE CAN MOVE 3K, REGISTRO INDEPENDIENTE)
+ * RAYOCERO — REGISTRATION TERMINAL (V38.1 — SELECTOR: LED 10K/5K + WE CAN MOVE 3K POR SEPARADO)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Architecture: React / TypeScript / Supabase / React Query / Framer Motion
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
+ *
+ * CHANGELOG V38.1 (evoluciona sobre V38.0):
+ * [V38.1-1] Selector "SELECCIONA TU EVENTO": la carrera WE RUN RAYOCERO Coro
+ *           ahora genera DOS tarjetas: (a) WE RUN LED CORO 10K / 5K y
+ *           (b) WE CAN MOVE 3K MASCOTAS GRATIS (21 NOV 2026, 5:00 PM).
+ * [V38.1-2] La tarjeta 3K navega con ?race=<id LED>&modo=wecanmove. Se reutiliza
+ *           el mismo race_id → BD, RLS, INSERT y confirmación NO cambian.
+ * [V38.1-3] getRaceCfg(race, modoWeCanMove): modo 3K → solo ["3K"] con fecha
+ *           propia; modo LED → solo ["10K","5K"]. El 3K ya no se mezcla en el
+ *           selector de modalidad de la LED.
+ * [V38.1-4] "Cambiar de evento" limpia la URL (race + modo) y recarga la lista.
+ * [V38.1-5] Prefetch de DorsalLed omitido en modo 3K (no genera dorsal).
  *
  * CHANGELOG V38.0 (evoluciona sobre V37.9):
  * [V38.0-1] 3K gratuito se inserta en tabla independiente we_can_move_registrations.
@@ -396,6 +408,7 @@ const CORO_CONFIG: RaceStaticConfig = {
 
 // [V37.3-1] Config exclusiva WE RUN RAYOCERO LED CORO
 // [V37.9] 10K/5K conservan precio/configuración previa. 3K tiene fecha separada.
+// [V38.1-3] Base con las 3 modalidades; getRaceCfg la recorta según el modo.
 const LED_CORO_CONFIG: RaceStaticConfig = {
   tipo: "carrera",
   modalidadesDisponibles: ["10K", "5K", "3K"],
@@ -423,6 +436,17 @@ const WE_CAN_MOVE = {
   invitado: "TSUNAMI",
 } as const;
 
+// [V38.1-3] Config propia del modo 3K: solo 3K, fecha 21/NOV/2026 5:00 PM.
+const WE_CAN_MOVE_CONFIG: RaceStaticConfig = {
+  ...LED_CORO_CONFIG,
+  modalidadesDisponibles: ["3K"],
+  evento: {
+    nombre: WE_CAN_MOVE.nombre, fecha: "21 NOV 2026", hora: WE_CAN_MOVE.hora,
+    distancia: "3K MASCOTAS", atletas: "+500", lugar: WE_CAN_MOVE.lugar,
+    proximaEd: "TEMPORADA 2026", targetDate: new Date("2026-11-21T17:00:00"),
+  },
+};
+
 const CANINATA_CONFIG: RaceStaticConfig = {
   tipo: "caninata",
   modalidadesDisponibles: ["10K", "5K"],
@@ -439,12 +463,12 @@ const CANINATA_CONFIG: RaceStaticConfig = {
 };
 
 // [V37.3-3] getRaceCfg: LED evaluado antes del fallback CORO
-const getRaceCfg = (race: ActiveRace | null): RaceStaticConfig => {
+// [V38.1-3] modoWeCanMove: true → solo 3K; false → LED solo 10K/5K.
+const getRaceCfg = (race: ActiveRace | null, modoWeCanMove: boolean = false): RaceStaticConfig => {
   if (race && isCaninataRace(race.name)) return CANINATA_CONFIG;
   if (race && isLedRunRace(race.name)) {
-    return isWeCanMoveRace(race.name)
-      ? LED_CORO_CONFIG
-      : { ...LED_CORO_CONFIG, modalidadesDisponibles: ["10K", "5K"] };
+    if (isWeCanMoveRace(race.name) && modoWeCanMove) return WE_CAN_MOVE_CONFIG;
+    return { ...LED_CORO_CONFIG, modalidadesDisponibles: ["10K", "5K"] };
   }
   return CORO_CONFIG;
 };
@@ -515,7 +539,11 @@ const calcularCategoria = (
 
 export default function RegistrationForm() {
   const { race, setRace, activeRaces } = useTargetRace();
-  const [, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // [V38.1-2] Modo 3K persistente en URL (?modo=wecanmove) y en estado.
+  const [modoWeCanMove, setModoWeCanMove] = useState<boolean>(
+    searchParams.get("modo") === "wecanmove",
+  );
 
   if (race === undefined) {
     return (
@@ -526,6 +554,13 @@ export default function RegistrationForm() {
   }
 
   if (!race) {
+    // [V38.1-1] Una carrera WE RUN Coro se expande en dos tarjetas de selección.
+    const cards: { r: ActiveRace; wcm: boolean }[] = activeRaces.flatMap((r) =>
+      isWeCanMoveRace(r.name)
+        ? [{ r, wcm: false }, { r, wcm: true }]
+        : [{ r, wcm: false }],
+    );
+
     return (
       <div className="min-h-screen bg-[#03070b] text-white pt-28 pb-20 px-4 font-sans flex flex-col items-center">
         <div className="max-w-4xl w-full text-center mb-10">
@@ -540,25 +575,31 @@ export default function RegistrationForm() {
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl w-full">
-          {activeRaces.map((r) => {
+          {cards.map(({ r, wcm }) => {
             const isCan = isCaninataRace(r.name);
             const isLed = isLedRunRace(r.name);
-            const hasWeCanMove = isWeCanMoveRace(r.name);
             // [V37.3-4] color por tipo
             const color = isCan ? "#FDD454" : isLed ? "#FCD34D" : "#00f2ff";
             // [V37.3-6] badge label por tipo
-            // [V37.4-7] LED ahora muestra 10K + 5K caminata
-            const badgeLabel = isCan
+            // [V37.4-7] LED muestra 10K + 5K caminata
+            // [V38.1-1] 3K tiene su propia tarjeta/badge
+            const badgeLabel = wcm
+              ? "3K MASCOTAS · GRATIS"
+              : isCan
               ? "10K CARRERA / 5K CANINATA"
               : isLed
-              ? (hasWeCanMove ? "10K CARRERA / 5K CAMINATA / 3K MASCOTAS GRATIS" : "10K CARRERA / 5K CAMINATA")
+              ? "10K CARRERA / 5K CAMINATA"
               : "CARRERA OFICIAL 10K / 4K";
 
             return (
               <motion.div
-                key={r.id}
+                key={`${r.id}-${wcm ? "wcm" : "std"}`}
                 whileHover={{ scale: 1.02 }}
-                onClick={() => { setRace(r); setSearchParams({ race: r.id }); }}
+                onClick={() => {
+                  setModoWeCanMove(wcm);
+                  setRace(r);
+                  setSearchParams(wcm ? { race: r.id, modo: "wecanmove" } : { race: r.id });
+                }}
                 className="cursor-pointer bg-white/[0.02] border border-white/10 hover:border-white/20 rounded-3xl p-6 transition-all flex flex-col justify-between"
               >
                 <div>
@@ -572,20 +613,21 @@ export default function RegistrationForm() {
                     <ChevronRight className="h-5 w-5 text-white/30" />
                   </div>
                   <h2 className="text-2xl font-black italic uppercase text-white mb-2">
-                    {r.name}
+                    {wcm ? WE_CAN_MOVE.nombre : r.name}
                   </h2>
                   <div className="space-y-1.5 text-xs text-white/50 mb-6">
                     <p className="flex items-center gap-2">
-                      <Calendar className="h-3.5 w-3.5 text-white/40" /> {r.date}
+                      <Calendar className="h-3.5 w-3.5 text-white/40" />
+                      {wcm ? `${WE_CAN_MOVE.fecha} · ${WE_CAN_MOVE.hora}` : r.date}
                     </p>
                     <p className="flex items-center gap-2">
                       <ChevronRight className="h-3.5 w-3.5 text-white/40" />
-                      {r.location || "Venezuela"}
+                      {wcm ? WE_CAN_MOVE.lugar : (r.location || "Venezuela")}
                     </p>
-                    {hasWeCanMove && (
+                    {wcm && (
                       <p className="flex items-center gap-2 text-[#FCD34D]">
                         <Dog className="h-3.5 w-3.5" />
-                        WE CAN MOVE · 3K GRATIS · 21 NOV · 5:00 PM
+                        INSCRIPCIÓN GRATUITA · SIN KIT NI FRANELA
                       </p>
                     )}
                   </div>
@@ -594,7 +636,7 @@ export default function RegistrationForm() {
                   className="w-full py-3 rounded-xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 transition-all"
                   style={{ background: color, color: "#03070b" }}
                 >
-                  INICIAR REGISTRO <ChevronRight className="h-4 w-4" />
+                  {wcm ? "INSCRIBIRME GRATIS" : "INICIAR REGISTRO"} <ChevronRight className="h-4 w-4" />
                 </button>
               </motion.div>
             );
@@ -604,13 +646,18 @@ export default function RegistrationForm() {
     );
   }
 
-  const raceCfg = getRaceCfg(race);
+  const raceCfg = getRaceCfg(race, modoWeCanMove); // [V38.1-3]
   return (
     <RegistrationFormActive
-      key={race.id}
+      key={`${race.id}-${modoWeCanMove ? "wcm" : "std"}`}
       race={race}
       cfg={raceCfg}
-      onResetRace={() => setRace(null)}
+      onResetRace={() => {
+        // [V38.1-4] Limpia race + modo de la URL → recarga la lista de eventos.
+        setModoWeCanMove(false);
+        setRace(null);
+        setSearchParams({});
+      }}
     />
   );
 }
@@ -634,13 +681,16 @@ function RegistrationFormActive({
   const accentColor        = getAccentColor(cfg, race.name);
   // [V37.5-4] Detector LED para selección de dorsal en /dorsal
   const isLedRace          = isLedRunRace(race.name);
+  // [V38.1-3] Modo 3K: la config solo ofrece 3K
+  const modoSolo3K         = cfg.modalidadesDisponibles.length === 1 && cfg.modalidadesDisponibles[0] === "3K";
 
   // [V37.7-1] Prefetch DorsalLed (chunk + arte + fuentes) en segundo plano
+  // [V38.1-5] No aplica al modo 3K (no genera dorsal).
   useEffect(() => {
-    if (!isLedRace) return;
+    if (!isLedRace || modoSolo3K) return;
     const t = setTimeout(() => { void import("@/pages/DorsalLed").catch(() => undefined); }, 1500);
     return () => clearTimeout(t);
-  }, [isLedRace]);
+  }, [isLedRace, modoSolo3K]);
 
   const [modalidad,          setModalidad]          = useState<Modalidad>(cfg.modalidadesDisponibles[0]);
   const [nombre,             setNombre]             = useState("");
@@ -948,7 +998,7 @@ function RegistrationFormActive({
             className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider"
             style={{ background: `${accentColor}15`, color: accentColor, border: `1px solid ${accentColor}30` }}
           >
-            {race.name}
+            {modoSolo3K ? WE_CAN_MOVE.nombre : race.name}
           </span>
           <h1 className="text-4xl font-black italic uppercase mt-3">
             FORMULARIO DE INSCRIPCIÓN
