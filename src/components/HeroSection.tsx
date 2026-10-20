@@ -45,8 +45,8 @@ const HERO_SLIDES = [
   },
   {
     src        : caminataHero,
-    alt        : "Caminata Recreativa — Rayocero Barquisimeto",
-    fecha      : "18.10.26",
+    alt        : "Caminata Recreativa — We can move 3K",
+    fecha      : "21.11.26",
     fechaColor : `linear-gradient(105deg,
       ${LED_GREEN}  0%,
       #a8ff78       40%,
