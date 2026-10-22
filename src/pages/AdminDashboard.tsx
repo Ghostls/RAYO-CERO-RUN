@@ -1,8 +1,34 @@
 /**
- * RAYO CERO — ADMIN DASHBOARD (EVOLUTION V4.4 — LED CORO 5K CAMINATA)
+ * RAYO CERO — ADMIN DASHBOARD (EVOLUTION V4.7 — LOGOUT REAL Y REINGRESO ADMIN)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
+ *
+ * CHANGELOG V4.7 (evoluciona sobre V4.6):
+ * [V4.7-1] Botón «Salir» cierra efectivamente supabase.auth.signOut({ scope: 'local' }).
+ * [V4.7-2] Pantalla de login Supabase Auth integrada cuando no hay sesión.
+ * [V4.7-3] Eventos de Auth sincronizan sesión; al cambiar de cuenta se
+ *          reinicia el dashboard para consultar el 3K con el UID correcto.
+ * [V4.7-4] No borra datos de inscritos, otros usuarios ni localStorage ajeno.
+ *
+ * CHANGELOG V4.6 (evoluciona sobre V4.5):
+ * [V4.6-1] Inicio de sesión Supabase Auth dentro del módulo 3K.
+ * [V4.6-2] Diagnóstico diferenciado: sin sesión, cuenta distinta,
+ *          ausencia de membresía, o error real de consulta.
+ * [V4.6-3] No se confunden inscritos no consultables con cero inscritos.
+ * [V4.6-4] Sin contraseñas ni service_role en el frontend. RLS intacto.
+ *
+ * CHANGELOG V4.5 (evoluciona sobre V4.4):
+ * [V4.5-1] WE CAN MOVE 3K: lectura read-only desde we_can_move_registrations,
+ *          aislada de runners, dorsales, verificación de pagos y entrega de kits.
+ * [V4.5-2] Pestaña 3K MASCOTAS (y filas en TODOS), buscador por
+ *          participante/mascota, inspección detallada y exportación PDF independiente.
+ * [V4.5-3] Detección de WE RUN RAYOCERO 10K - 5K CORO incluso si el
+ *          nombre real no lleva la palabra LED; CORO 499 conserva su alcance.
+ * [V4.5-4] Contadores por carrera, manejo explícito de errores/RLS y
+ *          consultas paginadas para evitar el límite por defecto de Supabase.
+ * SEGURIDAD: aplicar 20261022_we_can_move_admin_read.sql y autenticar al
+ *          administrador mediante Supabase Auth; NO exponer service_role.
  *
  * CHANGELOG V4.4 (evoluciona sobre V4.3):
  * [V4.4-1] Modalidad '5K' agregada al tipo. isLedScope() detecta
@@ -73,7 +99,30 @@ import ModuloInscripcionAdmin from '../components/admin/ModuloInscripcionAdmin';
 /* TYPES & CONSTANTS                                              */
 /* ────────────────────────────────────────────────────────────── */
 
-type Modalidad = '10K' | '4K' | '5K'; // [V4.4-1] + '5K'
+type Modalidad = '10K' | '4K' | '5K'; // WE CAN MOVE 3K vive en una tabla independiente
+type Access3KState = 'checking' | 'signed-out' | 'unauthorized' | 'authorized' | 'error';
+
+interface WeCanMoveRegistration {
+  id: string;
+  race_id: string;
+  modalidad: '3K';
+  evento: 'WE CAN MOVE';
+  nombre: string;
+  apellido: string;
+  cedula: string;
+  email: string;
+  telefono: string;
+  fecha_nacimiento: string;
+  genero: 'M' | 'F';
+  movilidad_reducida: boolean;
+  contacto_emergencia: string | null;
+  telefono_emergencia: string | null;
+  nombre_mascota: string;
+  tipo_mascota: 'Perro' | 'Gato' | 'Otra especie';
+  raza_mascota: string;
+  estado: 'confirmado';
+  created_at: string;
+}
 
 interface Runner {
   id: string;
@@ -128,7 +177,7 @@ const CATEGORY_ORDER: string[] = [
   'Master D Masculino', 'Master D Femenino',
   'Absoluto Masculino', 'Absoluto Femenino',
   'Caminata Recreativa 4K',
-  'Caminata Recreativa 5K', // [V4.4-4]
+  'Caminata Recreativa 5K', // [V4.4-4] (WE CAN MOVE no participa en runners)
 ];
 
 const getCategoryColor = (categoria: string): [number, number, number] => {
@@ -214,8 +263,13 @@ const isLegacyRace = (name: string) => {
  * [V4.4-1] Detecta WE RUN RAYOCERO LED CORO.
  * Misma keyword que isLedRunRace() del terminal de inscripciones.
  */
-const isLedScope = (scope: RaceScope): boolean =>
-  (scope.name || '').toLowerCase().includes('led');
+const isLedScope = (scope: RaceScope): boolean => {
+  const n = (scope.name || '').toLowerCase();
+  // La carrera real en Supabase puede llamarse "WE RUN RAYOCERO 10K - 5K CORO"
+  // sin "LED"; evitar confundirla con "CORO 499".
+  return /\bled\b/.test(n) ||
+    (n.includes('we run rayocero') && n.includes('coro') && !n.includes('499'));
+};
 
 /**
  * Detecta si la carrera activa es Coro 499 para estilos y labels.
@@ -290,7 +344,7 @@ const RaceScopeBar = ({ scope, onChange }: { scope: RaceScope | null; onChange: 
       {races.map(r => {
         const legacy   = isLegacyRace(r.name);
         const selected = scope?.raceId === r.id;
-        const isCoro   = r.name.toLowerCase().includes('coro') || r.name.includes('499');
+        const isCoro   = isCoroScope({ raceId: r.id, legacy, name: r.name, isActive: !!r.inscripciones_abiertas });
         const activeColor = isCoro ? 'bg-red-600 text-white border-red-600 shadow-lg shadow-red-600/20'
                                    : 'bg-cyan-500 text-black border-cyan-500 shadow-lg shadow-cyan-500/20';
         const archiveColor = isCoro ? 'bg-red-500/20 text-red-300 border-red-500/50'
@@ -1287,9 +1341,62 @@ const TasaConfig = ({ scope }: { scope: RaceScope }) => {
 /* ATLETAS LIST — V4.2 (+ [V4.4-3] 5K)                            */
 /* ────────────────────────────────────────────────────────────── */
 
-type ModalidadTab = 'todos' | '10K' | '4K' | '5K'; // [V4.4-3] + '5K'
+type ModalidadTab = 'todos' | '10K' | '4K' | '5K' | '3K'; // V4.5: 3K en tabla separada
 
-const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount?: (n: number) => void }) => {
+/**
+ * WE CAN MOVE: PDF independiente (sin columnas de pago, kit o dorsal).
+ * Solo exporta registros ya leídos bajo autorización de administrador.
+ */
+const generateWeCanMovePDF = (inscritos: WeCanMoveRegistration[], raceName: string) => {
+  if (inscritos.length === 0) {
+    alert('No hay inscritos 3K para exportar con el filtro actual.');
+    return;
+  }
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const width = doc.internal.pageSize.getWidth();
+  doc.setFillColor(10, 10, 15);
+  doc.rect(0, 0, width, 47, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(255, 255, 255);
+  doc.text('RAYOCERO  /  WE CAN MOVE', 14, 17);
+  doc.setFontSize(11);
+  doc.setTextColor(196, 181, 253);
+  doc.text('CAMINATA 3K CON MASCOTAS · INSCRITOS', 14, 26);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(200, 200, 210);
+  doc.text(raceName.substring(0, 80), 14, 34);
+  doc.text(`21/11/2026 · 5:00 PM · Ciudad Deportiva Universitaria · ${inscritos.length} inscripciones`, 14, 40);
+  autoTable(doc, {
+    startY: 53,
+    head: [['#', 'Participante', 'Cédula', 'Teléfono', 'Mascota', 'Especie', 'Raza / Detalle', 'Registro']],
+    body: inscritos.map((a, idx) => [
+      String(idx + 1),
+      `${a.nombre} ${a.apellido}`,
+      a.cedula,
+      a.telefono,
+      a.nombre_mascota,
+      a.tipo_mascota,
+      a.raza_mascota || 'Sin especificar',
+      new Date(a.created_at).toLocaleDateString('es-VE'),
+    ]),
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak' },
+    headStyles: { fillColor: [109, 40, 217], textColor: [255, 255, 255], fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [248, 245, 255] },
+  });
+  const totalPages = (doc.internal as any).getNumberOfPages?.() ?? 1;
+  for (let page = 1; page <= totalPages; page++) {
+    doc.setPage(page);
+    doc.setFontSize(7);
+    doc.setTextColor(100, 100, 110);
+    doc.text(`WE CAN MOVE · Uso administrativo · Valkyron Group · ${page}/${totalPages}`, width / 2, 205, { align: 'center' });
+  }
+  doc.save(`RAYOCERO_WE_CAN_MOVE_3K_INSCRITOS_${Date.now()}.pdf`);
+};
+
+const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount?: (n: number, verified: boolean) => void }) => {
   const [atletas, setAtletas]               = useState<Runner[]>([]);
   const [loading, setLoading]               = useState(true);
   const [searchTerm, setSearchTerm]         = useState('');
@@ -1304,8 +1411,20 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
   const [isTogglingPayment, setIsTogglingPayment] = useState<string | null>(null);
   const [isTogglingKit, setIsTogglingKit]   = useState<string | null>(null);
   const [showPDFModal, setShowPDFModal]     = useState(false);
+  // [V4.5] Tabla distinta: los 3K no son runners ni tienen dorsal o cobro.
+  const [weCanMove, setWeCanMove]           = useState<WeCanMoveRegistration[]>([]);
+  const [weCanMoveLoading, setWeCanMoveLoading] = useState(false);
+  const [weCanMoveError, setWeCanMoveError] = useState<string | null>(null);
+  const [selected3K, setSelected3K]         = useState<WeCanMoveRegistration | null>(null);
+  const weCanMoveSeq = useRef(0);
+  const [access3K, setAccess3K] = useState<Access3KState>('checking');
+  const [session3K, setSession3K] = useState<{ email: string; userId: string } | null>(null);
+  const [adminEmail3K, setAdminEmail3K] = useState('');
+  const [adminPassword3K, setAdminPassword3K] = useState('');
+  const [signIn3KBusy, setSignIn3KBusy] = useState(false);
+  const [signIn3KError, setSignIn3KError] = useState<string | null>(null);
 
-  const isLed = isLedScope(scope); // [V4.4-3]
+  const isLed = isLedScope(scope); // [V4.5] contempla nombre real sin LED
 
   const fetchAtletas = useCallback(async () => {
     setLoading(true);
@@ -1320,10 +1439,125 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
   }, [scope.raceId, scope.legacy]);
 
   useEffect(() => { fetchAtletas(); }, [fetchAtletas]);
-  useEffect(() => { if (onUpdateCount) onUpdateCount(atletas.length); }, [atletas.length, onUpdateCount]);
-  // [V4.4-3] Al cambiar de carrera, la pestaña vuelve a TODOS
-  //          (evita quedar en '5K' dentro de una carrera sin 5K caminata).
-  useEffect(() => { setModalidadTab('todos'); }, [scope.raceId, scope.legacy]);
+
+  // V4.6: Supabase RLS devuelve [] cuando no permite SELECT. Nunca mostrar
+  // cero inscritos hasta verificar la identidad y la pertenencia administrativa.
+  const fetchWeCanMove = useCallback(async () => {
+    const req = ++weCanMoveSeq.current;
+    if (!isLed || !scope.raceId || scope.legacy) {
+      setWeCanMove([]);
+      setWeCanMoveError(null);
+      setWeCanMoveLoading(false);
+      setSession3K(null);
+      setAccess3K('signed-out');
+      return;
+    }
+    setWeCanMoveLoading(true);
+    setAccess3K('checking');
+    setWeCanMoveError(null);
+    setWeCanMove([]);
+    try {
+      // getUser valida al usuario ante Supabase Auth. A diferencia de comprobar
+      // solo un token local, también obtiene la identidad efectiva de la sesión.
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (req !== weCanMoveSeq.current) return;
+      if (userErr && !/auth session missing/i.test(userErr.message)) {
+        // Una sesión inválida/caducada se trata como cuenta no autenticada.
+        if (!/invalid|expired|session|jwt/i.test(userErr.message)) throw userErr;
+      }
+      const user = userData?.user;
+      if (!user) {
+        setSession3K(null);
+        setAccess3K('signed-out');
+        return;
+      }
+      setSession3K({ email: user.email || 'Cuenta sin correo', userId: user.id });
+
+      const { data: isAdmin, error: authzErr } = await (supabase as any).rpc('rayocero_is_3k_admin');
+      if (req !== weCanMoveSeq.current) return;
+      if (authzErr) throw new Error(`Error validando permiso WE CAN MOVE: ${authzErr.message}`);
+      if (isAdmin !== true) {
+        setAccess3K('unauthorized');
+        return;
+      }
+
+      const pageSize = 500;
+      const all: WeCanMoveRegistration[] = [];
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await (supabase as any)
+          .from('we_can_move_registrations')
+          .select('id,race_id,modalidad,evento,nombre,apellido,cedula,email,telefono,fecha_nacimiento,genero,movilidad_reducida,contacto_emergencia,telefono_emergencia,nombre_mascota,tipo_mascota,raza_mascota,estado,created_at')
+          .eq('race_id', scope.raceId)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + pageSize - 1);
+        if (error) throw error;
+        if (req !== weCanMoveSeq.current) return;
+        const batch = (data || []) as WeCanMoveRegistration[];
+        all.push(...batch);
+        if (batch.length < pageSize) break;
+      }
+      if (req === weCanMoveSeq.current) {
+        setWeCanMove(all);
+        setAccess3K('authorized');
+      }
+    } catch (err: any) {
+      console.error('[RAYOCERO-3K] Error de lectura:', err);
+      if (req === weCanMoveSeq.current) {
+        setWeCanMove([]);
+        setAccess3K('error');
+        setWeCanMoveError(err?.message || 'No fue posible consultar inscritos WE CAN MOVE.');
+      }
+    } finally {
+      if (req === weCanMoveSeq.current) setWeCanMoveLoading(false);
+    }
+  }, [scope.raceId, scope.legacy, isLed]);
+
+  // La contraseña existe solo durante el envío del formulario. Supabase Auth
+  // administra los tokens. Nunca se registra en logs o en localStorage propio.
+  const handleSignIn3K = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (signIn3KBusy) return;
+    const email = adminEmail3K.trim().toLowerCase();
+    if (!email || !adminPassword3K) {
+      setSignIn3KError('Indica el correo y la contraseña de Supabase Auth.');
+      return;
+    }
+    setSignIn3KBusy(true);
+    setSignIn3KError(null);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password: adminPassword3K,
+      });
+      if (error) throw error;
+      setAdminPassword3K('');
+      await fetchWeCanMove();
+    } catch (err: any) {
+      setAdminPassword3K('');
+      setSignIn3KError(err?.message || 'No se pudo iniciar sesión en Supabase Auth.');
+    } finally {
+      setSignIn3KBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchWeCanMove();
+    return () => { weCanMoveSeq.current += 1; };
+  }, [fetchWeCanMove]);
+
+  useEffect(() => {
+    if (onUpdateCount) onUpdateCount(
+      atletas.length + (isLed ? weCanMove.length : 0),
+      !isLed || (access3K === 'authorized' && !weCanMoveError && !weCanMoveLoading),
+    );
+  }, [atletas.length, weCanMove.length, isLed, access3K, weCanMoveError, weCanMoveLoading, onUpdateCount]);
+
+  // Cambiar la carrera nunca conserva pestaña, selección ni búsqueda de otra.
+  useEffect(() => {
+    setModalidadTab('todos');
+    setSelected3K(null);
+    setSearchTerm('');
+  }, [scope.raceId, scope.legacy]);
 
   const togglePago = async (id: string, current?: boolean) => {
     setIsTogglingPayment(id);
@@ -1422,25 +1656,40 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
   const countMismatch     = atletas.filter(a => validateGenderCategoryConsistency(a) !== null).length;
 
   const filteredAtletas = useMemo(() => {
-    let list = atletas;
+    let list = modalidadTab === '3K' ? [] : atletas;
     if (modalidadTab === '10K') list = list.filter(a => a.modalidad === '10K');
     else if (modalidadTab === '4K') list = list.filter(a => a.modalidad === '4K');
-    else if (modalidadTab === '5K') list = list.filter(a => a.modalidad === '5K'); // [V4.4-3]
+    else if (modalidadTab === '5K') list = list.filter(a => a.modalidad === '5K');
     if (searchTerm) list = list.filter(a =>
       `${a.nombre} ${a.apellido} ${a.cedula} ${a.categoria || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
     );
     return list;
   }, [atletas, searchTerm, modalidadTab]);
 
+  const filteredWeCanMove = useMemo(() => {
+    if (!isLed || (modalidadTab !== 'todos' && modalidadTab !== '3K')) return [];
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return weCanMove;
+    return weCanMove.filter(a => [
+      a.nombre, a.apellido, a.cedula, a.email, a.telefono,
+      a.nombre_mascota, a.tipo_mascota, a.raza_mascota,
+    ].some(value => (value || '').toLowerCase().includes(term)));
+  }, [weCanMove, searchTerm, modalidadTab, isLed]);
+
   const kitsEntregados = atletas.filter(a => a.kit_entregado).length;
 
-  // [V4.4-3] Pestañas: LED → 10K + 5K CAMINATA. Resto → 10K + 4K (V4.3 intacto)
+  // Un conteo inaccesible NO es un cero verificado.
+  const count3KVerified = !isLed || (access3K === 'authorized' && !weCanMoveError);
+  const label3KCount = count3KVerified ? String(weCanMove.length) : '—';
+
+  // [V4.5] TODAS agrupa inscritos de ambas tablas, sin mezclar sus estados.
   const modalidadTabs: [ModalidadTab, string, string][] = [
-    ['todos', `TODOS (${atletas.length})`, '#94a3b8'],
+    ['todos', `TODOS (${count3KVerified ? atletas.length + (isLed ? weCanMove.length : 0) : `${atletas.length}+`})`, '#94a3b8'],
     ['10K',   `🏃 10K CARRERA (${count10k})`, '#00d4c8'],
     isLed
       ? ['5K', `🚶 5K CAMINATA (${count5k})`, COLOR_5K]
       : ['4K', `🚶 4K CAMINATA (${count4k})`, '#fbbf24'],
+    ...(isLed ? [['3K', `🐾 3K MASCOTAS (${label3KCount})`, '#c4b5fd'] as [ModalidadTab, string, string]] : []),
   ];
 
   return (
@@ -1472,15 +1721,37 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
         </div>
 
         <div className="p-6 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setShowPDFModal(true)}
-              className="px-4 py-2 rounded-lg bg-white/5 text-cyan-400 border border-cyan-400/20 hover:bg-cyan-400 hover:text-black flex items-center gap-2 text-[10px] uppercase font-black transition-all">
-              <FileText size={14} /> Exportar PDF
-            </button>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <Gift size={14} className="text-amber-400" />
-              <span className="text-[10px] font-black text-amber-400 uppercase">Kits: {kitsEntregados}/{atletas.length}</span>
-            </div>
+          <div className="flex flex-wrap items-center gap-3">
+            {modalidadTab !== '3K' && (
+              <button onClick={() => setShowPDFModal(true)}
+                className="px-4 py-2 rounded-lg bg-white/5 text-cyan-400 border border-cyan-400/20 hover:bg-cyan-400 hover:text-black flex items-center gap-2 text-[10px] uppercase font-black transition-all">
+                <FileText size={14} /> {isLed ? 'PDF 10K / 5K' : 'Exportar PDF'}
+              </button>
+            )}
+            {isLed && (
+              <button onClick={() => generateWeCanMovePDF(filteredWeCanMove.length ? filteredWeCanMove : (modalidadTab === 'todos' || modalidadTab === '3K' ? [] : weCanMove), scope.name)}
+                disabled={weCanMoveLoading || !!weCanMoveError || weCanMove.length === 0}
+                className="px-4 py-2 rounded-lg bg-violet-500/10 text-violet-300 border border-violet-400/25 hover:bg-violet-500 hover:text-white flex items-center gap-2 text-[10px] uppercase font-black transition-all disabled:opacity-40">
+                <FileText size={14} /> PDF 3K MASCOTAS
+              </button>
+            )}
+            {modalidadTab !== '3K' && (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <Gift size={14} className="text-amber-400" />
+                <span className="text-[10px] font-black text-amber-400 uppercase">Kits: {kitsEntregados}/{atletas.length}</span>
+              </div>
+            )}
+            {isLed && (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-500/10 border border-violet-500/20">
+                <span className="text-[10px] font-black text-violet-300 uppercase">🐾 3K confirmados: {label3KCount} · GRATIS</span>
+              </div>
+            )}
+            {isLed && (
+              <button onClick={() => void fetchWeCanMove()} disabled={weCanMoveLoading}
+                className="p-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40" title="Actualizar inscritos WE CAN MOVE 3K">
+                <RefreshCw size={15} className={weCanMoveLoading ? 'animate-spin' : ''} />
+              </button>
+            )}
           </div>
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
@@ -1489,26 +1760,82 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
           </div>
         </div>
 
+        {isLed && (access3K === 'signed-out' || access3K === 'unauthorized') && (
+          <section className="mx-6 mt-5 p-5 bg-violet-500/[0.07] border border-violet-400/30 rounded-xl" aria-label="Acceso privado WE CAN MOVE 3K">
+            <div className="flex items-center gap-2 text-violet-200 font-black uppercase text-xs mb-2">
+              <ShieldCheck size={16} /> Acceso administrativo · WE CAN MOVE 3K
+            </div>
+            {access3K === 'signed-out' ? (
+              <p className="text-xs text-gray-300 mb-3">
+                El dashboard no ha iniciado una sesión de Supabase Auth. Inicia sesión para ver los inscritos gratuitos.
+              </p>
+            ) : (
+              <div className="text-xs text-amber-200 mb-3 space-y-1">
+                <p>La sesión actual ({session3K?.email || 'desconocida'}) no tiene autorización 3K.</p>
+                <p className="text-[10px] text-gray-400 break-all">UID de la sesión: {session3K?.userId || 'no disponible'}</p>
+                <p>Accede con tu correo administrativo autorizado o comprueba que este UID está incluido en rayocero_admin_members.</p>
+              </div>
+            )}
+            <form className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end" onSubmit={handleSignIn3K}>
+              <label className="block min-w-0">
+                <span className="text-[9px] uppercase font-black text-gray-400 block mb-1">Correo de Supabase Auth</span>
+                <input type="email" autoComplete="username" required placeholder="Correo administrativo" value={adminEmail3K} onChange={e => setAdminEmail3K(e.target.value)}
+                  className="w-full bg-black/50 border border-white/15 rounded-lg px-3 py-3 text-white text-xs outline-none focus:border-violet-400" />
+              </label>
+              <label className="block min-w-0">
+                <span className="text-[9px] uppercase font-black text-gray-400 block mb-1">Contraseña</span>
+                <input type="password" autoComplete="current-password" required value={adminPassword3K} onChange={e => setAdminPassword3K(e.target.value)}
+                  className="w-full bg-black/50 border border-white/15 rounded-lg px-3 py-3 text-white text-xs outline-none focus:border-violet-400" />
+              </label>
+              <button type="submit" disabled={signIn3KBusy}
+                className="px-4 py-3 rounded-lg bg-violet-500 text-white font-black uppercase text-[10px] hover:bg-violet-400 disabled:opacity-40 flex items-center justify-center gap-2">
+                {signIn3KBusy ? <RefreshCw size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
+                {signIn3KBusy ? 'Validando...' : 'Ingresar 3K'}
+              </button>
+            </form>
+            {signIn3KError && <p role="alert" className="mt-3 text-xs text-red-300 break-words">{signIn3KError}</p>}
+            <p className="mt-3 text-[10px] text-gray-500">
+              Utiliza la contraseña de la cuenta en Supabase → Authentication → Users; la del login interno de HQ puede ser distinta.
+              No se modificarán los registros ni sus permisos públicos.
+            </p>
+          </section>
+        )}
+        {isLed && access3K === 'authorized' && session3K && (
+          <div className="mx-6 mt-4 flex flex-wrap items-center gap-2 text-[10px] text-green-300">
+            <ShieldCheck size={13} /> Acceso 3K verificado: {session3K.email}
+          </div>
+        )}
+        {isLed && weCanMoveError && (
+          <div role="alert" className="mx-6 mt-5 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-200">
+            <div className="font-black uppercase flex items-center gap-2"><ShieldAlert size={14} /> No se pudo leer WE CAN MOVE 3K</div>
+            <p className="mt-1 break-words">{weCanMoveError}</p>
+            {session3K && <p className="mt-1 text-red-200/70 break-all">Sesión: {session3K.email} · UID: {session3K.userId}</p>}
+            <p className="mt-1 text-red-200/70">Verifica la migración SQL, el proyecto Supabase y las políticas SELECT. No se interpreta el error como cero inscritos.</p>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="bg-white/5">
-                <th className="p-4 text-left text-[9px] uppercase text-gray-400">Atleta / Categoría</th>
+                <th className="p-4 text-left text-[9px] uppercase text-gray-400">{modalidadTab === '3K' ? 'Participante / Mascota' : 'Atleta / Categoría'}</th>
                 <th className="p-4 text-left text-[9px] uppercase text-gray-400">Modalidad</th>
                 <th className="p-4 text-left text-[9px] uppercase text-gray-400">Comunicación</th>
-                <th className="p-4 text-left text-[9px] uppercase text-gray-400">Talla</th>
-                <th className="p-4 text-left text-[9px] uppercase text-gray-400">Dorsal & RFID</th>
+                <th className="p-4 text-left text-[9px] uppercase text-gray-400">{modalidadTab === '3K' ? 'Mascota' : 'Talla / Mascota'}</th>
+                <th className="p-4 text-left text-[9px] uppercase text-gray-400">{modalidadTab === '3K' ? 'Estado' : 'Dorsal & RFID / Estado'}</th>
                 <th className="p-4 text-center text-[9px] uppercase text-gray-400">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {loading ? (
-                <tr><td colSpan={6} className="p-20 text-center text-cyan-500 font-black animate-pulse uppercase">Cargando atletas...</td></tr>
-              ) : filteredAtletas.length === 0 ? (
+              {loading || (isLed && weCanMoveLoading) ? (
+                <tr><td colSpan={6} className="p-20 text-center text-cyan-500 font-black animate-pulse uppercase">Cargando inscritos...</td></tr>
+              ) : filteredAtletas.length === 0 && filteredWeCanMove.length === 0 ? (
                 <tr><td colSpan={6} className="p-20 text-center text-gray-600 font-black uppercase text-[10px]">
-                  {searchTerm ? 'Sin coincidencias' : `Sin atletas${modalidadTab !== 'todos' ? ` en ${modalidadTab}` : ''} para ${scope.name}`}
+                  {(!count3KVerified && modalidadTab === '3K') ? 'Accede como administrador autorizado para consultar inscritos 3K'
+                    : searchTerm ? 'Sin coincidencias'
+                    : `Sin inscritos${modalidadTab !== 'todos' ? ` en ${modalidadTab}` : ''} para ${scope.name}`}
                 </td></tr>
-              ) : filteredAtletas.map(a => (
+              ) : <>
+              {filteredAtletas.map(a => (
                 <tr key={a.id} className={`hover:bg-white/[0.02] transition-colors ${validateGenderCategoryConsistency(a) ? 'bg-red-500/[0.02]' : ''}`}>
                   <td className="p-4">
                     <div className="font-bold text-xs uppercase flex items-center gap-2 flex-wrap">
@@ -1574,6 +1901,40 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
                   </td>
                 </tr>
               ))}
+              {filteredWeCanMove.map(a => (
+                <tr key={`3k-${a.id}`} className="hover:bg-violet-500/[0.04] transition-colors">
+                  <td className="p-4">
+                    <div className="font-bold text-xs uppercase flex flex-wrap items-center gap-2">
+                      {a.nombre} {a.apellido}
+                      <span className="text-[8px] px-2 py-0.5 rounded-full font-black border border-violet-400/25 bg-violet-500/10 text-violet-300">WE CAN MOVE</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 items-center mt-1">
+                      <span className="text-[9px] font-mono text-gray-500">V-{a.cedula}</span>
+                      <span className="text-[9px] text-violet-300">🐾 {a.nombre_mascota}</span>
+                    </div>
+                  </td>
+                  <td className="p-4"><span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full border border-violet-400/25 bg-violet-500/10 text-violet-300">🐾 3K GRATIS</span></td>
+                  <td className="p-4">
+                    <div className="text-cyan-400 text-[10px] font-mono flex items-center gap-1"><Phone size={12} />{a.telefono}</div>
+                    <div className="text-[9px] text-gray-500 mt-1 break-all">{a.email}</div>
+                  </td>
+                  <td className="p-4">
+                    <div className="text-white text-xs font-bold">{a.nombre_mascota}</div>
+                    <div className="text-[9px] text-gray-400">{a.tipo_mascota} · {a.raza_mascota}</div>
+                  </td>
+                  <td className="p-4">
+                    <span className="text-[9px] text-green-400 font-black uppercase flex items-center gap-1"><CheckCircle size={12} /> Confirmado</span>
+                    <span className="block text-[9px] text-gray-500 mt-1">Sin dorsal · Sin kit</span>
+                  </td>
+                  <td className="p-4 text-center">
+                    <button onClick={() => setSelected3K(a)}
+                      className="p-2 rounded-lg bg-white/5 hover:bg-violet-500 hover:text-white transition-all" title="Ver inscripción 3K y datos de mascota">
+                      <Eye size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              </>}
             </tbody>
           </table>
         </div>
@@ -1587,6 +1948,47 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
           scope={scope}
           onClose={() => setShowPDFModal(false)}
         />
+      )}
+
+      {/* V4.5 — Inspección 3K: solo lectura, sin pago/kit/comprobante/dorsal. */}
+      {selected3K && createPortal(
+        <div onClick={() => setSelected3K(null)} className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
+          <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Inscripción WE CAN MOVE 3K"
+            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-[#0d1019] border border-violet-500/30 rounded-3xl p-7 shadow-2xl">
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <p className="text-[10px] text-violet-300 font-black tracking-widest uppercase">🐾 WE CAN MOVE · 3K GRATIS</p>
+                <h4 className="text-2xl font-black text-white uppercase mt-1">{selected3K.nombre} {selected3K.apellido}</h4>
+                <p className="text-[10px] text-gray-400 mt-2">21 noviembre 2026 · 5:00 PM · Ciudad Deportiva Universitaria</p>
+              </div>
+              <button onClick={() => setSelected3K(null)} className="p-2 bg-white/5 rounded-full text-white hover:bg-white/10" aria-label="Cerrar"><X size={18} /></button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {([
+                ['Cédula', selected3K.cedula],
+                ['Teléfono', selected3K.telefono],
+                ['Correo', selected3K.email],
+                ['Nacimiento', selected3K.fecha_nacimiento],
+                ['Género', selected3K.genero === 'M' ? 'Masculino' : 'Femenino'],
+                ['Movilidad reducida', selected3K.movilidad_reducida ? 'Sí' : 'No'],
+                ['Mascota', selected3K.nombre_mascota],
+                ['Especie', selected3K.tipo_mascota],
+                ['Raza / descripción', selected3K.raza_mascota || 'No especificada'],
+                ['Contacto emergencia', selected3K.contacto_emergencia || '—'],
+                ['Teléfono emergencia', selected3K.telefono_emergencia || '—'],
+                ['Registro', new Date(selected3K.created_at).toLocaleString('es-VE')],
+              ] as [string, string][]).map(([label, value]) => (
+                <div key={label} className="bg-white/[0.03] border border-white/5 p-4 rounded-xl min-w-0">
+                  <p className="text-gray-500 text-[9px] font-black uppercase mb-1">{label}</p>
+                  <p className="text-white text-xs font-semibold break-words">{value}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-5 p-4 border border-green-500/25 bg-green-500/5 rounded-xl text-green-300 text-[10px] font-black uppercase">
+              Inscripción confirmada · USD 0 · No requiere pago, dorsal, kit ni franela
+            </div>
+          </div>
+        </div>, document.body
       )}
 
       {/* Panel de inspección */}
@@ -2306,7 +2708,135 @@ const TelemetryModule = ({ scope }: { scope: RaceScope }) => {
 export default function AdminDashboard() {
   const [activeTab, setActiveTab]     = useState<'overview' | 'race_config' | 'results' | 'teams' | 'kit_delivery' | 'kit_chequeo' | 'telemetry' | 'inscripcion' | 'menores'>('overview');
   const [totalAtletas, setTotalAtletas] = useState(0);
+  const [totalVerificado, setTotalVerificado] = useState(true);
   const [raceScope, setRaceScope]     = useState<RaceScope | null>(null);
+  const updateTotals = useCallback((count: number, verified: boolean) => {
+    setTotalAtletas(count);
+    setTotalVerificado(verified);
+  }, []);
+
+  // [V4.7] El acceso administrativo no depende de una ruta externa de login:
+  // si no existe sesión Supabase Auth, presentamos el formulario aquí mismo.
+  // La autorización específica para leer 3K se comprueba en AtletasList/RLS.
+  const [authStatus, setAuthStatus] = useState<'checking' | 'signed-in' | 'signed-out'>('checking');
+  const [authEmail, setAuthEmail] = useState('');
+  const [loginEmail, setLoginEmail] = useState('adminrayocero@gmail.com');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [authMessage, setAuthMessage] = useState<string | null>(null);
+  const [authRevision, setAuthRevision] = useState(0);
+
+  useEffect(() => {
+    // Supabase Auth v2 entrega INITIAL_SESSION, SIGNED_IN y SIGNED_OUT;
+    // este listener también cubre cambios de sesión desde otras pantallas.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthEmail(session?.user?.email ?? '');
+      setAuthStatus(session?.user ? 'signed-in' : 'signed-out');
+      // No realizar solicitudes asíncronas a Supabase dentro de este callback.
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    if (logoutBusy) return;
+    setLogoutBusy(true);
+    setAuthMessage(null);
+    try {
+      // «local» finaliza solo la sesión de este dispositivo/navegador.
+      // El cliente Supabase elimina su token persistido y notifica SIGNED_OUT.
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      if (error && error.name !== 'AuthSessionMissingError') throw error;
+      setAuthStatus('signed-out');
+      setAuthEmail('');
+      setLoginPassword('');
+      setActiveTab('overview');
+      setRaceScope(null);
+      setTotalAtletas(0);
+      setTotalVerificado(false);
+      setAuthRevision(prev => prev + 1);
+    } catch (error: any) {
+      setAuthMessage(error?.message || 'No se pudo cerrar la sesión de Supabase.');
+    } finally {
+      setLogoutBusy(false);
+    }
+  };
+
+  const handleAdminLogin = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (loginBusy) return;
+    setLoginBusy(true);
+    setAuthMessage(null);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: loginEmail.trim().toLowerCase(),
+        password: loginPassword,
+      });
+      if (error) throw error;
+      if (!data.user) throw new Error('Supabase no devolvió un usuario autenticado.');
+      setLoginPassword('');
+      setAuthStatus('signed-in');
+      setAuthEmail(data.user.email || '');
+      setRaceScope(null);
+      setActiveTab('overview');
+      setTotalAtletas(0);
+      setTotalVerificado(false);
+      // Remonta los módulos al cambiar de usuario, evitando resultados de la
+      // sesión anterior; la validación 3K vuelve a ejecutarse con el nuevo UID.
+      setAuthRevision(prev => prev + 1);
+    } catch (error: any) {
+      setLoginPassword('');
+      setAuthMessage(error?.message || 'No se pudo iniciar sesión. Verifica las credenciales.');
+    } finally {
+      setLoginBusy(false);
+    }
+  };
+
+  if (authStatus !== 'signed-in') {
+    return (
+      <div className="min-h-screen bg-[#050505] text-white font-sans flex items-center justify-center px-5 py-10">
+        <div className="w-full max-w-md rounded-3xl border border-cyan-500/20 bg-[#0b0f12] p-8 shadow-2xl">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-12 h-12 rounded-2xl bg-cyan-500 flex items-center justify-center">
+              <ShieldCheck className="text-black" size={25} />
+            </div>
+            <div>
+              <h1 className="text-xl uppercase font-black italic">RayoCero HQ</h1>
+              <p className="text-[9px] uppercase tracking-widest text-gray-500">Valkyron Group · Acceso administrativo</p>
+            </div>
+          </div>
+          {authStatus === 'checking' ? (
+            <div className="py-10 flex items-center justify-center gap-3 text-xs uppercase font-bold text-cyan-400">
+              <RefreshCw size={17} className="animate-spin" /> Verificando sesión...
+            </div>
+          ) : (
+            <>
+              <h2 className="text-2xl font-black uppercase mb-2">Iniciar sesión</h2>
+              <p className="text-sm text-gray-400 mb-6">Ingresa con la cuenta administrativa de Supabase Auth para consultar los inscritos de WE CAN MOVE 3K.</p>
+              <form onSubmit={handleAdminLogin} className="space-y-4">
+                <label className="block">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Correo administrativo</span>
+                  <input type="email" autoComplete="username" required value={loginEmail} onChange={e => setLoginEmail(e.target.value)}
+                    className="w-full rounded-xl bg-white/5 border border-white/15 px-4 py-3 text-white outline-none focus:border-cyan-400" />
+                </label>
+                <label className="block">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-2">Contraseña de Supabase Auth</span>
+                  <input type="password" autoComplete="current-password" required value={loginPassword} onChange={e => setLoginPassword(e.target.value)}
+                    className="w-full rounded-xl bg-white/5 border border-white/15 px-4 py-3 text-white outline-none focus:border-cyan-400" />
+                </label>
+                <button type="submit" disabled={loginBusy} className="w-full rounded-xl bg-cyan-500 px-5 py-3.5 text-black uppercase font-black text-xs tracking-widest hover:bg-cyan-400 disabled:opacity-50 flex items-center justify-center gap-2">
+                  {loginBusy ? <RefreshCw size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+                  {loginBusy ? 'Autenticando...' : 'Entrar al dashboard'}
+                </button>
+              </form>
+              {authMessage && <p role="alert" className="mt-4 text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg p-3 break-words">{authMessage}</p>}
+              <p className="mt-6 text-[10px] text-gray-500">La contraseña corresponde al usuario de Authentication → Users. La lectura del 3K continúa protegida por su política RLS.</p>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-cyan-500/30">
@@ -2323,13 +2853,19 @@ export default function AdminDashboard() {
               </p>
             </div>
           </div>
-          <button className="flex items-center gap-2 text-[10px] uppercase text-gray-400 hover:text-white">
-            <LogOut size={16} /> Salir
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button type="button" onClick={() => void handleLogout()} disabled={logoutBusy}
+              className="flex items-center gap-2 text-[10px] uppercase text-gray-400 hover:text-white disabled:opacity-50">
+              {logoutBusy ? <RefreshCw size={16} className="animate-spin" /> : <LogOut size={16} />}
+              {logoutBusy ? 'Cerrando sesión...' : 'Cerrar sesión'}
+            </button>
+            {authEmail && <span className="text-[9px] text-gray-500 break-all max-w-[220px] text-right">{authEmail}</span>}
+          </div>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-6 py-12">
+      {authMessage && <div role="alert" className="max-w-7xl mx-auto mt-4 p-3 border border-red-500/30 bg-red-500/10 rounded-xl text-red-200 text-xs">{authMessage}</div>}
+      <main key={authRevision} className="max-w-7xl mx-auto px-6 py-12">
         <RaceScopeBar scope={raceScope} onChange={setRaceScope} />
 
         <div className="flex flex-wrap gap-4 mb-12 border-b border-white/5 pb-6">
@@ -2367,7 +2903,7 @@ export default function AdminDashboard() {
               <>
                 <TasaConfig scope={raceScope} />
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className="lg:col-span-2"><AtletasList scope={raceScope} onUpdateCount={setTotalAtletas} /></div>
+                  <div className="lg:col-span-2"><AtletasList scope={raceScope} onUpdateCount={updateTotals} /></div>
                   <div>
                     <div className="rounded-3xl p-8 text-black shadow-2xl relative overflow-hidden group"
                       style={isCoroScope(raceScope)
@@ -2378,9 +2914,9 @@ export default function AdminDashboard() {
                       <h4 className="text-xs font-black uppercase">
                         Participación · {isCoroScope(raceScope) ? 'CORO 499' : raceScope.name}
                       </h4>
-                      <p className="text-7xl font-black italic">{totalAtletas.toString().padStart(3, '0')}</p>
+                      <p className="text-7xl font-black italic">{totalVerificado ? totalAtletas.toString().padStart(3, '0') : `${totalAtletas}+`}</p>
                       <p className="text-[10px] font-bold uppercase mt-4 opacity-70">
-                        {raceScope.isActive ? 'Carrera Activa' : 'Archivo Histórico'}
+                        {totalVerificado ? (raceScope.isActive ? 'Carrera Activa' : 'Archivo Histórico') : 'Total parcial · 3K pendiente de validación'}
                       </p>
                     </div>
                   </div>
