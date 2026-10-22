@@ -1,9 +1,17 @@
 /**
- * RAYOCERO — REGISTRATION TERMINAL (V38.1 — SELECTOR: LED 10K/5K + WE CAN MOVE 3K POR SEPARADO)
+ * RAYOCERO — REGISTRATION TERMINAL (V38.2 — FECHA DE NACIMIENTO SIN CALENDARIO EN ANDROID)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Architecture: React / TypeScript / Supabase / React Query / Framer Motion
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
+ *
+ * CHANGELOG V38.2 (evoluciona sobre V38.1):
+ * [V38.2-1] Fecha de nacimiento segmentada DD / MM / AAAA con teclado numerico
+ *           movil, sin obligar a desplazar el calendario nativo de Android.
+ * [V38.2-2] Validacion de calendario, bisiestos, fecha futura y anio 1900+.
+ * [V38.2-3] Conversion a ISO YYYY-MM-DD para API, edad, categorias y Supabase.
+ * [V38.2-4] Previene envios con fecha incompleta/invalida; no usa fecha inventada.
+ * [V38.2-5] Inscripciones, eventos, pagos, dorsales y mascotas sin alteraciones.
  *
  * CHANGELOG V38.1 (evoluciona sobre V38.0):
  * [V38.1-1] Selector "SELECCIONA TU EVENTO": la carrera WE RUN RAYOCERO Coro
@@ -388,6 +396,23 @@ const formatBs = (n: number): string =>
 const normalizeCedula = (c: string): string => c.replace(/\s+/g, "").trim();
 const normalizeEmail  = (e: string): string => e.trim().toLowerCase();
 
+// [V38.2] Conservar ISO YYYY-MM-DD sin depender del calendario nativo Android.
+// Retorna cadena vacia hasta que los tres campos formen una fecha valida.
+function fechaNacimientoISO(dia: string, mes: string, anio: string): string {
+  if (!/^\d{1,2}$/.test(dia) || !/^\d{1,2}$/.test(mes) || !/^\d{4}$/.test(anio)) return "";
+  const d = Number(dia);
+  const m = Number(mes);
+  const y = Number(anio);
+  const ahora = new Date();
+  if (y < 1900 || y > ahora.getFullYear() || m < 1 || m > 12 || d < 1 || d > 31) return "";
+  const fecha = new Date(y, m - 1, d);
+  if (fecha.getFullYear() !== y || fecha.getMonth() !== m - 1 || fecha.getDate() !== d) return "";
+  const iso = `${anio}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const hoy = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
+  return iso <= hoy ? iso : "";
+}
+
+
 // ---------------------------------------------------------------------------
 // CONFIGS ESTÁTICAS
 // ---------------------------------------------------------------------------
@@ -698,7 +723,16 @@ function RegistrationFormActive({
   const [cedula,             setCedula]             = useState("");
   const [email,              setEmail]              = useState("");
   const [telefono,           setTelefono]           = useState("");
-  const [fechaNacimiento,    setFechaNacimiento]    = useState("");
+  // [V38.2] Dia, mes y anio independientes para escribirlos con teclado Android.
+  const [diaNacimiento,     setDiaNacimiento]     = useState("");
+  const [mesNacimiento,     setMesNacimiento]     = useState("");
+  const [anioNacimiento,    setAnioNacimiento]    = useState("");
+  const fechaNacimiento = useMemo(
+    () => fechaNacimientoISO(diaNacimiento, mesNacimiento, anioNacimiento),
+    [diaNacimiento, mesNacimiento, anioNacimiento],
+  );
+  const fechaNacimientoInvalida =
+    Boolean(diaNacimiento && mesNacimiento && anioNacimiento) && !fechaNacimiento;
   const [genero,             setGenero]             = useState<"M" | "F">("M");
   const [talla,              setTalla]              = useState<RegistrationFormData["talla"]>("M");
   const [movilidadReducida,  setMovilidadReducida]  = useState(false);
@@ -801,8 +835,10 @@ function RegistrationFormActive({
       setFormError("Para WE CAN MOVE necesitamos un teléfono de contacto.");
       return;
     }
-    if (isWeCanMove3K && !fechaNacimiento) {
-      setFormError("Introduce tu fecha de nacimiento para completar la inscripción gratuita.");
+    // [V38.2] Validar tambien los eventos pagos: una fecha invalida altera
+    // edad/categoria y jamas debe sustituirse por una fecha ficticia.
+    if (!fechaNacimiento) {
+      setFormError("Introduce una fecha de nacimiento válida (día, mes y año). No puede ser futura.");
       return;
     }
     if (isWeCanMove3K && !aceptaMascota) {
@@ -925,7 +961,7 @@ function RegistrationFormActive({
         cedula: cedulaNorm, // [V37.5-2]
         email:  emailNorm,  // [V37.5-2]
         telefono,
-        fechaNacimiento: fechaNacimiento || "2000-01-01",
+        fechaNacimiento, // [V38.2] ISO validado; nunca inventar fecha por defecto.
         genero,
         talla,
         movilidadReducida, categoria,
@@ -1133,12 +1169,50 @@ function RegistrationFormActive({
               />
             </div>
             <div>
-              <label className="text-xs font-bold uppercase text-white/60 mb-1 block">Fecha de Nacimiento</label>
-              <input
-                type="date" value={fechaNacimiento}
-                onChange={e => setFechaNacimiento(e.target.value)} required
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-white/30"
-              />
+              <label className="text-xs font-bold uppercase text-white/60 mb-1 block" id="rc-birthdate-label">
+                Fecha de Nacimiento
+              </label>
+              {/* [V38.2] No abrir date-picker nativo: en Android obliga a retroceder
+                  meses/años. Se introduce directamente dia / mes / anio. */}
+              <div role="group" aria-labelledby="rc-birthdate-label" className="grid grid-cols-[1fr_1fr_1.5fr] gap-2">
+                <div>
+                  <label htmlFor="rc-birth-day" className="sr-only">Día de nacimiento</label>
+                  <input
+                    id="rc-birth-day" type="text" inputMode="numeric" pattern="[0-9]*"
+                    autoComplete="bday-day" placeholder="DD" aria-label="Día"
+                    maxLength={2} required value={diaNacimiento}
+                    onChange={e => setDiaNacimiento(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                    className="w-full min-w-0 bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-sm text-center text-white focus:outline-none focus:border-white/30"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="rc-birth-month" className="sr-only">Mes de nacimiento</label>
+                  <input
+                    id="rc-birth-month" type="text" inputMode="numeric" pattern="[0-9]*"
+                    autoComplete="bday-month" placeholder="MM" aria-label="Mes"
+                    maxLength={2} required value={mesNacimiento}
+                    onChange={e => setMesNacimiento(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                    className="w-full min-w-0 bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-sm text-center text-white focus:outline-none focus:border-white/30"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="rc-birth-year" className="sr-only">Año de nacimiento</label>
+                  <input
+                    id="rc-birth-year" type="text" inputMode="numeric" pattern="[0-9]*"
+                    autoComplete="bday-year" placeholder="AAAA" aria-label="Año"
+                    maxLength={4} required value={anioNacimiento}
+                    onChange={e => setAnioNacimiento(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    className="w-full min-w-0 bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-sm text-center text-white focus:outline-none focus:border-white/30"
+                  />
+                </div>
+              </div>
+              {fechaNacimientoInvalida ? (
+                <p role="alert" className="mt-2 text-xs text-red-400">
+                  Fecha inválida o futura. Verifica el día, mes y año.
+                </p>
+              ) : (
+                <p className="mt-1.5 text-[11px] text-white/40">Escribe tu fecha: día / mes / año (por ejemplo 08 / 05 / 1990).</p>
+              )}
             </div>
           </div>
 
