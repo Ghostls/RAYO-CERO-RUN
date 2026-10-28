@@ -1,9 +1,18 @@
 /**
- * RAYOCERO — REGISTRATION TERMINAL (V38.2 — FECHA DE NACIMIENTO SIN CALENDARIO EN ANDROID)
+ * RAYOCERO — REGISTRATION TERMINAL (V38.3.1 — CASHEA LINK + COMPROBANTE DE INICIAL)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Architecture: React / TypeScript / Supabase / React Query / Framer Motion
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
+ *
+ * CHANGELOG V38.3 (evoluciona sobre V38.2):
+ * [V38.3-1] Selector de pago móvil / Cashea en carreras LED 10K y 5K.
+ * [V38.3-2] Abre enlace oficial compartido Cashea en otra pestaña/app.
+ * [V38.3-3] Retorno al formulario + captura obligatoria de cuota inicial Cashea.
+ * [V38.3-4] Referencia CASHEA-* en runners.referencia_pago para revisión admin.
+ * [V38.3-5] No se declara pago verificado ni se muestra dorsal Cashea antes de revisión.
+ * [V38.3-6] WE CAN MOVE 3K gratuito y pago móvil original intactos.
+ * AVISO: enlace de PRODUCTO COMPARTIDO, no sesión individual ni pago automático.
  *
  * CHANGELOG V38.2 (evoluciona sobre V38.1):
  * [V38.2-1] Fecha de nacimiento segmentada DD / MM / AAAA con teclado numerico
@@ -105,12 +114,12 @@
  *           modalidad==="5K". Cualquier modalidad caninata navega a /dorsal?tipo=caninata.
  */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2, AlertCircle, Banknote,
   ChevronRight, Flag, Timer, Dog, Calendar, Check, Copy, Zap, ShieldAlert,
-  Footprints, Shirt, // [V37.4-3] + [V37.8]
+  Footprints, Shirt, ExternalLink, CreditCard, UploadCloud, // [V38.3]
 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -146,6 +155,12 @@ interface RaceStaticConfig {
 }
 
 interface PetData { nombrePerro: string; razaPerro: string; }
+
+// Cashea envió este enlace de producto compartido; no es una orden única por participante.
+// IMPORTANTE: confirmar con RayoCero que los precios del producto corresponden
+// a la(s) modalidad(es) habilitadas. La app Cashea fija las cuotas y la inicial.
+const CASHEA_LINK = "https://mobile.cashea.app/products/226c2f83-35c8-4866-b10a-c0e0ba5423cb";
+type MetodoPago = "pago_movil" | "cashea";
 
 const RAZAS_COMUNES: string[] = [
   "Mestizo / Criollo","Labrador Retriever","Golden Retriever","Pastor Alemán",
@@ -737,6 +752,15 @@ function RegistrationFormActive({
   const [talla,              setTalla]              = useState<RegistrationFormData["talla"]>("M");
   const [movilidadReducida,  setMovilidadReducida]  = useState(false);
   const [referencia,         setReferencia]         = useState("");
+  const [metodoPago,         setMetodoPago]         = useState<MetodoPago>("pago_movil");
+  // Fija el método enviado para que cambiar la selección durante la subida
+  // no pueda alterar la pantalla de éxito ni habilitar un dorsal por accidente.
+  const envioFueCashea = useRef(false);
+  const [casheaAbierto,      setCasheaAbierto]      = useState(false);
+  const [casheaPrimeraCuota, setCasheaPrimeraCuota] = useState(false);
+  const [casheaConfirmation, setCasheaConfirmation] = useState<{
+    nombre: string; bib: number | string | null;
+  } | null>(null);
   const [contactoEmergencia, setContactoEmergencia] = useState("");
   const [telefonoEmergencia, setTelefonoEmergencia] = useState("");
   const [fileComprobante,    setFileComprobante]    = useState<File | null>(null);
@@ -760,6 +784,11 @@ function RegistrationFormActive({
   const isMascotaForm = (isCaninataRaceType && modalidad === "5K") || isWeCanMove3K;
   // [V37.4-2] 5K en carrera tipo "carrera" = caminata recreativa (LED Coro)
   const isCaminata5K = !isCaninataRaceType && modalidad === "5K";
+  // Disponible por defecto solo en el evento LED pago donde se recibió este link.
+  // NO ofrecer el mismo producto Cashea para carreras/precios distintos sin validar.
+  const casheaDisponible = isWeCanMoveRace(race.name) && !isWeCanMove3K
+    && (modalidad === "10K" || modalidad === "5K");
+  const esCashea = casheaDisponible && metodoPago === "cashea";
 
   const precio = usePrecioEvento(race.id, modalidad, isCaminata5K, isWeCanMove3K);
 
@@ -793,6 +822,12 @@ function RegistrationFormActive({
   const mutation = useMutation({
     mutationFn: registerRunner,
     onSuccess: (data) => {
+      if (envioFueCashea.current) {
+        // El registro existe, pero la captura NO demuestra automáticamente el cobro.
+        // El administrador deberá revisar Cashea y marcar pago_verificado.
+        setCasheaConfirmation({ nombre: nombre.trim(), bib: data.bib_number ?? null });
+        return;
+      }
       if (isCaninataRaceType) {
         navigate(
           `/dorsal` +
@@ -827,8 +862,28 @@ function RegistrationFormActive({
     setFormError(null);
 
     if (!nombre.trim() || !apellido.trim() || !cedula.trim() || !email.trim() ||
-        (!isWeCanMove3K && !referencia.trim())) {
+        (!isWeCanMove3K && !esCashea && !referencia.trim())) {
       setFormError("Por favor completa todos los campos obligatorios.");
+      return;
+    }
+    if (esCashea && !telefono.trim()) {
+      setFormError("Para la inscripción con Cashea necesitamos tu teléfono de contacto.");
+      return;
+    }
+    if (esCashea && !casheaAbierto) {
+      setFormError("Abre primero el enlace de pago de Cashea y completa la primera cuota.");
+      return;
+    }
+    if (esCashea && !casheaPrimeraCuota) {
+      setFormError("Confirma que completaste el pago de la primera cuota en Cashea.");
+      return;
+    }
+    if (esCashea && !fileComprobante) {
+      setFormError("Para finalizar con Cashea debes subir una captura de la primera cuota pagada.");
+      return;
+    }
+    if (fileComprobante && (!fileComprobante.type.startsWith("image/") || fileComprobante.size > 10 * 1024 * 1024)) {
+      setFormError("El comprobante debe ser una imagen JPG, PNG o equivalente de máximo 10 MB.");
       return;
     }
     if (isWeCanMove3K && !telefono.trim()) {
@@ -944,9 +999,11 @@ function RegistrationFormActive({
         const compressed = await imageCompression(fileComprobante, {
           maxSizeMB: 0.8, maxWidthOrHeight: 1200,
         });
-        const filePath = `comprobantes/${Date.now()}_${cedulaNorm}.jpg`; // [V37.5-2]
+        const ext = compressed.type === "image/png" ? "png"
+          : compressed.type === "image/webp" ? "webp" : "jpg";
+        const filePath = `comprobantes/${Date.now()}_${cedulaNorm}.${ext}`;
         const { error: upErr } = await supabase.storage
-          .from("comprobantes-pago").upload(filePath, compressed);
+          .from("comprobantes-pago").upload(filePath, compressed, { contentType: compressed.type || "image/jpeg" });
         if (upErr) throw upErr;
         comprobanteUrl = supabase.storage
           .from("comprobantes-pago").getPublicUrl(filePath).data.publicUrl;
@@ -966,7 +1023,11 @@ function RegistrationFormActive({
         talla,
         movilidadReducida, categoria,
         monto: precio.montoBs > 0 ? String(precio.montoBs.toFixed(2)) : "0",
-        referenciaPago: referencia,
+        // La columna existente referencia_pago permite al admin identificar CASHEA
+        // sin modificar lib/api.ts ni exigir migraciones SQL para nuevas columnas.
+        referenciaPago: esCashea
+          ? `CASHEA-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+          : referencia.trim(),
         comprobanteUrl: comprobanteUrl || undefined,
         contactoEmergencia: contactoEmergencia || "N/A",
         telefonoEmergencia: telefonoEmergencia || "N/A",
@@ -976,6 +1037,7 @@ function RegistrationFormActive({
         ...petFields,
       } as RegistrationFormData & Partial<PetData>;
 
+      envioFueCashea.current = esCashea;
       await mutation.mutateAsync(payload);
     } catch (err: any) {
       setFormError(mapRegistrationError(err)); // [V37.5-1]
@@ -986,6 +1048,40 @@ function RegistrationFormActive({
 
   // [V37.3-5] Una sola modalidad → col-span completo
   const solaModalidad = cfg.modalidadesDisponibles.length === 1;
+
+  if (casheaConfirmation) {
+    return (
+      <div className="min-h-screen bg-[#03070b] text-white pt-28 pb-20 px-4 font-sans flex justify-center">
+        <section role="status" className="w-full max-w-xl h-fit rounded-3xl border border-amber-400/30 bg-white/[0.03] p-7 sm:p-10 space-y-5 text-center">
+          <div className="mx-auto w-16 h-16 rounded-2xl bg-amber-400/10 flex items-center justify-center">
+            <UploadCloud className="h-8 w-8 text-amber-300" />
+          </div>
+          <p className="text-xs font-black uppercase tracking-widest text-amber-300">Cashea · Captura recibida</p>
+          <h1 className="text-3xl font-black uppercase">Registro recibido</h1>
+          <p className="text-sm text-white/70 leading-relaxed">
+            {casheaConfirmation.nombre}, recibimos tu inscripción y la captura de la primera cuota.
+            <strong className="text-white"> El pago está pendiente de verificación por RayoCero.</strong>
+          </p>
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm space-y-1">
+            <p><strong>Evento:</strong> {race.name}</p>
+            <p><strong>Modalidad:</strong> {modalidad}</p>
+            {casheaConfirmation.bib !== null && (
+              <p><strong>Dorsal reservado:</strong> #{casheaConfirmation.bib}</p>
+            )}
+            <p className="text-amber-300 font-bold">Estado: pago por verificar</p>
+          </div>
+          <p className="text-xs text-white/50 leading-relaxed">
+            Guarda tu comprobante de Cashea. La captura no significa pago aprobado.
+            RayoCero revisará la operación antes de dar por validada tu inscripción y habilitar tu dorsal.
+          </p>
+          <button type="button" onClick={() => navigate("/")}
+            className="w-full rounded-xl bg-[#FCD34D] py-3.5 text-xs font-black uppercase text-[#03070b]">
+            Volver al inicio
+          </button>
+        </section>
+      </div>
+    );
+  }
 
   if (weCanMoveConfirmation) {
     return (
@@ -1431,6 +1527,32 @@ function RegistrationFormActive({
           {/* [V37.9] Solo modalidades pagas muestran datos bancarios y comprobante. */}
           {!isWeCanMove3K ? (
           <div className="pt-6 border-t border-white/10 space-y-4">
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold uppercase text-white/80 flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-[#FCD34D]" /> Forma de pago
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button type="button" disabled={uploading || mutation.isPending}
+                  onClick={() => { if (metodoPago !== "pago_movil") { setFileComprobante(null); setCasheaPrimeraCuota(false); setCasheaAbierto(false); } setMetodoPago("pago_movil"); }}
+                  aria-pressed={metodoPago === "pago_movil"}
+                  className={`p-4 rounded-xl text-left border transition-colors ${metodoPago === "pago_movil" ? "border-emerald-400/60 bg-emerald-400/[0.07]" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"}`}>
+                  <span className="flex gap-2 items-center font-black uppercase text-xs"><Banknote size={17} className="text-emerald-400" /> Pago móvil</span>
+                  <span className="block mt-2 text-xs text-white/50">Transferencia con referencia bancaria.</span>
+                </button>
+                {casheaDisponible && (
+                  <button type="button" disabled={uploading || mutation.isPending}
+                    onClick={() => { if (metodoPago !== "cashea") { setFileComprobante(null); setCasheaPrimeraCuota(false); setCasheaAbierto(false); } setMetodoPago("cashea"); }}
+                    aria-pressed={metodoPago === "cashea"}
+                    className={`p-4 rounded-xl text-left border transition-colors ${esCashea ? "border-[#FCD34D]/70 bg-[#FCD34D]/[0.08]" : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"}`}>
+                    <span className="flex gap-2 items-center font-black uppercase text-xs"><CreditCard size={17} className="text-[#FCD34D]" /> Cashea</span>
+                    <span className="block mt-2 text-xs text-white/50">Abre Cashea y paga la primera cuota.</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {!esCashea && (
+            <>
             <h3 className="text-sm font-bold uppercase text-white/80 flex items-center gap-2">
               <Banknote className="h-4 w-4 text-emerald-400" />
               Datos Bancarios para Pago / Transferencia
@@ -1576,6 +1698,57 @@ function RegistrationFormActive({
                 />
               </div>
             </div>
+            </>
+            )}
+
+            {esCashea && (
+              <div className="space-y-4 rounded-2xl border border-[#FCD34D]/35 bg-[#FCD34D]/[0.04] p-5 sm:p-6" role="region" aria-label="Pago con Cashea">
+                <div className="flex items-center gap-2 text-[#FCD34D]">
+                  <CreditCard size={19} />
+                  <p className="text-sm font-black uppercase">Paga con Cashea</p>
+                </div>
+                <p className="text-xs text-white/75 leading-relaxed">
+                  1. Abre el enlace oficial de RayoCero en Cashea. Si estás en teléfono,
+                  puede abrirse la aplicación. Completa la compra y paga la primera cuota.
+                </p>
+                <a href={CASHEA_LINK} target="_blank" rel="noopener noreferrer"
+                  onClick={() => setCasheaAbierto(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FCD34D] px-5 py-4 text-xs font-black uppercase text-[#03070b] hover:brightness-110">
+                  <ExternalLink size={18} /> Abrir pago en Cashea
+                </a>
+                <p className="text-[11px] text-white/50 leading-relaxed">
+                  El enlace se abrirá en otra pestaña o en Cashea. Luego regresa a esta pestaña
+                  sin cerrarla para conservar tus datos.
+                  {precio.costoUSD > 0 && (
+                    <strong className="block mt-2 text-white">Precio de la modalidad en RayoCero: ${precio.costoUSD.toFixed(2)} USD.</strong>
+                  )}
+                  Confirma que el producto mostrado en Cashea tenga el mismo importe y corresponda
+                  a tu modalidad. Si no coincide, no pagues y contacta a RayoCero.
+                </p>
+                <div className="border-t border-white/10 pt-4 space-y-3">
+                  <p className="text-xs text-white/75 leading-relaxed">
+                    2. Una vez pagada la inicial, adjunta una <strong className="text-white">captura de la operación aprobada</strong>.
+                    RayoCero revisará el comprobante.
+                  </p>
+                  <label className="block text-xs font-bold uppercase text-[#FCD34D]">
+                    Captura del pago de la primera cuota · Obligatoria
+                    <input type="file" accept="image/*" required={esCashea}
+                      onChange={e => setFileComprobante(e.target.files?.[0] || null)}
+                      className="mt-2 w-full bg-white/5 border border-[#FCD34D]/30 rounded-xl px-4 py-3 text-xs text-white/60 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#FCD34D]/20 file:text-[#FCD34D]" />
+                  </label>
+                  {fileComprobante && <p className="text-xs text-emerald-300">Imagen seleccionada: {fileComprobante.name}</p>}
+                  <label className="flex gap-3 items-start cursor-pointer rounded-xl border border-white/10 p-3 text-xs text-white/80">
+                    <input type="checkbox" checked={casheaPrimeraCuota}
+                      onChange={e => setCasheaPrimeraCuota(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-[#FCD34D]" />
+                    Confirmo que ya pagué la primera cuota en Cashea y que la captura corresponde a esta operación.
+                  </label>
+                  <p className="text-[11px] text-amber-200/80">
+                    Adjuntar un comprobante no equivale a pago validado. La organización verificará la transacción.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
           ) : (
             <div className="space-y-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.04] p-5">
@@ -1625,6 +1798,8 @@ function RegistrationFormActive({
               <><Dog className="h-5 w-5" /> {`PROCESAR INSCRIPCIÓN CANINATA (${modalidad})`}</>
             ) : isWeCanMove3K ? (
               <><Dog className="h-5 w-5" /> INSCRIBIRME GRATIS · WE CAN MOVE 3K</>
+            ) : esCashea ? (
+              <><CreditCard className="h-5 w-5" /> ENVIAR INSCRIPCIÓN Y COMPROBANTE CASHEA</>
             ) : isCaminata5K ? (
               // [V37.4-8] 5K caminata LED Coro
               <><Footprints className="h-5 w-5" /> PROCESAR INSCRIPCIÓN CAMINATA (5K)</>

@@ -1,8 +1,19 @@
 /**
- * VALKYRON GROUP — RAYO CERO API LAYER (V3.2 - CATEGORIAS_GRANULARES)
+ * VALKYRON GROUP — RAYO CERO API LAYER (V3.3 - CASHEA + COMPATIBILIDAD)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Código completo sin omisiones. Copy-paste ready.
+ *
+ * CHANGELOG V3.3:
+ * [V3.3-1] Identificación automática de Cashea a partir de referenciaPago
+ *          CASHEA-... enviada por RegistrationForm V38.3.1.
+ * [V3.3-2] Guarda metodo_pago="cashea" o "pago_movil" según corresponde.
+ * [V3.3-3] Inscripciones nuevas nacen como pago_verificado=false.
+ *          El comprobante NO constituye confirmación automática.
+ * [V3.3-4] Cashea exige comprobante y referencia interna antes del INSERT.
+ * [V3.3-5] Compatibilidad entre nombrePerro/razaPerro y
+ *          nombreMascota/razaMascota para Caninata 5K.
+ * [V3.3-6] Conserva todas las funciones de resultados y atletismo.
  *
  * CHANGELOG V3.2:
  * [V3.2-1] EVOLUCIÓN: calcularCategoria() ahora usa el sistema estándar
@@ -128,6 +139,9 @@ export const registrationSchema = z.object({
   // Mascota (Caninata 5K)
   nombreMascota: z.string().optional(),
   razaMascota:   z.string().optional(),
+  // Alias utilizados por RegistrationForm para la Caninata.
+  nombrePerro:   z.string().optional(),
+  razaPerro:     z.string().optional(),
 
   // Carrera y Modalidad
   race_id:   z.string().uuid("race_id inválido").optional(),
@@ -192,10 +206,36 @@ export async function registerRunner(
     }
   }
 
-  // Normalización doble nomenclatura
-  const refPago   = parsed.referencia    || parsed.referenciaPago     || "";
-  const repNombre = parsed.nombreRepresentante || parsed.repr_nombre  || null;
-  const repCedula = parsed.cedulaRepresentante || parsed.repr_cedula  || null;
+  // Normalización doble nomenclatura. V38.3.1 envía referenciaPago.
+  const refPago   = (parsed.referenciaPago || parsed.referencia || "").trim();
+  const repNombre = parsed.nombreRepresentante || parsed.repr_nombre || null;
+  const repCedula = parsed.cedulaRepresentante || parsed.repr_cedula || null;
+
+  // La referencia CASHEA-* es un identificador interno del formulario,
+  // NO la referencia real de la transacción en Cashea.
+  const esCasheaPorRef = /^CASHEA-[A-Z0-9]+(?:-[A-Z0-9]+)*$/i.test(refPago);
+  const metodoDeclarado = (parsed.metodoPago || "").trim().toLowerCase();
+  const esCashea = esCasheaPorRef || metodoDeclarado === "cashea";
+
+  // El panel admin V4.8.1 identifica Cashea mediante el prefijo CASHEA-.
+  // Sin él, un registro podría ser rotulado incorrectamente como Pago Móvil.
+  if (esCashea && !esCasheaPorRef) {
+    throw new Error("La inscripción Cashea requiere su identificador interno CASHEA-...; regresa al formulario e inténtalo de nuevo.");
+  }
+  if (esCashea && !parsed.comprobanteUrl?.trim()) {
+    throw new Error("Debes adjuntar el comprobante de la primera cuota de Cashea antes de finalizar la inscripción.");
+  }
+
+  // Mantener compatibilidad con otros canales de registro que ya envían
+  // metodoPago. En el formulario web, una referencia bancaria implica Pago Móvil.
+  const metodoPagoDb = esCashea
+    ? "cashea"
+    : (metodoDeclarado || (refPago ? "pago_movil" : null));
+
+  // RegistrationForm envía nombrePerro/razaPerro, la API original esperaba
+  // nombreMascota/razaMascota; aceptar ambas evita pérdida de datos.
+  const nombreMascota = parsed.nombreMascota || parsed.nombrePerro || null;
+  const razaMascota = parsed.razaMascota || parsed.razaPerro || null;
 
   const { data, error } = await supabase
     .from("runners")
@@ -219,8 +259,11 @@ export async function registerRunner(
       monto:           parsed.monto          ?? null,
       banco_origen:    parsed.bancoOrigen    ?? null,
       fecha_pago:      parsed.fechaPago      ?? null,
-      metodo_pago:     parsed.metodoPago     ?? null,
+      metodo_pago:     metodoPagoDb,
       comprobante_url: parsed.comprobanteUrl ?? null,
+      // La inscripción puede reservar dorsal; el pago exige verificación
+      // manual del administrador. Nunca marcar como pagado desde el cliente.
+      pago_verificado: false,
 
       // Emergencia / Deslinde
       contacto_emergencia:  parsed.contactoEmergencia ?? null,
@@ -229,8 +272,8 @@ export async function registerRunner(
       timestamp_aceptacion: new Date().toISOString(),
 
       // Mascota (Caninata 5K)
-      nombre_mascota: parsed.nombreMascota ?? null,
-      raza_mascota:   parsed.razaMascota   ?? null,
+      nombre_mascota: nombreMascota,
+      raza_mascota:   razaMascota,
 
       // Carrera y Modalidad
       race_id:   parsed.race_id   ?? null,

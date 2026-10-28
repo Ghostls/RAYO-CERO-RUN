@@ -1,8 +1,15 @@
 /**
- * RAYO CERO — ADMIN DASHBOARD (EVOLUTION V4.7 — LOGOUT REAL Y REINGRESO ADMIN)
+ * RAYO CERO — ADMIN DASHBOARD (EVOLUTION V4.8.1 — CASHEA MANUAL VERIFICATION)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
+ *
+ * CHANGELOG V4.8 (evoluciona sobre V4.7):
+ * [V4.8-1] Marca CASHEA leyendo referencia_pago con prefijo CASHEA-.
+ * [V4.8-2] Filtro para pagos Cashea / pago móvil sin cambiar schema.
+ * [V4.8-3] Ver comprobante almacenado por URL exacta si existe.
+ * [V4.8-4] Advertencia antes de aprobar pagos Cashea: cotejar en cuenta Cashea.
+ * [V4.8-5] WE CAN MOVE 3K, login/admin, modalidades y otros cobros intactos.
  *
  * CHANGELOG V4.7 (evoluciona sobre V4.6):
  * [V4.7-1] Botón «Salir» cierra efectivamente supabase.auth.signOut({ scope: 'local' }).
@@ -179,6 +186,9 @@ const CATEGORY_ORDER: string[] = [
   'Caminata Recreativa 4K',
   'Caminata Recreativa 5K', // [V4.4-4] (WE CAN MOVE no participa en runners)
 ];
+
+const esPagoCashea = (runner: Pick<Runner, "referencia_pago">): boolean =>
+  /^CASHEA-/i.test(runner.referencia_pago || "");
 
 const getCategoryColor = (categoria: string): [number, number, number] => {
   const c = categoria.toLowerCase();
@@ -1400,6 +1410,7 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
   const [atletas, setAtletas]               = useState<Runner[]>([]);
   const [loading, setLoading]               = useState(true);
   const [searchTerm, setSearchTerm]         = useState('');
+  const [filtroPago, setFiltroPago]         = useState<'todos' | 'cashea' | 'pago_movil'>('todos');
   const [modalidadTab, setModalidadTab]     = useState<ModalidadTab>('todos');
   const [selectedAtleta, setSelectedAtleta] = useState<Runner | null>(null);
   const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null);
@@ -1557,11 +1568,25 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
     setModalidadTab('todos');
     setSelected3K(null);
     setSearchTerm('');
+    setFiltroPago('todos');
   }, [scope.raceId, scope.legacy]);
 
   const togglePago = async (id: string, current?: boolean) => {
-    setIsTogglingPayment(id);
     const nv = !current;
+    const a = atletas.find(r => r.id === id);
+    if (nv && a && esPagoCashea(a)) {
+      if (!a.comprobante_url && !a.comprobante_path) {
+        window.alert('No hay captura de la primera cuota asociada a esta inscripción Cashea. No se puede aprobar desde esta pantalla.');
+        return;
+      }
+      // No asumir cobro por la imagen. Revisión presencial en portal de Cashea.
+      const ok = window.confirm(
+        `¿Verificaste en la cuenta/comercio Cashea que el pago inicial de ${a.nombre} ${a.apellido} fue aprobado y corresponde a esta inscripción?\n\n` +
+        'La captura por sí sola NO confirma el pago.'
+      );
+      if (!ok) return;
+    }
+    setIsTogglingPayment(id);
     try {
       const { error } = await supabase.from('runners').update({ pago_verificado: nv }).eq('id', id);
       if (error) throw error;
@@ -1623,8 +1648,15 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
       return;
     }
 
-    setStatusMsg('Escaneando storage...');
+    setStatusMsg('Cargando comprobante...');
     try {
+      // Usar la URL exacta enviada por RegistrationForm, evitando confundir
+      // capturas de la misma cédula entre distintos eventos.
+      if (a.comprobante_url && /^https:\/\//i.test(a.comprobante_url)) {
+        setComprobanteUrl(a.comprobante_url);
+        setStatusMsg('');
+        return;
+      }
       const url = await getComprobantePublicUrl(
         a.cedula,
         a.referencia_pago,
@@ -1657,14 +1689,16 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
 
   const filteredAtletas = useMemo(() => {
     let list = modalidadTab === '3K' ? [] : atletas;
+    if (filtroPago === 'cashea') list = list.filter(esPagoCashea);
+    else if (filtroPago === 'pago_movil') list = list.filter(a => !esPagoCashea(a));
     if (modalidadTab === '10K') list = list.filter(a => a.modalidad === '10K');
     else if (modalidadTab === '4K') list = list.filter(a => a.modalidad === '4K');
     else if (modalidadTab === '5K') list = list.filter(a => a.modalidad === '5K');
     if (searchTerm) list = list.filter(a =>
-      `${a.nombre} ${a.apellido} ${a.cedula} ${a.categoria || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
+      `${a.nombre} ${a.apellido} ${a.cedula} ${a.categoria || ''} ${a.referencia_pago || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
     );
     return list;
-  }, [atletas, searchTerm, modalidadTab]);
+  }, [atletas, searchTerm, modalidadTab, filtroPago]);
 
   const filteredWeCanMove = useMemo(() => {
     if (!isLed || (modalidadTab !== 'todos' && modalidadTab !== '3K')) return [];
@@ -1753,6 +1787,18 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
               </button>
             )}
           </div>
+          {modalidadTab !== '3K' && (
+            <label className="flex items-center gap-2 text-[10px] uppercase font-black text-gray-400">
+              Pago
+              <select aria-label="Filtrar forma de pago" value={filtroPago}
+                onChange={e => setFiltroPago(e.target.value as 'todos' | 'cashea' | 'pago_movil')}
+                className="bg-[#0d1117] border border-white/10 text-white text-[11px] rounded-lg px-3 py-2">
+                <option value="todos">Todos</option>
+                <option value="cashea">Cashea</option>
+                <option value="pago_movil">Otros pagos</option>
+              </select>
+            </label>
+          )}
           <div className="relative w-full md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
             <input type="text" placeholder="Filtrar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
@@ -1843,6 +1889,11 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
                       {a.pago_verificado && <ShieldCheck size={12} className="text-green-500" />}
                       {a.kit_entregado && <Gift size={12} className="text-amber-400" />}
                       {a.repr_cedula && <span title="Menor con representante" style={{ fontSize: '0.65rem' }}>👨‍👧</span>}
+                      {esPagoCashea(a) && (
+                        <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full border border-[#FCD34D]/30 bg-[#FCD34D]/10 text-[#FCD34D]">
+                          CASHEA {a.pago_verificado ? '✓ VALIDADO' : '· REVISAR INICIAL'}
+                        </span>
+                      )}
                       {/* [V4.2-1] Badge inscripción admin */}
                       {a.referencia_pago === 'INSCRIPCION_ADMIN' && (
                         <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-full border"
@@ -2092,8 +2143,19 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
                   <p className="text-gray-500 text-[9px] uppercase">Talla</p>
                   <p className="text-white font-mono uppercase">{selectedAtleta.talla_camiseta || 'N/A'}</p>
                 </div>
+                {esPagoCashea(selectedAtleta) && (
+                  <div className="p-4 rounded-xl border border-[#FCD34D]/30 bg-[#FCD34D]/[0.06] text-xs space-y-2">
+                    <p className="font-black text-[#FCD34D] uppercase">Método: Cashea</p>
+                    <p className="text-white/75">
+                      Comprobante de PRIMERA CUOTA. Comprueba la transacción en Cashea antes de aprobar.
+                    </p>
+                    <p className={selectedAtleta.pago_verificado ? 'text-emerald-300 font-bold' : 'text-amber-300 font-bold'}>
+                      {selectedAtleta.pago_verificado ? 'Pago validado por administrador' : 'Pendiente de verificación'}
+                    </p>
+                  </div>
+                )}
                 <div className="bg-white/[0.03] p-4 rounded-xl border border-white/5">
-                  <p className="text-gray-500 text-[9px] uppercase">Referencia</p>
+                  <p className="text-gray-500 text-[9px] uppercase">{esPagoCashea(selectedAtleta) ? "Identificador interno (no es referencia Cashea)" : "Referencia"}</p>
                   <p className={`font-mono break-all text-xs ${selectedAtleta.referencia_pago === 'INSCRIPCION_ADMIN' ? 'text-indigo-400' : 'text-green-400'}`}>
                     {selectedAtleta.referencia_pago || 'PENDIENTE'}
                   </p>
