@@ -1,9 +1,15 @@
 /**
- * RAYOCERO — REGISTRATION TERMINAL (V38.3.3 — RESTAURAR DORSAL DIGITAL TRAS CASHEA)
+ * RAYOCERO — REGISTRATION TERMINAL (V38.3.4 — TITULAR DE CASHEA)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Architecture: React / TypeScript / Supabase / React Query / Framer Motion
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
+ *
+ * CHANGELOG V38.3.4 (sobre V38.3.3):
+ * [V38.3.4-1] Campo obligatorio Nombre completo del titular de Cashea.
+ * [V38.3.4-2] Persiste el nombre en banco_origen solo cuando metodo=Cashea;
+ *             la API actual ya acepta bancoOrigen, sin alterar SQL ni rutas.
+ * [V38.3.4-3] Dorsal LED inmediato y verificacion manual sin cambios.
  *
  * CHANGELOG V38.3 (evoluciona sobre V38.2):
  * [V38.3-1] Selector de pago móvil / Cashea en carreras LED 10K y 5K.
@@ -754,6 +760,7 @@ function RegistrationFormActive({
   const [movilidadReducida,  setMovilidadReducida]  = useState(false);
   const [referencia,         setReferencia]         = useState("");
   const [metodoPago,         setMetodoPago]         = useState<MetodoPago>("pago_movil");
+  const [titularCashea,       setTitularCashea]       = useState("");
   // Fija el método enviado para que cambiar la selección durante la subida
   // no pueda alterar la pantalla de éxito ni habilitar un dorsal por accidente.
   const envioFueCashea = useRef(false);
@@ -861,6 +868,13 @@ function RegistrationFormActive({
         (!isWeCanMove3K && !esCashea && !referencia.trim())) {
       setFormError("Por favor completa todos los campos obligatorios.");
       return;
+    }
+    if (esCashea) {
+      const titularNormalizado = titularCashea.trim().replace(/\s+/g, " ");
+      if (titularNormalizado.length < 5 || titularNormalizado.length > 100 || titularNormalizado.split(" ").length < 2) {
+        setFormError("Indica el nombre y apellido del titular de la cuenta Cashea con la que se pagó.");
+        return;
+      }
     }
     if (esCashea && !telefono.trim()) {
       setFormError("Para la inscripción con Cashea necesitamos tu teléfono de contacto.");
@@ -1024,6 +1038,10 @@ function RegistrationFormActive({
         referenciaPago: esCashea
           ? `CASHEA-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
           : referencia.trim(),
+        // El titular puede ser distinto del corredor. Usar el campo ya existente
+        // banco_origen mediante la propiedad bancoOrigen de lib/api.ts.
+        // No usar referencia_pago: conserva su identificador CASHEA-*.
+        bancoOrigen: esCashea ? titularCashea.trim().replace(/\s+/g, " ") : undefined,
         comprobanteUrl: comprobanteUrl || undefined,
         contactoEmergencia: contactoEmergencia || "N/A",
         telefonoEmergencia: telefonoEmergencia || "N/A",
@@ -1668,6 +1686,27 @@ function RegistrationFormActive({
                 <div className="flex items-center gap-2 text-[#FCD34D]">
                   <CreditCard size={19} />
                   <p className="text-sm font-black uppercase">Paga con Cashea</p>
+                </div>
+                <div className="rounded-xl border border-[#FCD34D]/30 bg-black/20 p-4 space-y-2">
+                  <label htmlFor="titular-cashea" className="block text-xs font-black uppercase text-[#FCD34D]">
+                    Nombre completo del titular de Cashea · Obligatorio
+                  </label>
+                  <input
+                    id="titular-cashea"
+                    type="text"
+                    autoComplete="name"
+                    maxLength={100}
+                    required={esCashea}
+                    disabled={uploading || mutation.isPending}
+                    value={titularCashea}
+                    onChange={e => setTitularCashea(e.target.value)}
+                    placeholder="Nombre y apellido como aparecen en Cashea"
+                    className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/35 focus:outline-none focus:border-[#FCD34D]"
+                  />
+                  <p className="text-[11px] leading-relaxed text-white/60">
+                    Si pagas con Cashea de un familiar o de otra persona, escribe el nombre de
+                    esa persona, no el del corredor. RayoCero lo usará para verificar la inicial.
+                  </p>
                 </div>
                 <p className="text-xs text-white/75 leading-relaxed">
                   1. Abre el enlace oficial de RayoCero en Cashea. Si estás en teléfono,

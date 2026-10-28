@@ -1,8 +1,13 @@
 /**
- * RAYO CERO — ADMIN DASHBOARD (EVOLUTION V4.8.1 — CASHEA MANUAL VERIFICATION)
+ * RAYO CERO — ADMIN DASHBOARD (EVOLUTION V4.8.2 — TITULAR CASHEA)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
+ *
+ * CHANGELOG V4.8.2:
+ * [V4.8.2-1] Mostrar y buscar el titular de la cuenta Cashea cuando
+ *             sea distinto del corredor. Se reutiliza banco_origen ya existente.
+ * [V4.8.2-2] Mostrar titular en confirmacion administrativa del pago.
  *
  * CHANGELOG V4.8 (evoluciona sobre V4.7):
  * [V4.8-1] Marca CASHEA leyendo referencia_pago con prefijo CASHEA-.
@@ -140,6 +145,7 @@ interface Runner {
   telefono?: string;
   talla_camiseta?: string;
   referencia_pago?: string;
+  banco_origen?: string | null; // [V4.8.2] Titular Cashea cuando es ese método
   created_at: string;
   bib_number?: string | number;
   categoria?: string;
@@ -1582,7 +1588,8 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
       // No asumir cobro por la imagen. Revisión presencial en portal de Cashea.
       const ok = window.confirm(
         `¿Verificaste en la cuenta/comercio Cashea que el pago inicial de ${a.nombre} ${a.apellido} fue aprobado y corresponde a esta inscripción?\n\n` +
-        'La captura por sí sola NO confirma el pago.'
+        `Titular de Cashea: ${a.banco_origen?.trim() || 'No registrado'}\n\n` +
+        'La captura por sí sola NO confirma el pago.' 
       );
       if (!ok) return;
     }
@@ -1695,7 +1702,7 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
     else if (modalidadTab === '4K') list = list.filter(a => a.modalidad === '4K');
     else if (modalidadTab === '5K') list = list.filter(a => a.modalidad === '5K');
     if (searchTerm) list = list.filter(a =>
-      `${a.nombre} ${a.apellido} ${a.cedula} ${a.categoria || ''} ${a.referencia_pago || ''}`.toLowerCase().includes(searchTerm.toLowerCase())
+      `${a.nombre} ${a.apellido} ${a.cedula} ${a.categoria || ''} ${a.referencia_pago || ''} ${esPagoCashea(a) ? (a.banco_origen || '') : ''}`.toLowerCase().includes(searchTerm.toLowerCase())
     );
     return list;
   }, [atletas, searchTerm, modalidadTab, filtroPago]);
@@ -1903,6 +1910,11 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
                       )}
                       <GenderMismatchBadge runner={a} />
                     </div>
+                    {esPagoCashea(a) && a.banco_origen?.trim() && (
+                      <div className="mt-1 text-[10px] text-[#FCD34D]">
+                        Titular Cashea: <span className="font-semibold">{a.banco_origen}</span>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-[9px] text-gray-500 font-mono">V-{a.cedula}</span>
                       <span className="text-[8px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded font-black uppercase">{a.categoria || 'SIN CAT'}</span>
@@ -2146,6 +2158,12 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
                 {esPagoCashea(selectedAtleta) && (
                   <div className="p-4 rounded-xl border border-[#FCD34D]/30 bg-[#FCD34D]/[0.06] text-xs space-y-2">
                     <p className="font-black text-[#FCD34D] uppercase">Método: Cashea</p>
+                    <div className="rounded-lg border border-[#FCD34D]/20 bg-black/20 p-3">
+                      <p className="text-[10px] uppercase font-bold text-[#FCD34D]/70">Titular de Cashea (puede ser distinto del corredor)</p>
+                      <p className="mt-1 break-words text-sm font-bold text-white">
+                        {selectedAtleta.banco_origen?.trim() || 'No registrado en esta inscripción'}
+                      </p>
+                    </div>
                     <p className="text-white/75">
                       Comprobante de PRIMERA CUOTA. Comprueba la transacción en Cashea antes de aprobar.
                     </p>
