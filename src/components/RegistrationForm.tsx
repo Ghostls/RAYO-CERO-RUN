@@ -1,5 +1,5 @@
 /**
- * RAYOCERO — REGISTRATION TERMINAL (V38.3.1 — CASHEA LINK + COMPROBANTE DE INICIAL)
+ * RAYOCERO — REGISTRATION TERMINAL (V38.3.3 — RESTAURAR DORSAL DIGITAL TRAS CASHEA)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Architecture: React / TypeScript / Supabase / React Query / Framer Motion
@@ -10,7 +10,8 @@
  * [V38.3-2] Abre enlace oficial compartido Cashea en otra pestaña/app.
  * [V38.3-3] Retorno al formulario + captura obligatoria de cuota inicial Cashea.
  * [V38.3-4] Referencia CASHEA-* en runners.referencia_pago para revisión admin.
- * [V38.3-5] No se declara pago verificado ni se muestra dorsal Cashea antes de revisión.
+ * [V38.3-5] CASHEA: genera y muestra el dorsal inmediatamente; la verificación del pago sigue pendiente.
+ * [V38.3-7] Restaura navegación original /dorsal para ambos métodos; señal visual para aviso debajo del dorsal.
  * [V38.3-6] WE CAN MOVE 3K gratuito y pago móvil original intactos.
  * AVISO: enlace de PRODUCTO COMPARTIDO, no sesión individual ni pago automático.
  *
@@ -758,9 +759,6 @@ function RegistrationFormActive({
   const envioFueCashea = useRef(false);
   const [casheaAbierto,      setCasheaAbierto]      = useState(false);
   const [casheaPrimeraCuota, setCasheaPrimeraCuota] = useState(false);
-  const [casheaConfirmation, setCasheaConfirmation] = useState<{
-    nombre: string; bib: number | string | null;
-  } | null>(null);
   const [contactoEmergencia, setContactoEmergencia] = useState("");
   const [telefonoEmergencia, setTelefonoEmergencia] = useState("");
   const [fileComprobante,    setFileComprobante]    = useState<File | null>(null);
@@ -822,12 +820,8 @@ function RegistrationFormActive({
   const mutation = useMutation({
     mutationFn: registerRunner,
     onSuccess: (data) => {
-      if (envioFueCashea.current) {
-        // El registro existe, pero la captura NO demuestra automáticamente el cobro.
-        // El administrador deberá revisar Cashea y marcar pago_verificado.
-        setCasheaConfirmation({ nombre: nombre.trim(), bib: data.bib_number ?? null });
-        return;
-      }
+      // Regla RayoCero: Cashea y Pago Móvil reciben el dorsal inmediatamente.
+      // La aprobación administrativa del pago permanece independiente.
       if (isCaninataRaceType) {
         navigate(
           `/dorsal` +
@@ -849,7 +843,9 @@ function RegistrationFormActive({
           // [V37.5-4] LED Coro: la página Dorsal usa tipo=led → dorsal-led.png
           (isLedRace
             ? `&tipo=led&modalidad=${encodeURIComponent(modalidad)}`
-            : ""),
+            : "") +
+          // Parámetro exclusivamente informativo: NO confirma el pago.
+          (envioFueCashea.current ? "&pago=cashea&verificacion=pendiente" : ""),
         );
       }
     },
@@ -1048,40 +1044,6 @@ function RegistrationFormActive({
 
   // [V37.3-5] Una sola modalidad → col-span completo
   const solaModalidad = cfg.modalidadesDisponibles.length === 1;
-
-  if (casheaConfirmation) {
-    return (
-      <div className="min-h-screen bg-[#03070b] text-white pt-28 pb-20 px-4 font-sans flex justify-center">
-        <section role="status" className="w-full max-w-xl h-fit rounded-3xl border border-amber-400/30 bg-white/[0.03] p-7 sm:p-10 space-y-5 text-center">
-          <div className="mx-auto w-16 h-16 rounded-2xl bg-amber-400/10 flex items-center justify-center">
-            <UploadCloud className="h-8 w-8 text-amber-300" />
-          </div>
-          <p className="text-xs font-black uppercase tracking-widest text-amber-300">Cashea · Captura recibida</p>
-          <h1 className="text-3xl font-black uppercase">Registro recibido</h1>
-          <p className="text-sm text-white/70 leading-relaxed">
-            {casheaConfirmation.nombre}, recibimos tu inscripción y la captura de la primera cuota.
-            <strong className="text-white"> El pago está pendiente de verificación por RayoCero.</strong>
-          </p>
-          <div className="rounded-xl border border-white/10 bg-white/[0.04] p-4 text-sm space-y-1">
-            <p><strong>Evento:</strong> {race.name}</p>
-            <p><strong>Modalidad:</strong> {modalidad}</p>
-            {casheaConfirmation.bib !== null && (
-              <p><strong>Dorsal reservado:</strong> #{casheaConfirmation.bib}</p>
-            )}
-            <p className="text-amber-300 font-bold">Estado: pago por verificar</p>
-          </div>
-          <p className="text-xs text-white/50 leading-relaxed">
-            Guarda tu comprobante de Cashea. La captura no significa pago aprobado.
-            RayoCero revisará la operación antes de dar por validada tu inscripción y habilitar tu dorsal.
-          </p>
-          <button type="button" onClick={() => navigate("/")}
-            className="w-full rounded-xl bg-[#FCD34D] py-3.5 text-xs font-black uppercase text-[#03070b]">
-            Volver al inicio
-          </button>
-        </section>
-      </div>
-    );
-  }
 
   if (weCanMoveConfirmation) {
     return (
