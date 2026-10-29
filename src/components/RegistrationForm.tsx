@@ -1,9 +1,17 @@
 /**
- * RAYOCERO — REGISTRATION TERMINAL (V38.3.4 — TITULAR DE CASHEA)
+ * RAYOCERO — REGISTRATION TERMINAL (V38.4 — ESTABILIDAD Y EFICIENCIA)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Architecture: React / TypeScript / Supabase / React Query / Framer Motion
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
+ *
+ * CHANGELOG V38.4 (sobre V38.3.4):
+ * [V38.4-1] Bloqueo sincrónico anti doble envío para 3K y carreras pagas.
+ * [V38.4-2] Descarta respuestas obsoletas al cambiar de carrera (AbortController).
+ * [V38.4-3] Cancela solicitudes de tarifa ya obsoletas al cambiar modalidad.
+ * [V38.4-4] Nombre de archivo de comprobante único incluso en el mismo milisegundo.
+ * [V38.4-5] Retira imports/imágenes sin uso para reducir el bundle del registro.
+ * [V38.4-6] Cashea, pago móvil, dorsal inmediato, mascotas y 3K: misma lógica.
  *
  * CHANGELOG V38.3.4 (sobre V38.3.3):
  * [V38.3.4-1] Campo obligatorio Nombre completo del titular de Cashea.
@@ -135,10 +143,8 @@ import imageCompression from "browser-image-compression";
 import { registerRunner, calcularEdad, type RegistrationFormData } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
-import dorsalCoroSrc from "../assets/dorsal-led.png";
-
-let dorsalCaninataSrc: string = dorsalCoroSrc;
-try { dorsalCaninataSrc = require("../assets/dorsal-caninata.png").default; } catch (_) {}
+// El dorsal se renderiza exclusivamente en /dorsal. No descargar sus
+// imágenes en la pantalla pública de registro (el prefetch LED sigue debajo).
 
 // ---------------------------------------------------------------------------
 // TIPOS
@@ -321,6 +327,7 @@ function usePrecioEvento(
       return;
     }
     let cancelled = false;
+    const controller = new AbortController();
     // [V37.4-4] costo_5k_usd solo se solicita cuando aplica → query idéntica
     //           a V37.3 para 499 Coro, Caninata y LED 10K.
     const cols = usaCosto5k
@@ -333,13 +340,13 @@ function usePrecioEvento(
         if (raceId) {
           const { data: d } = await supabase
             .from("system_config").select(cols)
-            .eq("race_id", raceId).maybeSingle();
+            .eq("race_id", raceId).abortSignal(controller.signal).maybeSingle();
           data = d;
         }
         if (!data) {
           const { data: fb } = await supabase
             .from("system_config").select(cols)
-            .eq("id", 1).single();
+            .eq("id", 1).abortSignal(controller.signal).single();
           data = fb;
         }
         if (!cancelled && data) {
@@ -360,7 +367,7 @@ function usePrecioEvento(
         if (!cancelled) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; controller.abort(); };
   }, [raceId, modalidad, usaCosto5k, esGratuita]); // [V37.9] gratuito en deps
 
   return {
@@ -538,22 +545,35 @@ const useTargetRace = () => {
   const [activeRaces, setActiveRaces] = useState<ActiveRace[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
     (async () => {
       try {
         if (raceIdParam) {
-          const { data: d } = await supabase
+          const { data: d, error } = await supabase
             .from("races").select("id,name,slug,date,time,location,inscripciones_abiertas")
-            .eq("id", raceIdParam).maybeSingle();
+            .eq("id", raceIdParam).abortSignal(controller.signal).maybeSingle();
+          if (cancelled) return;
+          if (error) throw error;
           setRace((d as ActiveRace) ?? null);
         } else {
-          const { data: list } = await supabase
+          const { data: list, error } = await supabase
             .from("races").select("id,name,slug,date,time,location,inscripciones_abiertas")
-            .eq("inscripciones_abiertas", true).order("date", { ascending: true });
+            .eq("inscripciones_abiertas", true).order("date", { ascending: true })
+            .abortSignal(controller.signal);
+          if (cancelled) return;
+          if (error) throw error;
           setActiveRaces((list as ActiveRace[]) || []);
           setRace(null);
         }
-      } catch { setRace(null); }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[RAYOCERO] No se pudo consultar la carrera:", err);
+          setRace(null);
+        }
+      }
     })();
+    return () => { cancelled = true; controller.abort(); };
   }, [raceIdParam]);
 
   return { race, setRace, activeRaces };
@@ -764,6 +784,8 @@ function RegistrationFormActive({
   // Fija el método enviado para que cambiar la selección durante la subida
   // no pueda alterar la pantalla de éxito ni habilitar un dorsal por accidente.
   const envioFueCashea = useRef(false);
+  // Ref: impide dos POST aunque React todavía no haya renderizado el loading.
+  const submitLockRef = useRef(false);
   const [casheaAbierto,      setCasheaAbierto]      = useState(false);
   const [casheaPrimeraCuota, setCasheaPrimeraCuota] = useState(false);
   const [contactoEmergencia, setContactoEmergencia] = useState("");
@@ -862,6 +884,7 @@ function RegistrationFormActive({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitLockRef.current || uploading || mutation.isPending) return;
     setFormError(null);
 
     if (!nombre.trim() || !apellido.trim() || !cedula.trim() || !email.trim() ||
@@ -936,6 +959,7 @@ function RegistrationFormActive({
     const cedulaNorm = normalizeCedula(cedula);
     const emailNorm  = normalizeEmail(email);
 
+    submitLockRef.current = true;
     try {
       setUploading(true);
 
@@ -1011,7 +1035,12 @@ function RegistrationFormActive({
         });
         const ext = compressed.type === "image/png" ? "png"
           : compressed.type === "image/webp" ? "webp" : "jpg";
-        const filePath = `comprobantes/${Date.now()}_${cedulaNorm}.${ext}`;
+        // Evita colisión de rutas de Storage entre distintos clientes/solicitudes.
+        // Se conserva la cédula en el nombre para el buscador legacy del admin.
+        const uploadId = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID().slice(0, 12)
+          : Math.random().toString(36).slice(2, 14);
+        const filePath = `comprobantes/${Date.now()}_${cedulaNorm}_${uploadId}.${ext}`;
         const { error: upErr } = await supabase.storage
           .from("comprobantes-pago").upload(filePath, compressed, { contentType: compressed.type || "image/jpeg" });
         if (upErr) throw upErr;
@@ -1056,6 +1085,7 @@ function RegistrationFormActive({
     } catch (err: any) {
       setFormError(mapRegistrationError(err)); // [V37.5-1]
     } finally {
+      submitLockRef.current = false;
       setUploading(false);
     }
   };

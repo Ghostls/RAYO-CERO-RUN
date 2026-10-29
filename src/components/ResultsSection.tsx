@@ -1,5 +1,5 @@
 /**
- * RAYOCERO — RESULTS SECTION V4.8 · MULTI-EVENTO · TACTICAL CERTIFICATE ENGINE
+ * RAYOCERO — RESULTS SECTION V4.8.1 · MULTI-EVENTO · TACTICAL CERTIFICATE ENGINE
  * CEO: Lualdo Sciscioli | Valkyron Group
  *
  * EVOLUCIÓN V4.8: Selector inicial "¿Qué carrera quieres consultar?" + evento WE RUN RAYOCERO.
@@ -1065,6 +1065,9 @@ function ResultsSectionCoroOriginal({ config = CORO_CONFIG }: { config?: RaceCon
   const [copied, setCopied]         = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const certRef = useRef<HTMLDivElement>(null);
+  const searchSequenceRef = useRef(0);
+
+  useEffect(() => () => { searchSequenceRef.current += 1; }, []);
 
   /**
    * Búsqueda de dorsal — SCOPED AL EVENTO ACTIVO.
@@ -1074,7 +1077,8 @@ function ResultsSectionCoroOriginal({ config = CORO_CONFIG }: { config?: RaceCon
    */
   const handleSearch = useCallback(async () => {
     const bibNum = parseInt(bib.trim());
-    if (!bibNum || isNaN(bibNum)) return;
+    if (!Number.isSafeInteger(bibNum) || bibNum <= 0) return;
+    const requestId = ++searchSequenceRef.current;
     setLoading(true); setError(null); setRunner(null);
     setRaceResult(null); setJsonAtleta(null); setSearched(true);
 
@@ -1093,6 +1097,7 @@ function ResultsSectionCoroOriginal({ config = CORO_CONFIG }: { config?: RaceCon
             .maybeSingle()
         : { data: null, error: null };
 
+      if (requestId !== searchSequenceRef.current) return;
       if (runnerErr || !runnerData) {
         // Sin registro vivo en Supabase → se reconstruye el atleta desde el JSON oficial.
         if (jsonData) {
@@ -1143,12 +1148,15 @@ function ResultsSectionCoroOriginal({ config = CORO_CONFIG }: { config?: RaceCon
           .eq('bib_number', bibNum)
           .eq('race_id', raceId)
           .maybeSingle();
+        if (requestId !== searchSequenceRef.current) return;
         if (raceData) setRaceResult(raceData as RaceResult);
       }
     } catch {
-      setError('ERROR DE CONEXIÓN — INTENTA NUEVAMENTE');
+      if (requestId === searchSequenceRef.current) {
+        setError('ERROR DE CONEXIÓN — INTENTA NUEVAMENTE');
+      }
     } finally {
-      setLoading(false);
+      if (requestId === searchSequenceRef.current) setLoading(false);
     }
   }, [bib, race]);
 
@@ -1618,12 +1626,25 @@ function CaninataResults() {
   const [downloadError,setDownloadError]=useState('');
   const certRef=useRef<HTMLDivElement|null>(null);
   const loadingRef=useRef(false);
+  const abortRef=useRef<AbortController|null>(null);
+  const lastRefreshRef=useRef(0);
+  const failureCountRef=useRef(0);
+  const activeRef=useRef(true);
 
   const refresh=useCallback(async()=>{
-    if (loadingRef.current) return;
-    loadingRef.current=true; setLoadingBoard(true);
+    if (loadingRef.current || !navigator.onLine || !activeRef.current) return;
+    loadingRef.current=true;
+    const controller=new AbortController();
+    abortRef.current=controller;
+    setLoadingBoard(true);
+    // Una RPC bloqueada no debe dejar la vista esperando indefinidamente.
+    const timeout=window.setTimeout(()=>controller.abort(),12000);
     try {
-      const {data,error}=await supabase.rpc('rc_timing_results_board',{p_race_id:CANINATA_RACE_ID});
+      const {data,error}=await supabase
+        .rpc('rc_timing_results_board',{p_race_id:CANINATA_RACE_ID})
+        .abortSignal(controller.signal);
+      if (!activeRef.current) return;
+      if (controller.signal.aborted) throw new Error('Tiempo de espera agotado. Reintentaremos la consulta.');
       if (error) throw error;
       const result=data as CaninataBoard | null;
       if (!result || !Array.isArray(result.rows)) throw new Error('Respuesta de resultados inválida. Verifica la migración de Caninata.');
@@ -1631,14 +1652,50 @@ function CaninataResults() {
       setBoard({...result,rows:ordered});
       setBoardError('');
       setSelected(old => old ? ordered.find(r=>normalizeCaninataBib(r.bib)===normalizeCaninataBib(old.bib)) || null : null);
+      failureCountRef.current=0;
     }catch(e){
-      setBoardError(e instanceof Error?e.message:'No fue posible cargar los resultados.');
-    }finally{ loadingRef.current=false;setLoadingBoard(false); }
+      if (activeRef.current) {
+        failureCountRef.current=Math.min(failureCountRef.current+1,4);
+        setBoardError(e instanceof Error?e.message:'No fue posible cargar los resultados.');
+      }
+    }finally{
+      window.clearTimeout(timeout);
+      lastRefreshRef.current=Date.now();
+      if (abortRef.current===controller) abortRef.current=null;
+      loadingRef.current=false;
+      if (activeRef.current) setLoadingBoard(false);
+    }
   },[]);
+
   useEffect(()=>{
+    activeRef.current=true;
+    let cancelled=false;
+    let timer:number|null=null;
+    const schedule=()=>{
+      if (cancelled) return;
+      const delay=60000*Math.pow(2,Math.min(failureCountRef.current,2));
+      timer=window.setTimeout(async()=>{
+        if (cancelled) return;
+        if (!document.hidden && navigator.onLine) await refresh();
+        schedule();
+      },delay);
+    };
+    const resume=()=>{
+      if (document.hidden || !navigator.onLine) return;
+      if (Date.now()-lastRefreshRef.current>=60000) void refresh();
+    };
     void refresh();
-    const poll=window.setInterval(()=>{if(!document.hidden)void refresh();},60000);
-    return ()=>clearInterval(poll);
+    schedule();
+    document.addEventListener('visibilitychange',resume);
+    window.addEventListener('online',resume);
+    return ()=>{
+      cancelled=true;
+      activeRef.current=false;
+      if (timer!==null) window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange',resume);
+      window.removeEventListener('online',resume);
+      abortRef.current?.abort();
+    };
   },[refresh]);
 
   const rows=board?.published ? board.rows : [];

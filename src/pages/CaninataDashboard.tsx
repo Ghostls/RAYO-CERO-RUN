@@ -2524,6 +2524,9 @@ function CaninataTiming({ raceId }: { raceId: string }) {
         const rtt = t1 - t0;
         const offset = new Date(data.server_now).getTime() - (t0 + t1) / 2;
         if (!best || rtt < best.rtt) best = { rtt, offset, data };
+        // En preparación o prueba cerrada basta una muestra: evita 3 RPC extra.
+        // En carrera activa se mantienen las 4 muestras de menor RTT.
+        if (data.status !== "running") break;
       } catch (e) {
         noteServerFail(e); // [V1.8-6]
         if (i === 3 && !best) throw e;
@@ -2541,12 +2544,20 @@ function CaninataTiming({ raceId }: { raceId: string }) {
     try {
       const seenRun = localStorage.getItem(runKey);
       if (seenRun !== null && seenRun !== currentRun) {
+        // Respaldo local recuperable: NUNCA descartar silenciosamente marcas pendientes.
+        // No reenviar marcas del run anterior al nuevo por seguridad temporal.
+        const previousQueue = localStorage.getItem(queueKey) || "[]";
+        const previousTaps = localStorage.getItem(tapKey) || "[]";
+        if (previousQueue !== "[]" || previousTaps !== "[]") {
+          const archiveKey = `rc_timing_archive:${raceId}:${userId || "anon"}:${Date.now()}`;
+          localStorage.setItem(archiveKey, JSON.stringify({ previousRun: seenRun, queue: JSON.parse(previousQueue), taps: JSON.parse(previousTaps) }));
+        }
         localStorage.removeItem(queueKey);
         localStorage.removeItem(tapKey);
         setPending([]);
         setTaps([]);
         setTapBib({});
-        setNotice({kind:"warn",text:"Nueva sesión detectada: se descartaron las capturas locales de una prueba anterior en este dispositivo."});
+        setNotice({kind:"warn",text:"Nueva sesión de carrera detectada. Las capturas de la prueba anterior quedaron archivadas localmente para revisión, sin mezclar tiempos."});
       }
       localStorage.setItem(runKey, currentRun);
     } catch {
@@ -2628,7 +2639,9 @@ function CaninataTiming({ raceId }: { raceId: string }) {
       if (!alive) return;
       marksFails = ok ? 0 : marksFails + 1;
       window.clearTimeout(marksTimer);
-      marksTimer = window.setTimeout(() => { void runMarks(); }, jitter(backoff(baseMarks, marksFails, 30_000)));
+      const activeRace = lastClockRef.current?.status === "running";
+      const marksCadence = activeRace ? baseMarks : 15_000;
+      marksTimer = window.setTimeout(() => { void runMarks(); }, jitter(backoff(marksCadence, marksFails, 90_000)));
     };
     const runClock = async (first = false) => {
       if (!alive || (document.hidden && !first)) return;
@@ -2641,7 +2654,9 @@ function CaninataTiming({ raceId }: { raceId: string }) {
       if (!alive) return;
       clockFails = ok ? 0 : clockFails + 1;
       window.clearTimeout(clockTimer);
-      clockTimer = window.setTimeout(() => { void runClock(); }, jitter(backoff(CLOCK_SYNC_MS, clockFails, 60_000)));
+      // Conserva la detección de una salida iniciada en otro dispositivo (20s).
+      const clockCadence = CLOCK_SYNC_MS;
+      clockTimer = window.setTimeout(() => { void runClock(); }, jitter(backoff(clockCadence, clockFails, 120_000)));
     };
 
     void runClock(true);

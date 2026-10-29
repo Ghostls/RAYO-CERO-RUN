@@ -1,8 +1,15 @@
 /**
- * VALKYRON GROUP — RAYO CERO API LAYER (V3.3 - CASHEA + COMPATIBILIDAD)
+ * VALKYRON GROUP — RAYO CERO API LAYER (V3.4 - INTEGRIDAD Y EFICIENCIA)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Código completo sin omisiones. Copy-paste ready.
+ *
+ * CHANGELOG V3.4 (sobre V3.3):
+ * [V3.4-1] Edad por cumpleaños real (sin error por año de 365.25 días).
+ * [V3.4-2] Cédula numérica validada después de normalizar caracteres.
+ * [V3.4-3] Pace redondeado sin generar segundos "60".
+ * [V3.4-4] Consulta de dorsal exige entrada numérica íntegra, sin parseInt parcial.
+ * [V3.4-5] Sin nuevas escrituras ni cambios a tablas, rutas, Cashea o dorsales.
  *
  * CHANGELOG V3.3:
  * [V3.3-1] Identificación automática de Cashea a partir de referenciaPago
@@ -39,18 +46,27 @@ import { supabase } from "./supabase";
 // ─── HELPERS MATEMÁTICOS ────────────────────────────────────────────────────
 
 export function calcularEdad(fechaNacimiento: string): number {
-  const nacimiento = new Date(fechaNacimiento).getTime();
-  const ahora = Date.now();
-  const diffMs = ahora - nacimiento;
-  const MS_PER_YEAR = 365.25 * 24 * 60 * 60 * 1000;
-  return Math.floor(diffMs / MS_PER_YEAR);
+  // Fecha civil (YYYY-MM-DD), sin desfases UTC ni aproximaciones de 365.25 días.
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fechaNacimiento);
+  if (!m) return 0;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  const birth = new Date(year, month - 1, day);
+  if (birth.getFullYear() !== year || birth.getMonth() !== month - 1 || birth.getDate() !== day) return 0;
+  const today = new Date();
+  let age = today.getFullYear() - year;
+  if (today.getMonth() + 1 < month ||
+      (today.getMonth() + 1 === month && today.getDate() < day)) age--;
+  return Math.max(0, age);
 }
 
 export function calcularPace(tiempoSegundos: number, distanciaKm: number): string {
   if (distanciaKm <= 0) return "0:00/km";
-  const paceTotalSegundos = tiempoSegundos / distanciaKm;
-  const minutos = Math.floor(paceTotalSegundos / 60);
-  const segundos = Math.round(paceTotalSegundos % 60);
+  if (!Number.isFinite(tiempoSegundos) || tiempoSegundos < 0) return "0:00/km";
+  const totalSegundos = Math.round(tiempoSegundos / distanciaKm);
+  const minutos = Math.floor(totalSegundos / 60);
+  const segundos = totalSegundos % 60;
   return `${minutos}:${segundos.toString().padStart(2, "0")}/km`;
 }
 
@@ -105,14 +121,24 @@ export const registrationSchema = z.object({
     .string()
     .min(4, "Cédula muy corta")
     .max(15, "Cédula muy larga")
-    .transform((val) => val.replace(/\D/g, "")),
+    .transform((val) => val.replace(/\D/g, ""))
+    .refine((val) => val.length >= 4 && val.length <= 15, "Cédula inválida: introduce entre 4 y 15 dígitos"),
   email:    z.string().email("Email inválido"),
   telefono: z.string().optional().or(z.literal("")),
 
   fechaNacimiento: z.string().refine(
     (val) => {
-      const d = new Date(val);
-      return !isNaN(d.getTime()) && d.getFullYear() > 1900;
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(val);
+      if (!match) return false;
+      const year = Number(match[1]);
+      const month = Number(match[2]);
+      const day = Number(match[3]);
+      if (year < 1900) return false;
+      const date = new Date(year, month - 1, day);
+      const today = new Date();
+      return date.getFullYear() === year && date.getMonth() === month - 1 &&
+        date.getDate() === day &&
+        date.getTime() <= new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
     },
     "Fecha de nacimiento inválida"
   ),
@@ -291,9 +317,10 @@ export async function registerRunner(
     .single();
 
   if (error) {
-    if (error.code === "23505")
-      throw new Error("Ya estás inscrito en esta carrera con esta cédula o email.");
-    throw new Error(error.message);
+    // Conservar code, details y hint para mapRegistrationError(): el frontend
+    // puede distinguir cédula, email o dorsal duplicado por su constraint real.
+    // No reintentar automáticamente el INSERT: un timeout puede ocultar éxito.
+    throw error;
   }
 
   return data as RegistrationResult;
@@ -302,8 +329,10 @@ export async function registerRunner(
 // ─── RESULTADOS POR DORSAL ──────────────────────────────────────────────────
 
 export async function getResultsByBib(bib: string): Promise<RunnerResultData> {
-  const bibNum = parseInt(bib.trim(), 10);
-  if (isNaN(bibNum)) throw new Error("Dorsal inválido.");
+  const bibLimpio = bib.trim();
+  if (!/^\d+$/.test(bibLimpio)) throw new Error("Dorsal inválido.");
+  const bibNum = Number(bibLimpio);
+  if (!Number.isSafeInteger(bibNum) || bibNum <= 0) throw new Error("Dorsal inválido.");
 
   const { data, error } = await supabase
     .from("runners")

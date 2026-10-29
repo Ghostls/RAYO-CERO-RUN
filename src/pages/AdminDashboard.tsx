@@ -1,8 +1,15 @@
 /**
- * RAYO CERO — ADMIN DASHBOARD (EVOLUTION V4.8.2 — TITULAR CASHEA)
+ * RAYO CERO — ADMIN DASHBOARD (EVOLUTION V4.9 — PERFORMANCE SAFE)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
+ *
+ * CHANGELOG V4.9 — PERFORMANCE SAFE:
+ * [V4.9-1] runners: columnas explícitas (sin gps_track) y paginación completa.
+ * [V4.9-2] Evita respuestas obsoletas al cambiar carrera; error visible.
+ * [V4.9-3] Cache breve de páginas Storage al inspeccionar comprobantes.
+ * [V4.9-4] Telemetría UI: 20 FPS en lugar de re-renderizar a 60 FPS.
+ * [V4.9-5] No modifica Cashea, WE CAN MOVE 3K, PDF, pagos, kits ni SQL.
  *
  * CHANGELOG V4.8.2:
  * [V4.8.2-1] Mostrar y buscar el titular de la cuenta Cashea cuando
@@ -164,6 +171,16 @@ interface Runner {
   repr_email?:    string | null;
   repr_relacion?: string | null;
 }
+
+// Proyección para la tabla administrativa: NO descargar gps_track, que puede
+// incluir miles de coordenadas y producir respuestas de muchos megabytes.
+// Estos campos cubren filtros, inspección de pagos, representantes, kits y PDF.
+// Mantener como literal constante: Supabase/PostgREST necesita conocer
+// la selección en tiempo de compilación. `.join(',')` la convierte en
+// `string` genérico y provoca `GenericStringError[]` / TS2352.
+const RUNNER_ADMIN_FIELDS =
+  'id,nombre,apellido,cedula,email,telefono,talla_camiseta,referencia_pago,banco_origen,created_at,bib_number,categoria,comprobante_url,comprobante_path,pago_verificado,rfid_epc,kit_entregado,race_id,modalidad,genero,repr_nombre,repr_apellido,repr_cedula,repr_telefono,repr_email,repr_relacion' as const;
+const RUNNERS_PAGE_SIZE = 500;
 
 const BUCKET = 'comprobantes-pago';
 
@@ -430,14 +447,43 @@ const tryGetPublicUrl = (path: string): string | null => {
   return data?.publicUrl ?? null;
 };
 
+// Cache pequeña por pestaña: evita repetir el mismo storage.search() cuando
+// se revisan varios comprobantes. Expira rápido para ver pagos recién subidos.
+interface StoragePageCacheEntry {
+  timestamp: number;
+  names: string[];
+}
+const STORAGE_PAGE_TTL_MS = 15_000;
+const STORAGE_PAGE_CACHE_MAX = 48;
+const storagePageCache = new Map<string, StoragePageCacheEntry>();
+
+const listStoragePage = async (prefix: string, offset: number, limit: number): Promise<string[]> => {
+  const key = `${prefix}|${offset}|${limit}`;
+  const cached = storagePageCache.get(key);
+  if (cached && Date.now() - cached.timestamp < STORAGE_PAGE_TTL_MS) {
+    return cached.names;
+  }
+
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .list(prefix, { limit, offset, sortBy: { column: 'name', order: 'asc' } });
+  if (error) throw error;
+  const names = (data ?? []).map(file => file.name);
+  storagePageCache.delete(key);
+  storagePageCache.set(key, { timestamp: Date.now(), names });
+  if (storagePageCache.size > STORAGE_PAGE_CACHE_MAX) {
+    const oldest = storagePageCache.keys().next().value;
+    if (oldest !== undefined) storagePageCache.delete(oldest);
+  }
+  return names;
+};
+
 const getComprobantePublicUrl = async (
   cedula: string,
   referencia_pago?: string,
   scope?: RaceScope,
   telefono?: string,
 ): Promise<string | null> => {
-
-  console.log('[MIA-COMPROBANTE] Iniciando búsqueda:', { cedula, referencia_pago, scopeName: scope?.name, telefono });
 
   // ── Prefijo prioritario según carrera ────────────────────────
   let scopePrefix = '';
@@ -463,48 +509,39 @@ const getComprobantePublicUrl = async (
   const matchesFile = (fileName: string): boolean => {
     const n = fileName.toLowerCase();
     if (telefonoRaw && n.startsWith(telefonoRaw)) return true;
-    if (n.includes(cedulaRaw.toLowerCase())) return true;
-    if (n.includes(cedulaV.toLowerCase()))   return true;
-    if (n.includes(cedulaVDash.toLowerCase())) return true;
+    if (cedulaRaw && n.includes(cedulaRaw.toLowerCase())) return true;
+    if (cedulaRaw && n.includes(cedulaV.toLowerCase()))   return true;
+    if (cedulaRaw && n.includes(cedulaVDash.toLowerCase())) return true;
     if (ref && ref !== 'inscripcion_admin' && n.includes(ref)) return true;
     return false;
   };
 
-  // ── Scan por prefijo con paginación ─────────────────────────
+  // Scan exacto como en V4.8.2, pero reutilizando durante 15s las páginas
+  // ya consultadas. Solo se ejecuta si NO hay comprobante_url válido.
   for (const prefix of prefixOrder) {
     let offset = 0;
-    const PS   = 200;
+    const PS = 200;
     while (true) {
-      const { data: files, error } = await supabase.storage
-        .from(BUCKET)
-        .list(prefix || '', { limit: PS, offset, sortBy: { column: 'name', order: 'asc' } });
-
-      if (error) {
-        console.warn(`[MIA-COMPROBANTE] Error listando prefijo "${prefix}":`, error.message);
-        break;
+      let names: string[];
+      try {
+        names = await listStoragePage(prefix || '', offset, PS);
+      } catch (err) {
+        console.warn('[RAYOCERO] No se pudo listar Storage:', err);
+        break; // Mantener búsqueda en los prefijos restantes
       }
-      if (!files || files.length === 0) {
-        console.log(`[MIA-COMPROBANTE] No hay archivos en prefijo "${prefix}" (offset ${offset}).`);
-        break;
-      }
+      if (names.length === 0) break;
 
-      console.log(`[MIA-COMPROBANTE] Listado prefijo "${prefix}" (${files.length} archivos). Nombres:`, files.map(f => f.name).slice(0, 20));
-
-      const found = files.find(f => matchesFile(f.name));
-      if (found) {
-        const fullPath = prefix ? `${prefix}${found.name}` : found.name;
+      const foundName = names.find(matchesFile);
+      if (foundName) {
+        const fullPath = prefix ? `${prefix}${foundName}` : foundName;
         const url = tryGetPublicUrl(fullPath);
-        console.log(`[MIA-COMPROBANTE] ENCONTRADO: ${fullPath} → URL: ${url}`);
         if (url) return url;
-        else console.warn('[MIA-COMPROBANTE] No se pudo generar URL pública.');
       }
-
-      if (files.length < PS) break;
+      if (names.length < PS) break;
       offset += PS;
     }
   }
 
-  console.warn('[MIA-COMPROBANTE] No se encontró archivo para:', { cedula, telefono: telefonoRaw, referencia_pago: ref });
   return null;
 };
 
@@ -1414,6 +1451,8 @@ const generateWeCanMovePDF = (inscritos: WeCanMoveRegistration[], raceName: stri
 
 const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount?: (n: number, verified: boolean) => void }) => {
   const [atletas, setAtletas]               = useState<Runner[]>([]);
+  const [atletasError, setAtletasError]      = useState<string | null>(null);
+  const atletasRequestSeq = useRef(0);
   const [loading, setLoading]               = useState(true);
   const [searchTerm, setSearchTerm]         = useState('');
   const [filtroPago, setFiltroPago]         = useState<'todos' | 'cashea' | 'pago_movil'>('todos');
@@ -1444,18 +1483,43 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
   const isLed = isLedScope(scope); // [V4.5] contempla nombre real sin LED
 
   const fetchAtletas = useCallback(async () => {
+    const req = ++atletasRequestSeq.current;
     setLoading(true);
+    setAtletasError(null);
+    setAtletas([]);
     try {
-      let q = supabase.from('runners').select('*,genero').order('created_at', { ascending: false });
-      q = applyScopeFilter(q, scope);
-      const { data, error } = await q;
-      if (error) throw error;
-      setAtletas(data || []);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+      // Se conservan TODOS los inscritos del scope, incluidas exportaciones PDF.
+      // Orden secundario estable para evitar duplicar u omitir filas en empates.
+      const all: Runner[] = [];
+      for (let offset = 0; ; offset += RUNNERS_PAGE_SIZE) {
+        let q = supabase.from('runners')
+          .select(RUNNER_ADMIN_FIELDS)
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+          .range(offset, offset + RUNNERS_PAGE_SIZE - 1);
+        q = applyScopeFilter(q, scope);
+        const { data, error } = await q;
+        if (req !== atletasRequestSeq.current) return;
+        if (error) throw error;
+        const batch = (data ?? []) as Runner[];
+        all.push(...batch);
+        if (batch.length < RUNNERS_PAGE_SIZE) break;
+      }
+      if (req === atletasRequestSeq.current) setAtletas(all);
+    } catch (err: any) {
+      console.error('[RAYOCERO] Error cargando inscritos:', err);
+      if (req === atletasRequestSeq.current) {
+        setAtletasError(err?.message || 'No fue posible consultar los inscritos.');
+      }
+    } finally {
+      if (req === atletasRequestSeq.current) setLoading(false);
+    }
   }, [scope.raceId, scope.legacy]);
 
-  useEffect(() => { fetchAtletas(); }, [fetchAtletas]);
+  useEffect(() => {
+    void fetchAtletas();
+    return () => { atletasRequestSeq.current += 1; };
+  }, [fetchAtletas]);
 
   // V4.6: Supabase RLS devuelve [] cuando no permite SELECT. Nunca mostrar
   // cero inscritos hasta verificar la identidad y la pertenencia administrativa.
@@ -1565,9 +1629,10 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
   useEffect(() => {
     if (onUpdateCount) onUpdateCount(
       atletas.length + (isLed ? weCanMove.length : 0),
-      !isLed || (access3K === 'authorized' && !weCanMoveError && !weCanMoveLoading),
+      !loading && !atletasError &&
+        (!isLed || (access3K === 'authorized' && !weCanMoveError && !weCanMoveLoading)),
     );
-  }, [atletas.length, weCanMove.length, isLed, access3K, weCanMoveError, weCanMoveLoading, onUpdateCount]);
+  }, [atletas.length, weCanMove.length, loading, atletasError, isLed, access3K, weCanMoveError, weCanMoveLoading, onUpdateCount]);
 
   // Cambiar la carrera nunca conserva pestaña, selección ni búsqueda de otra.
   useEffect(() => {
@@ -1735,6 +1800,14 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
 
   return (
     <div className="relative text-white">
+      {atletasError && (
+        <div role="alert" className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-200 text-xs">
+          No se pudo cargar la lista completa de inscritos: {atletasError}
+          <button type="button" className="ml-3 underline font-bold" onClick={() => void fetchAtletas()}>
+            Reintentar
+          </button>
+        </div>
+      )}
       <div className="bg-black/40 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
 
         {/* Tabs de modalidad */}
@@ -1883,7 +1956,8 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
                 <tr><td colSpan={6} className="p-20 text-center text-cyan-500 font-black animate-pulse uppercase">Cargando inscritos...</td></tr>
               ) : filteredAtletas.length === 0 && filteredWeCanMove.length === 0 ? (
                 <tr><td colSpan={6} className="p-20 text-center text-gray-600 font-black uppercase text-[10px]">
-                  {(!count3KVerified && modalidadTab === '3K') ? 'Accede como administrador autorizado para consultar inscritos 3K'
+                  {atletasError && modalidadTab !== '3K' ? 'No se pudo consultar la lista completa de atletas' :
+                   (!count3KVerified && modalidadTab === '3K') ? 'Accede como administrador autorizado para consultar inscritos 3K'
                     : searchTerm ? 'Sin coincidencias'
                     : `Sin inscritos${modalidadTab !== 'todos' ? ` en ${modalidadTab}` : ''} para ${scope.name}`}
                 </td></tr>
@@ -2637,18 +2711,23 @@ const TelemetryModule = ({ scope }: { scope: RaceScope }) => {
   const [startTs, setStartTs]           = useState<number | null>(null);
   const [pausedMs, setPausedMs]         = useState(0);
   const [officialStart, setOfficialStart] = useState<string | null>(null);
-  const rafRef = useRef<number | null>(null);
+  const tickTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [gunFlash, setGunFlash]         = useState(false);
   const [savingStart, setSavingStart]   = useState(false);
   const [saveMsg, setSaveMsg]           = useState<{ text: string; ok: boolean } | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
 
   useEffect(() => {
-    if (raceState === 'running') {
-      const tick = () => { setElapsedMs(Date.now() - startTs! + pausedMs); rafRef.current = requestAnimationFrame(tick); };
-      rafRef.current = requestAnimationFrame(tick);
-    }
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+    if (raceState !== 'running' || startTs === null) return;
+    // 20 actualizaciones/s en pantalla: cronómetro calculado con Date.now(),
+    // sin hacer 60 re-renders por segundo de toda la interfaz.
+    const tick = () => setElapsedMs(Math.max(0, Date.now() - startTs + pausedMs));
+    tick();
+    tickTimerRef.current = setInterval(tick, 50);
+    return () => {
+      if (tickTimerRef.current) clearInterval(tickTimerRef.current);
+      tickTimerRef.current = null;
+    };
   }, [raceState, startTs, pausedMs]);
 
   const fmt = (ms: number) => {
@@ -2684,7 +2763,7 @@ const TelemetryModule = ({ scope }: { scope: RaceScope }) => {
     else if (raceState === 'paused') { setStartTs(Date.now()); setRaceState('running'); }
   };
   const handleReset  = () => { setRaceState('idle'); setElapsedMs(0); setStartTs(null); setPausedMs(0); setOfficialStart(null); setSaveMsg(null); setConfirmReset(false); };
-  const handleFinish = () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); setRaceState('finished'); };
+  const handleFinish = () => { if (tickTimerRef.current) clearInterval(tickTimerRef.current); tickTimerRef.current = null; setRaceState('finished'); };
 
   const SC: Record<RaceState, string> = { idle: 'rgba(100,100,120,1)', running: '#00f2ff', paused: '#fbbf24', finished: '#22c55e' };
   const SG: Record<RaceState, string> = { idle: 'transparent', running: 'rgba(0,242,255,0.15)', paused: 'rgba(251,191,36,0.15)', finished: 'rgba(34,197,94,0.15)' };

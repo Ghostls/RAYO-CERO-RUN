@@ -219,113 +219,149 @@ export default function RaceTracker({ bibNumber }: Props) {
   const [elapsed, setElapsed] = useState<string>('00:00');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  /* ── Pre-race overlay state ── */
   const [showPreRace, setShowPreRace] = useState(false);
   const [preRaceSeconds, setPreRaceSeconds] = useState(60);
 
-  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const raceControlRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const runnerRef = useRef<RunnerState | null>(null);
+  const selectionRef = useRef<number | null>(null);
+  const requestRef = useRef(0);
 
   const {
-    points: gpsPoints,
-    gpsActive,
-    wakeActive,
-    iosWarning,
-    start: startGPS,
-    stop: stopGPS,
+    points: gpsPoints, gpsActive, wakeActive, iosWarning, error: gpsError,
+    start: startGPS, stop: stopGPS, restorePoints,
   } = useGpsBackground({ bibNumber: runner?.bib_number ?? null });
 
-  /* ── Suscripción al canal race-control para recibir prerace ── */
+  // Broadcast aislado: un único canal mientras existe la pantalla Tracker.
   useEffect(() => {
-    raceControlRef.current = supabase
+    const channel = supabase
       .channel('race-control')
-      .on('broadcast', { event: 'prerace' }, (payload) => {
-        const seconds = payload?.payload?.countdown_seconds ?? 60;
-        setPreRaceSeconds(seconds);
+      .on('broadcast', { event: 'prerace' }, payload => {
+        const value = Number(payload?.payload?.countdown_seconds ?? 60);
+        setPreRaceSeconds(Number.isFinite(value) && value > 0 ? Math.min(600, Math.ceil(value)) : 60);
         setShowPreRace(true);
       })
-      .on('broadcast', { event: 'race_start' }, () => {
-        // La pistola se disparó — cerrar overlay si sigue abierto
-        setShowPreRace(false);
-      })
+      .on('broadcast', { event: 'race_start' }, () => setShowPreRace(false))
       .subscribe();
-
-    return () => {
-      if (raceControlRef.current) supabase.removeChannel(raceControlRef.current);
-    };
+    return () => { void supabase.removeChannel(channel); };
   }, []);
 
+  // La suscripción solo actualiza el estado. Nunca inicia GPS ni crea intervalos.
   const subscribeToRunner = useCallback((bibNum: number) => {
-    if (channelRef.current) supabase.removeChannel(channelRef.current);
-    channelRef.current = supabase.channel(`runner-${bibNum}`)
+    if (channelRef.current) void supabase.removeChannel(channelRef.current);
+    const channel = supabase.channel(`runner-${bibNum}`)
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'runners',
         filter: `bib_number=eq.${bibNum}`,
-      }, (payload) => {
+      }, payload => {
+        if (selectionRef.current !== bibNum) return;
         const updated = payload.new as RunnerState;
-        runnerRef.current = updated;
-        setRunner(updated);
-        if (updated.race_status === 'in_progress') {
-          startGPS();
-          elapsedRef.current = setInterval(() => {
-            if (updated.start_time) setElapsed(formatElapsed(updated.start_time));
-          }, 1000);
-        }
-        if (updated.race_status === 'completed') {
-          stopGPS();
-          if (elapsedRef.current) clearInterval(elapsedRef.current);
-        }
+        if (updated.bib_number !== bibNum) return;
+        setRunner(previous => {
+          if (!previous || previous.bib_number !== bibNum) return updated;
+          // gps_track UPDATEs son frecuentes; no deben renderizar el cronómetro.
+          if (previous.race_status === updated.race_status &&
+              previous.start_time === updated.start_time &&
+              previous.finish_time === updated.finish_time &&
+              previous.finish_time_seconds === updated.finish_time_seconds) return previous;
+          return { ...previous, ...updated };
+        });
       }).subscribe();
-  }, [startGPS, stopGPS]);
+    channelRef.current = channel;
+  }, []);
 
-  const loadRunner = async (bibNum: number) => {
-    setLoading(true); setError(null);
-    const { data, error: err } = await supabase
-      .from('runners')
-      .select('bib_number,nombre,apellido,categoria,race_status,start_time,finish_time,finish_time_seconds,gps_track')
-      .eq('bib_number', bibNum)
-      .single();
-    setLoading(false);
-    if (err || !data) { setError(`BIB #${bibNum} no encontrado`); return; }
-    const runnerData = { ...data, race_status: data.race_status ?? 'waiting' } as RunnerState;
-    runnerRef.current = runnerData;
-    setRunner(runnerData);
-    subscribeToRunner(bibNum);
-    if (runnerData.race_status === 'in_progress' && runnerData.start_time) {
-      startGPS();
-      elapsedRef.current = setInterval(() => setElapsed(formatElapsed(runnerData.start_time!)), 1000);
+  const loadRunner = useCallback(async (bibNum: number) => {
+    if (!Number.isInteger(bibNum) || bibNum <= 0) {
+      setError('Ingresa un dorsal válido.');
+      return;
     }
-  };
+    const request = ++requestRef.current;
+    setLoading(true);
+    setError(null);
+    try {
+      if (selectionRef.current !== null && selectionRef.current !== bibNum) {
+        // La carrera anterior finaliza su intento de envío GPS ANTES del cambio.
+        await stopGPS();
+      }
+      const { data, error: readError } = await supabase
+        .from('runners')
+        .select('bib_number,nombre,apellido,categoria,race_status,start_time,finish_time,finish_time_seconds,gps_track')
+        .eq('bib_number', bibNum)
+        .single();
+      if (request !== requestRef.current) return;
+      if (readError || !data) {
+        setError(`BIB #${bibNum} no encontrado o no disponible.`);
+        return;
+      }
+      const next = { ...data, race_status: data.race_status ?? 'waiting' } as RunnerState;
+      const changed = selectionRef.current !== bibNum;
+      if (changed && !restorePoints(bibNum, next.gps_track)) {
+        setError('Hay coordenadas pendientes de enviar del dorsal anterior. Recupera conexión y vuelve a intentarlo antes de cambiar de atleta.');
+        return;
+      }
+      selectionRef.current = bibNum;
+      setRunner(next);
+      subscribeToRunner(bibNum);
+    } catch (cause) {
+      if (request === requestRef.current) {
+        setError(cause instanceof Error ? cause.message : 'No se pudo cargar el dorsal.');
+      }
+    } finally {
+      if (request === requestRef.current) setLoading(false);
+    }
+  }, [restorePoints, stopGPS, subscribeToRunner]);
+
+  // Transición por estado: una sola sesión GPS y un solo reloj local.
+  useEffect(() => {
+    if (runner?.race_status === 'in_progress' && runner.start_time) {
+      void startGPS();
+    } else if (runner) {
+      void stopGPS();
+    }
+  }, [runner?.bib_number, runner?.race_status, runner?.start_time, startGPS, stopGPS]);
 
   useEffect(() => {
-    if (bibNumber) loadRunner(bibNumber);
+    if (runner?.race_status !== 'in_progress' || !runner.start_time) return;
+    const update = () => setElapsed(formatElapsed(runner.start_time!));
+    update();
+    const id = window.setInterval(update, 1000);
+    return () => window.clearInterval(id);
+  }, [runner?.race_status, runner?.start_time]);
+
+  useEffect(() => {
+    if (bibNumber) void loadRunner(bibNumber);
     return () => {
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
-      if (elapsedRef.current) clearInterval(elapsedRef.current);
-      stopGPS();
+      requestRef.current++;
+      selectionRef.current = null;
+      if (channelRef.current) {
+        void supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      void stopGPS();
     };
-  }, [bibNumber]);
+  }, [bibNumber, loadRunner, stopGPS]);
 
   const forceStart = async () => {
-    if (!runner) return;
-    await supabase.from('runners')
-      .update({ race_status: 'in_progress', start_time: new Date().toISOString() })
+    if (!runner || runner.race_status !== 'waiting') return;
+    const startTime = new Date().toISOString();
+    const { error: updateError } = await supabase.from('runners')
+      .update({ race_status: 'in_progress', start_time: startTime })
       .eq('bib_number', runner.bib_number);
+    if (updateError) { setError(`No se pudo iniciar: ${updateError.message}`); return; }
+    setRunner(old => old && old.bib_number === runner.bib_number
+      ? { ...old, race_status: 'in_progress', start_time: startTime } : old);
   };
 
   const forceFinish = async () => {
-    if (!runner || !runner.start_time) return;
-    const secs = (Date.now() - new Date(runner.start_time).getTime()) / 1000;
-    await supabase.from('runners')
-      .update({
-        race_status: 'completed',
-        finish_time: new Date().toISOString(),
-        finish_time_seconds: Math.round(secs * 100) / 100,
-      })
+    if (!runner || runner.race_status !== 'in_progress' || !runner.start_time) return;
+    const finishTime = new Date().toISOString();
+    const secs = Math.max(0, (new Date(finishTime).getTime() - new Date(runner.start_time).getTime()) / 1000);
+    const rounded = Math.round(secs * 100) / 100;
+    const { error: updateError } = await supabase.from('runners')
+      .update({ race_status: 'completed', finish_time: finishTime, finish_time_seconds: rounded })
       .eq('bib_number', runner.bib_number);
+    if (updateError) { setError(`No se pudo finalizar: ${updateError.message}`); return; }
+    setRunner(old => old && old.bib_number === runner.bib_number
+      ? { ...old, race_status: 'completed', finish_time: finishTime, finish_time_seconds: rounded } : old);
   };
 
   const statusLabel = { waiting: 'EN ESPERA', in_progress: 'EN CARRERA', completed: 'FINALIZADO' };
@@ -672,6 +708,7 @@ export default function RaceTracker({ bibNumber }: Props) {
           )}
 
           {error && <div className="rt-error">{error}</div>}
+          {gpsError && <div className="rt-error" role="status">{gpsError}</div>}
 
           {runner ? (
             <div className="rt-card">
@@ -706,7 +743,7 @@ export default function RaceTracker({ bibNumber }: Props) {
                 <div className={`rt-timer ${runner.race_status === 'in_progress' ? 'running' : runner.race_status === 'completed' ? 'finished' : ''}`}>
                   {runner.race_status === 'waiting' && '--:--'}
                   {runner.race_status === 'in_progress' && elapsed}
-                  {runner.race_status === 'completed' && (runner.finish_time_seconds ? formatFinal(runner.finish_time_seconds) : elapsed)}
+                  {runner.race_status === 'completed' && (runner.finish_time_seconds != null ? formatFinal(runner.finish_time_seconds) : elapsed)}
                 </div>
               </div>
 

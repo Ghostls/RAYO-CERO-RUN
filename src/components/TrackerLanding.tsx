@@ -1,5 +1,5 @@
 /**
- * RAYO CERO — TRACKER LANDING V2.1
+ * RAYO CERO — TRACKER LANDING V2.2 — GPS LIFECYCLE HARDENING
  * Mini PWA para corredores: BIB → GPS → Timer en vivo → Mapa resultado
  * Diseño: Liquid Glass Morph + RouteMapStrava V3 (Leaflet tiles reales)
  * Valkyron Group — 2026
@@ -7,7 +7,7 @@
  * EVOLUCIÓN V2.1: StravaMap SVG inline reemplazado por RouteMapStrava V3
  */
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { GeoKalmanFilter, GeoPoint } from './KalmanFilter';
 import LazyRouteMapStrava from './LazyRouteMapStrava';
@@ -16,6 +16,7 @@ type RaceStatus = 'waiting' | 'in_progress' | 'completed';
 type AppStep = 'bib_input' | 'gps_request' | 'waiting' | 'running' | 'finished';
 
 interface Runner {
+  id?: string;
   bib_number: number;
   nombre: string;
   apellido: string;
@@ -70,81 +71,232 @@ export default function TrackerLanding() {
   const kalmanRef = useRef(new GeoKalmanFilter());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const gpsPointsRef = useRef<GeoPoint[]>([]);
+  const currentBibRef = useRef<number | null>(null);
+  const runnerRef = useRef<Runner | null>(null);
+  const timerStartRef = useRef<string | null>(null);
+  const savedTracksRef = useRef<Set<string>>(new Set());
+  const savingTrackRef = useRef<Map<string, Promise<void>>>(new Map());
+  const lookupSeqRef = useRef(0);
 
+  // El mapa y la distancia se calculan solo cuando cambian las coordenadas.
+  const gpsDistanceKm = useMemo(() => step === 'finished' ? calcDist(gpsPoints) : 0, [step, gpsPoints]);
+
+  const clearClock = useCallback(() => {
+    if (timerRef.current !== null) clearInterval(timerRef.current);
+    timerRef.current = null;
+    timerStartRef.current = null;
+  }, []);
+
+  const startClock = useCallback((startIso: string) => {
+    if (timerRef.current !== null && timerStartRef.current === startIso) return;
+    clearClock();
+    timerStartRef.current = startIso;
+    setElapsed(formatElapsed(startIso));
+    timerRef.current = setInterval(() => setElapsed(formatElapsed(startIso)), 1000);
+  }, [clearClock]);
+
+  const clearGPSWatch = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+  }, []);
+
+  // Idempotente: un solo observador por corredor/pestaña.
   const startGPS = useCallback(() => {
-    if (!navigator.geolocation) { setGpsStatus('error'); setGpsError('GPS no disponible'); return; }
+    if (watchIdRef.current !== null) return;
+    if (!navigator.geolocation) {
+      setGpsStatus('error');
+      setGpsError('GPS no disponible');
+      return;
+    }
+    const watchedBib = currentBibRef.current;
+    setGpsError('');
     kalmanRef.current.reset();
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        setGpsStatus('active');
-        const raw: GeoPoint = { lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: pos.timestamp, accuracy: pos.coords.accuracy, speed: pos.coords.speed ?? undefined };
-        const filtered = kalmanRef.current.filter(raw);
-        setGpsPoints(prev => [...prev, filtered]);
-      },
-      (err) => { setGpsStatus('error'); setGpsError(err.message); },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
-  }, []);
-
-  const stopGPS = useCallback(async (points: GeoPoint[], bib: number) => {
-    if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
-    if (points.length > 0) {
-      await supabase.from('runners').update({ gps_track: points }).eq('bib_number', bib);
+    try {
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (pos) => {
+          // Descartar notificaciones tardías de un dorsal anterior.
+          if (currentBibRef.current !== watchedBib) return;
+          setGpsStatus('active');
+          const raw: GeoPoint = {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            timestamp: pos.timestamp,
+            accuracy: pos.coords.accuracy,
+            speed: pos.coords.speed ?? undefined,
+          };
+          const filtered = kalmanRef.current.filter(raw);
+          gpsPointsRef.current = [...gpsPointsRef.current, filtered];
+          setGpsPoints(gpsPointsRef.current);
+        },
+        (err) => {
+          if (currentBibRef.current !== watchedBib) return;
+          setGpsStatus('error');
+          setGpsError(err.message);
+          // Un permiso denegado es definitivo; los timeouts pueden ser transitorios.
+          if (err.code === err.PERMISSION_DENIED) clearGPSWatch();
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+      );
+    } catch (err) {
+      setGpsStatus('error');
+      setGpsError(err instanceof Error ? err.message : 'No se pudo iniciar el GPS');
     }
-  }, []);
+  }, [clearGPSWatch]);
 
-  const handleBibSubmit = async () => {
-    const bib = parseInt(bibInput.trim());
-    if (!bib || isNaN(bib)) { setError('Ingresa un número de dorsal válido'); return; }
-    setLoading(true); setError('');
-    const { data, error: err } = await supabase.from('runners')
-      .select('bib_number,nombre,apellido,categoria,race_status,start_time,finish_time,finish_time_seconds,gps_track')
-      .eq('bib_number', bib).single();
-    setLoading(false);
-    if (err || !data) { setError(`Dorsal #${bib} no encontrado`); return; }
-    const r = { ...data, race_status: data.race_status ?? 'waiting' } as Runner;
-    setRunner(r);
-    if (r.race_status === 'completed') {
-      if (r.gps_track && r.gps_track.length > 0) setGpsPoints(r.gps_track);
-      setStep('finished'); return;
+  // Guarda UNA instantánea al finalizar; no escribir desde actualizadores React.
+  // Se identifica por id cuando Supabase lo proporciona, evitando cruzar dorsales
+  // reutilizados entre eventos. La escritura no se repite si llegó otro UPDATE.
+  const stopGPS = useCallback(async (bib: number, runnerId: string | undefined) => {
+    clearGPSWatch();
+    const snapshot = gpsPointsRef.current.slice();
+    if (snapshot.length === 0) return;
+    const last = snapshot[snapshot.length - 1];
+    const signature = `${runnerId ?? bib}:${snapshot.length}:${last.timestamp}`;
+    if (savedTracksRef.current.has(signature)) return;
+    const existingSave = savingTrackRef.current.get(signature);
+    if (existingSave) return existingSave;
+
+    const pending = (async () => {
+      let q = supabase.from('runners').update({ gps_track: snapshot });
+      q = runnerId ? q.eq('id', runnerId) : q.eq('bib_number', bib);
+      const { error: syncError } = await q;
+      if (syncError) throw syncError;
+      savedTracksRef.current.add(signature);
+    })();
+    savingTrackRef.current.set(signature, pending);
+    try {
+      await pending;
+    } catch (err) {
+      if (currentBibRef.current === bib) {
+        setGpsError(err instanceof Error ? err.message : 'No se pudo sincronizar el recorrido');
+        setGpsStatus('error');
+      }
+    } finally {
+      if (savingTrackRef.current.get(signature) === pending) {
+        savingTrackRef.current.delete(signature);
+      }
     }
-    if (r.race_status === 'in_progress' && r.start_time) {
-      setStep('running'); startGPS();
-      timerRef.current = setInterval(() => setElapsed(formatElapsed(r.start_time!)), 1000);
-      subscribeToRunner(bib, r); return;
-    }
-    setStep('gps_request');
-  };
+  }, [clearGPSWatch]);
 
-  const handleActivateGPS = () => {
-    startGPS(); setStep('waiting');
-    if (runner) subscribeToRunner(runner.bib_number, runner);
-  };
-
-  const subscribeToRunner = useCallback((bib: number, _currentRunner: Runner) => {
-    if (channelRef.current) supabase.removeChannel(channelRef.current);
-    channelRef.current = supabase.channel(`tracker-${bib}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'runners', filter: `bib_number=eq.${bib}` }, (payload) => {
+  const subscribeToRunner = useCallback((bib: number) => {
+    if (channelRef.current) void supabase.removeChannel(channelRef.current);
+    const channel = supabase.channel(`tracker-${bib}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'runners',
+        filter: `bib_number=eq.${bib}`,
+      }, (payload) => {
+        if (currentBibRef.current !== bib) return;
         const updated = payload.new as Runner;
+        const previous = runnerRef.current;
+        // Ignorar escrituras gps_track que no alteran el estado ni la hora.
+        // Actualizamos la información visible, pero no reiniciamos el reloj.
+        runnerRef.current = updated;
         setRunner(updated);
         if (updated.race_status === 'in_progress' && updated.start_time) {
           setStep('running');
-          if (timerRef.current) clearInterval(timerRef.current);
-          timerRef.current = setInterval(() => setElapsed(formatElapsed(updated.start_time!)), 1000);
-        }
-        if (updated.race_status === 'completed') {
-          if (timerRef.current) clearInterval(timerRef.current);
-          setGpsPoints(prev => { stopGPS(prev, bib); return prev; });
+          startClock(updated.start_time);
+        } else if (updated.race_status === 'completed') {
+          clearClock();
           setStep('finished');
+          if (previous?.race_status !== 'completed') {
+            void stopGPS(bib, updated.id ?? previous?.id);
+          }
         }
       }).subscribe();
-  }, [stopGPS]);
+    channelRef.current = channel;
+  }, [clearClock, startClock, stopGPS]);
+
+  const handleBibSubmit = async () => {
+    const bib = Number(bibInput.trim());
+    if (!Number.isSafeInteger(bib) || bib <= 0) {
+      setError('Ingresa un número de dorsal válido');
+      return;
+    }
+    const requestId = ++lookupSeqRef.current;
+    setLoading(true);
+    setError('');
+    try {
+      const { data, error: err } = await supabase.from('runners')
+        .select('id,bib_number,nombre,apellido,categoria,race_status,start_time,finish_time,finish_time_seconds,gps_track')
+        .eq('bib_number', bib).single();
+      if (requestId !== lookupSeqRef.current) return;
+      if (err || !data) {
+        setError(`Dorsal #${bib} no encontrado`);
+        return;
+      }
+      // Cambiar de corredor siempre libera los recursos del anterior.
+      clearGPSWatch();
+      clearClock();
+      if (channelRef.current) void supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+      currentBibRef.current = bib;
+      const r = { ...data, race_status: data.race_status ?? 'waiting' } as Runner;
+      runnerRef.current = r;
+      setRunner(r);
+      gpsPointsRef.current = [];
+      setGpsPoints([]);
+      setGpsStatus('idle');
+      setGpsError('');
+      setElapsed('00:00');
+      if (r.race_status === 'completed') {
+        const previousTrack = Array.isArray(r.gps_track) ? r.gps_track : [];
+        gpsPointsRef.current = previousTrack;
+        setGpsPoints(previousTrack);
+        setStep('finished');
+        return;
+      }
+      if (r.race_status === 'in_progress' && r.start_time) {
+        setStep('running');
+        startGPS();
+        startClock(r.start_time);
+        subscribeToRunner(bib);
+        return;
+      }
+      setStep('gps_request');
+    } catch (err) {
+      if (requestId === lookupSeqRef.current) {
+        setError(err instanceof Error ? err.message : 'Error al consultar el dorsal');
+      }
+    } finally {
+      if (requestId === lookupSeqRef.current) setLoading(false);
+    }
+  };
+
+  const handleActivateGPS = () => {
+    if (!runner) return;
+    currentBibRef.current = runner.bib_number;
+    startGPS();
+    setStep('waiting');
+    subscribeToRunner(runner.bib_number);
+  };
+
+  const resetToBibInput = () => {
+    ++lookupSeqRef.current;
+    clearGPSWatch();
+    clearClock();
+    if (channelRef.current) void supabase.removeChannel(channelRef.current);
+    channelRef.current = null;
+    runnerRef.current = null;
+    currentBibRef.current = null;
+    gpsPointsRef.current = [];
+    setGpsPoints([]);
+    setGpsStatus('idle');
+    setGpsError('');
+    setRunner(null);
+    setBibInput('');
+    setElapsed('00:00');
+    setStep('bib_input');
+  };
 
   useEffect(() => () => {
-    if (channelRef.current) supabase.removeChannel(channelRef.current);
-    if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
-    if (timerRef.current) clearInterval(timerRef.current);
-  }, []);
+    ++lookupSeqRef.current;
+    if (channelRef.current) void supabase.removeChannel(channelRef.current);
+    clearGPSWatch();
+    clearClock();
+  }, [clearGPSWatch, clearClock]);
 
   return (
     <>
@@ -629,7 +781,7 @@ export default function TrackerLanding() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <button className="tl-btn-green" onClick={handleActivateGPS}>✓ Activar GPS y esperar salida</button>
-                <button className="tl-btn-ghost" onClick={() => setStep('bib_input')}>← Cambiar dorsal</button>
+                <button className="tl-btn-ghost" onClick={resetToBibInput}>← Cambiar dorsal</button>
               </div>
             </div>
           )}
@@ -699,7 +851,7 @@ export default function TrackerLanding() {
                   <div className="tl-stats-grid">
                     <div className="tl-stat-box">
                       <div className="tl-stat-label">Distancia GPS</div>
-                      <div className="tl-stat-value">{calcDist(gpsPoints).toFixed(2)} km</div>
+                      <div className="tl-stat-value">{gpsDistanceKm.toFixed(2)} km</div>
                     </div>
                     <div className="tl-stat-box">
                       <div className="tl-stat-label">Puntos GPS</div>
@@ -719,17 +871,25 @@ export default function TrackerLanding() {
                 />
               )}
 
+              {gpsStatus === 'error' && gpsError && gpsPoints.length > 0 && (
+                <div className="tl-error" role="alert">
+                  El recorrido no se pudo guardar: {gpsError}
+                  <button className="tl-btn-ghost" style={{ marginTop: 10 }}
+                    onClick={() => { setGpsError(''); void stopGPS(runner.bib_number, runner.id); }}>
+                    Reintentar guardar GPS
+                  </button>
+                </div>
+              )}
+
               <button className="tl-btn-share" onClick={async () => {
-                const text = `⚡ RayoCero We Run\n🏃 ${runner.nombre} ${runner.apellido} — BIB #${runner.bib_number}\n⏱️ ${runner.finish_time_seconds ? formatFinal(runner.finish_time_seconds) : '--'}\n📍 ${calcDist(gpsPoints).toFixed(2)} km\n\nrayocero-run.vercel.app/tracker`;
+                const text = `⚡ RayoCero We Run\n🏃 ${runner.nombre} ${runner.apellido} — BIB #${runner.bib_number}\n⏱️ ${runner.finish_time_seconds ? formatFinal(runner.finish_time_seconds) : '--'}\n📍 ${gpsDistanceKm.toFixed(2)} km\n\nrayocero-run.vercel.app/tracker`;
                 if (navigator.share) await navigator.share({ title: 'Mi resultado RayoCero', text });
                 else { await navigator.clipboard.writeText(text); alert('Resultado copiado'); }
               }}>
                 🔗 Compartir mi resultado
               </button>
 
-              <button className="tl-btn-ghost" onClick={() => {
-                setStep('bib_input'); setRunner(null); setBibInput(''); setGpsPoints([]);
-              }}>
+              <button className="tl-btn-ghost" onClick={resetToBibInput}>
                 Ver otro corredor
               </button>
             </div>
