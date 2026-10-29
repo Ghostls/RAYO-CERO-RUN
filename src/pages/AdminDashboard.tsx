@@ -11,6 +11,11 @@
  * [V4.9-4] Telemetría UI: 20 FPS en lugar de re-renderizar a 60 FPS.
  * [V4.9-5] No modifica Cashea, WE CAN MOVE 3K, PDF, pagos, kits ni SQL.
  *
+ * CHANGELOG V4.9.3:
+ * [V4.9.3-1] Elimina comprobante_path del SELECT runners: columna ausente (42703).
+ * [V4.9.3-2] Conserva comprobante_url y compatibilidad de esquemas.
+ * [V4.9.3-3] Sin cambios en Cashea, kits, inscripción, 3K, GPS o pagos.
+ *
  * CHANGELOG V4.9.2:
  * [V4.9.2-1] Reintento controlado solo ante columnas opcionales inexistentes
  *              (42703 / PGRST204); muestra diagnósticos reales si el 400 es otro.
@@ -185,9 +190,10 @@ interface Runner {
 // la selección en tiempo de compilación. `.join(',')` la convierte en
 // `string` genérico y provoca `GenericStringError[]` / TS2352.
 const RUNNER_ADMIN_FIELDS =
-  'id,nombre,apellido,cedula,email,telefono,talla_camiseta,referencia_pago,banco_origen,created_at,bib_number,categoria,comprobante_url,comprobante_path,pago_verificado,rfid_epc,kit_entregado,race_id,modalidad,genero,repr_nombre,repr_apellido,repr_cedula,repr_telefono,repr_email,repr_relacion' as const;
+  'id,nombre,apellido,cedula,email,telefono,talla_camiseta,referencia_pago,banco_origen,created_at,bib_number,categoria,comprobante_url,pago_verificado,rfid_epc,kit_entregado,race_id,modalidad,genero,repr_nombre,repr_apellido,repr_cedula,repr_telefono,repr_email,repr_relacion' as const;
 const RUNNERS_PAGE_SIZE = 500;
 
+// V4.9.3: Proyección ajustada al esquema real: comprobante_path no existe.
 // V4.9.2: Compatibilidad con esquemas de runners que no incluyan TODAS las
 // columnas opcionales de la proyección. Evita volver a usar SELECT * / gps_track.
 // Cache solo en memoria de la pestaña; ninguna escritura SQL adicional.
