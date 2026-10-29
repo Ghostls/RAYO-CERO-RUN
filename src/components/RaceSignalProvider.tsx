@@ -1,50 +1,69 @@
 /**
- * RAYOCERO — RACE SIGNAL PROVIDER
- * Build: V1.1 — VALKYRON LAUNCH
- *
- * Provider global que escucha señales de Supabase y muestra
- * RaceCountdown cuando llega 'pre_race_warning'.
- *
- * USO: envolver App.tsx con <RaceSignalProvider>
- *   <RaceSignalProvider eventName="WE RUN 10K NIGHT FEST">
- *     <AppContent />
- *   </RaceSignalProvider>
+ * RAYOCERO — RACE SIGNAL PROVIDER V2.0
+ * Mantiene el countdown global sin iniciar un polling de 4s en todas las rutas.
+ * La prioridad de evento puede activarse mediante VITE_RACE_SIGNALS_LIVE_MODE=true.
  */
-
-import { useState, useCallback } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import RaceCountdown, { useRaceSignal, type RaceSignal } from './RaceCountdown';
 
 interface Props {
-  children: React.ReactNode;
+  children: ReactNode;
   eventName?: string;
 }
 
+interface CountdownState {
+  signalId: string;
+  totalSeconds: number;
+  endsAt: number;
+}
+
 export default function RaceSignalProvider({ children, eventName }: Props) {
-  const [showCountdown, setShowCountdown] = useState(false);
-  const [countdownSeconds, setCountdownSeconds] = useState(60);
+  const { pathname } = useLocation();
+  const [countdown, setCountdown] = useState<CountdownState | null>(null);
+
+  // La ruta de una carrera tiene una recuperación más frecuente. Fuera de ella,
+  // Realtime continúa activo pero el sondeo de respaldo es mucho más espaciado.
+  const liveMode = import.meta.env.VITE_RACE_SIGNALS_LIVE_MODE === 'true';
+  const highPriority = liveMode || /^\/carrera\/[^/]+\/?$/.test(pathname);
 
   const handleSignal = useCallback((signal: RaceSignal) => {
-    if (signal.type === 'pre_race_warning') {
-      const secs = signal.message ? parseInt(signal.message) || 60 : 60;
-      setCountdownSeconds(secs);
-      setShowCountdown(true);
+    if (signal.type === 'race_start' || signal.type === 'race_finish') {
+      setCountdown(null);
+      return;
     }
-    if (signal.type === 'race_start') {
-      // Pistola disparada — cerrar countdown si sigue abierto
-      setShowCountdown(false);
-    }
+
+    if (signal.type !== 'pre_race_warning') return;
+
+    const parsed = Number.parseInt(signal.message ?? '', 10);
+    const duration = Number.isFinite(parsed) && parsed > 0
+      ? Math.min(parsed, 600)
+      : 60;
+
+    const now = Date.now();
+    const created = Date.parse(signal.created_at);
+    // El aviso tiene una duración real desde su timestamp; no se reinicia al reconectar.
+    const started = Number.isFinite(created) && created <= now ? created : now;
+    const endsAt = started + duration * 1000;
+    if (endsAt <= now) return; // aviso ya vencido
+
+    setCountdown({ signalId: signal.id, totalSeconds: duration, endsAt });
   }, []);
 
-  useRaceSignal({ onSignal: handleSignal });
+  useRaceSignal({ onSignal: handleSignal, highPriority });
+
+  const dismissCountdown = useCallback(() => setCountdown(null), []);
 
   return (
     <>
       {children}
-      {showCountdown && (
+      {countdown && (
         <RaceCountdown
-          totalSeconds={countdownSeconds}
+          key={countdown.signalId}
+          totalSeconds={countdown.totalSeconds}
+          endsAt={countdown.endsAt}
           eventName={eventName}
-          onDismiss={() => setShowCountdown(false)}
+          onDismiss={dismissCountdown}
         />
       )}
     </>

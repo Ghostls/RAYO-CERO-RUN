@@ -1,77 +1,179 @@
 /**
- * RAYOCERO — RACE COUNTDOWN MODULE
- * Build: V1.1 — VALKYRON LAUNCH
- * CEO: Lualdo Sciscioli | Valkyron Group
- *
- * CHANGELOG V1.1:
- * ─ useRaceSignal: polling cada 4s como fallback para atletas sin Supabase Auth
- * ─ Doble canal: postgres_changes (Realtime) + polling SELECT (sin auth)
- * ─ Deduplicación por id para evitar doble disparo
+ * RAYOCERO — RACE COUNTDOWN MODULE V2.0
+ * Realtime principal + polling de respaldo adaptativo.
+ * Evita solapamientos, deduplica eventos y respeta la hora original del aviso.
  */
-
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 
-/* ─── Types ─────────────────────────────────────────────────── */
 export type SignalType = 'pre_race_warning' | 'race_start' | 'race_finish';
 
 export interface RaceSignal {
   id: string;
   type: SignalType;
-  message?: string;
+  message?: string | null;
   created_at: string;
 }
 
-/* ─── Hook: useRaceSignal ────────────────────────────────────── */
 interface UseRaceSignalOptions {
   onSignal?: (signal: RaceSignal) => void;
+  /** Uso de la pantalla de una carrera o ventana operativa de salida. */
+  highPriority?: boolean;
+  enabled?: boolean;
 }
 
-export function useRaceSignal({ onSignal }: UseRaceSignalOptions = {}) {
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+const SIGNAL_TTL_MS = 10 * 60 * 1000;
+const MAX_SEEN_IDS = 256;
+const OVERLAP_MS = 2000;
+
+/**
+ * Mantiene un único canal y una única solicitud de polling pendiente por montaje.
+ * Con Realtime conectado, el sondeo se usa para reconciliación eventual.
+ * Si Realtime falla, el respaldo continúa con backoff para no saturar Supabase.
+ */
+export function useRaceSignal({
+  onSignal,
+  highPriority = false,
+  enabled = true,
+}: UseRaceSignalOptions = {}) {
+  const callbackRef = useRef(onSignal);
 
   useEffect(() => {
-    let lastId: string | null = null;
-    let lastChecked = new Date().toISOString();
+    callbackRef.current = onSignal;
+  }, [onSignal]);
 
-    // ── Canal 1: Realtime postgres_changes (para clientes con auth) ──
-    channelRef.current = supabase
-      .channel('race_signals_broadcast')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'race_signals' },
-        (payload) => {
-          const signal = payload.new as RaceSignal;
-          if (signal.id === lastId) return; // deduplicar
-          lastId = signal.id;
-          onSignal?.(signal);
-        }
-      )
-      .subscribe();
+  useEffect(() => {
+    if (!enabled) return;
 
-    // ── Canal 2: Polling cada 4s (para atletas sin Supabase Auth) ──
-    const poll = setInterval(async () => {
-      const { data } = await supabase
-        .from('race_signals')
-        .select('*')
-        .gt('created_at', lastChecked)
-        .order('created_at', { ascending: true });
+    let cancelled = false;
+    let requestInFlight = false;
+    let connected = false;
+    let failures = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let controller: AbortController | null = null;
+    let newestMs = Date.now() - 5000;
+    const seenIds = new Set<string>();
+    const idQueue: string[] = [];
 
-      if (data && data.length > 0) {
-        lastChecked = data[data.length - 1].created_at;
-        data.forEach(signal => {
-          if (signal.id === lastId) return; // deduplicar
-          lastId = signal.id;
-          onSignal?.(signal as RaceSignal);
-        });
+    const remember = (id: string) => {
+      if (seenIds.has(id)) return false;
+      seenIds.add(id);
+      idQueue.push(id);
+      if (idQueue.length > MAX_SEEN_IDS) {
+        const oldest = idQueue.shift();
+        if (oldest) seenIds.delete(oldest);
       }
-    }, 4000);
+      return true;
+    };
+
+    const acceptSignal = (input: unknown) => {
+      if (cancelled || !input || typeof input !== 'object') return;
+      const record = input as Partial<RaceSignal>;
+      if (
+        (typeof record.id !== 'string' && typeof record.id !== 'number') ||
+        typeof record.created_at !== 'string' ||
+        (record.type !== 'pre_race_warning' &&
+          record.type !== 'race_start' &&
+          record.type !== 'race_finish')
+      ) return;
+
+      const eventMs = Date.parse(record.created_at);
+      if (!Number.isFinite(eventMs)) return;
+      newestMs = Math.max(newestMs, eventMs);
+      const signalId = String(record.id);
+      if (!remember(signalId)) return;
+      if (eventMs < Date.now() - SIGNAL_TTL_MS) return;
+      callbackRef.current?.({ ...record, id: signalId } as RaceSignal);
+    };
+
+    const nextDelay = () => {
+      if (failures > 0) {
+        const base = highPriority ? 8000 : 20000;
+        return Math.min(120000, base * Math.pow(2, Math.min(failures - 1, 4)));
+      }
+      if (connected) return highPriority ? 4000 : 30000;
+      return highPriority ? 4000 : 30000;
+    };
+
+    const schedule = (delay: number) => {
+      if (cancelled) return;
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => { void poll(); }, delay);
+    };
+
+    const poll = async () => {
+      if (cancelled) return;
+      if (document.visibilityState === 'hidden') {
+        schedule(90000);
+        return;
+      }
+      if (requestInFlight) return;
+      requestInFlight = true;
+      controller = new AbortController();
+      let fetchMore = false;
+      try {
+        const since = new Date(Math.max(0, newestMs - OVERLAP_MS)).toISOString();
+        const { data, error } = await supabase
+          .from('race_signals')
+          .select('id,type,message,created_at')
+          .gte('created_at', since)
+          .order('created_at', { ascending: true })
+          .limit(100)
+          .abortSignal(controller.signal);
+
+        if (cancelled) return;
+        if (error) throw error;
+        failures = 0;
+        const before = newestMs;
+        for (const signal of data ?? []) acceptSignal(signal);
+        // Continuar inmediatamente si hay más eventos, sin bucles sobre el mismo cursor.
+        fetchMore = (data?.length ?? 0) === 100 && newestMs > before;
+      } catch (error) {
+        if (!cancelled) {
+          failures += 1;
+          if (import.meta.env.DEV) console.warn('[RaceSignal] Poll fallido:', error);
+        }
+      } finally {
+        requestInFlight = false;
+        controller = null;
+        if (!cancelled) schedule(fetchMore ? 100 : nextDelay());
+      }
+    };
+
+    const channel = supabase
+      .channel('rayocero-race-signals-v2')
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'race_signals',
+      }, (payload) => acceptSignal(payload.new))
+      .subscribe((status) => {
+        if (cancelled) return;
+        const wasConnected = connected;
+        connected = status === 'SUBSCRIBED';
+        if (connected && !wasConnected) {
+          // Reconciliar posibles eventos que llegaron durante la reconexión.
+          schedule(1000);
+        } else if (!connected && wasConnected) {
+          schedule(nextDelay());
+        }
+      });
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') schedule(0);
+    };
+    const onOnline = () => schedule(0);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('online', onOnline);
+    schedule(1000);
 
     return () => {
-      if (channelRef.current) supabase.removeChannel(channelRef.current);
-      clearInterval(poll);
+      cancelled = true;
+      if (timer !== null) clearTimeout(timer);
+      controller?.abort();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('online', onOnline);
+      void supabase.removeChannel(channel);
     };
-  }, [onSignal]);
+  }, [enabled, highPriority]);
 }
 
 /* ─── CSS ───────────────────────────────────────────────────── */
@@ -334,7 +436,8 @@ const CSS = `
 function ArcProgress({ seconds, total = 60 }: { seconds: number; total?: number }) {
   const r = 56;
   const circumference = 2 * Math.PI * r;
-  const dashOffset = circumference * (1 - seconds / total);
+  const progress = Math.min(1, Math.max(0, seconds / Math.max(1, total)));
+  const dashOffset = circumference * (1 - progress);
   const color = seconds > 20 ? '#00f2ff' : seconds > 10 ? '#fbbf24' : '#f87171';
 
   return (
@@ -357,45 +460,59 @@ interface RaceCountdownProps {
   onDismiss?: () => void;
   eventName?: string;
   totalSeconds?: number;
+  /** Instante UNIX (ms) de finalización del aviso. Evita drift por suspensión. */
+  endsAt?: number;
 }
 
 export default function RaceCountdown({
   onDismiss,
   eventName = 'WE RUN 10K NIGHT FEST',
   totalSeconds = 60,
+  endsAt,
 }: RaceCountdownProps) {
-  const [seconds, setSeconds] = useState(totalSeconds);
+  const [targetTime] = useState(() => endsAt ?? Date.now() + Math.max(1, totalSeconds) * 1000);
+  const [seconds, setSeconds] = useState(() =>
+    Math.max(0, Math.ceil((targetTime - Date.now()) / 1000))
+  );
   const [phase, setPhase] = useState<'countdown' | 'go' | 'closing'>('countdown');
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const onDismissRef = useRef(onDismiss);
+  useEffect(() => { onDismissRef.current = onDismiss; }, [onDismiss]);
 
   const vibrate = useCallback((pattern: number[]) => {
-    if ('vibrate' in navigator) navigator.vibrate(pattern);
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(pattern);
+    }
   }, []);
 
   useEffect(() => {
     vibrate([100, 50, 100, 50, 100]);
+    const clock = setInterval(() => {
+      setSeconds(Math.max(0, Math.ceil((targetTime - Date.now()) / 1000)));
+    }, 250);
+    return () => clearInterval(clock);
+  }, [targetTime, vibrate]);
 
-    intervalRef.current = setInterval(() => {
-      setSeconds(prev => {
-        const next = prev - 1;
-        if (next === 30) vibrate([200, 100, 200]);
-        if (next === 10) vibrate([300, 100, 300, 100, 300]);
-        if (next <= 5 && next > 0) vibrate([150]);
-        if (next === 0) vibrate([500, 200, 500, 200, 1000]);
-        if (next <= 0) {
-          clearInterval(intervalRef.current!);
-          setPhase('go');
-          setTimeout(() => {
-            setPhase('closing');
-            setTimeout(() => onDismiss?.(), 800);
-          }, 3000);
-        }
-        return Math.max(next, 0);
-      });
-    }, 1000);
+  useEffect(() => {
+    if (seconds === 30) vibrate([200, 100, 200]);
+    if (seconds === 10) vibrate([300, 100, 300, 100, 300]);
+    if (seconds <= 5 && seconds > 0) vibrate([150]);
+    if (seconds === 0 && phase === 'countdown') {
+      vibrate([500, 200, 500, 200, 1000]);
+      setPhase('go');
+    }
+  }, [seconds, phase, vibrate]);
 
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [vibrate, onDismiss]);
+  useEffect(() => {
+    if (phase !== 'go') return;
+    const transition = setTimeout(() => setPhase('closing'), 3000);
+    return () => clearTimeout(transition);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== 'closing') return;
+    const dismissal = setTimeout(() => onDismissRef.current?.(), 800);
+    return () => clearTimeout(dismissal);
+  }, [phase]);
 
   const flashClass = phase === 'countdown'
     ? seconds <= 10 ? 'flashing-red' : seconds <= 30 ? 'flashing' : ''
@@ -406,7 +523,7 @@ export default function RaceCountdown({
   return (
     <>
       <style>{CSS}</style>
-      <div className={`rc-overlay ${flashClass}`}>
+      <div className={`rc-overlay ${flashClass}`} role="dialog" aria-modal="true" aria-label="Cuenta regresiva de salida">
         <div className="rc-grid" />
         <div className="rc-scan-line" />
 
@@ -438,10 +555,7 @@ export default function RaceCountdown({
 
         <div className="rc-bottom">
           {phase === 'countdown' && (
-            <button className="rc-dismiss" onClick={() => {
-              if (intervalRef.current) clearInterval(intervalRef.current);
-              onDismiss?.();
-            }}>
+            <button className="rc-dismiss" onClick={() => onDismissRef.current?.()}>
               cerrar
             </button>
           )}

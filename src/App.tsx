@@ -1,7 +1,9 @@
 /**
- * RAYO CERO — CORE ROUTER V8.0 (DORSAL LED SWITCH)
+ * RAYO CERO — CORE ROUTER V8.1 (RACE SIGNAL OPTIMIZED)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
+ *
+ * CHANGELOG V8.1: Provider con Realtime + respaldo adaptativo; auth con manejo de errores.
  *
  * CHANGELOG V8.0 (evoluciona sobre V7.9):
  * [V8.0-1] Import DorsalLed — lazy load desde pages/DorsalLed (chunk propio:
@@ -215,16 +217,29 @@ const App = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    let alive = true;
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        if (alive) setSession(session);
+      })
+      .catch((error) => {
+        // Una incidencia de Supabase no debe dejar la pantalla bloqueada en loading.
+        console.error('[RayoCero] No se pudo obtener la sesión:', error);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!alive) return;
+      setSession(nextSession);
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      alive = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   return (
