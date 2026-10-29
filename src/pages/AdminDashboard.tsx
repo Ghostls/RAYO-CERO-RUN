@@ -11,6 +11,12 @@
  * [V4.9-4] Telemetría UI: 20 FPS en lugar de re-renderizar a 60 FPS.
  * [V4.9-5] No modifica Cashea, WE CAN MOVE 3K, PDF, pagos, kits ni SQL.
  *
+ * CHANGELOG V4.9.2:
+ * [V4.9.2-1] Reintento controlado solo ante columnas opcionales inexistentes
+ *              (42703 / PGRST204); muestra diagnósticos reales si el 400 es otro.
+ * [V4.9.2-2] Conserva paginación 500 y evita SELECT * / gps_track.
+ * [V4.9.2-3] Advertencia visible de campos faltantes sin confundir fallo con 0.
+ *
  * CHANGELOG V4.8.2:
  * [V4.8.2-1] Mostrar y buscar el titular de la cuenta Cashea cuando
  *             sea distinto del corredor. Se reutiliza banco_origen ya existente.
@@ -181,6 +187,42 @@ interface Runner {
 const RUNNER_ADMIN_FIELDS =
   'id,nombre,apellido,cedula,email,telefono,talla_camiseta,referencia_pago,banco_origen,created_at,bib_number,categoria,comprobante_url,comprobante_path,pago_verificado,rfid_epc,kit_entregado,race_id,modalidad,genero,repr_nombre,repr_apellido,repr_cedula,repr_telefono,repr_email,repr_relacion' as const;
 const RUNNERS_PAGE_SIZE = 500;
+
+// V4.9.2: Compatibilidad con esquemas de runners que no incluyan TODAS las
+// columnas opcionales de la proyección. Evita volver a usar SELECT * / gps_track.
+// Cache solo en memoria de la pestaña; ninguna escritura SQL adicional.
+const RUNNER_ADMIN_REQUIRED_COLUMNS = new Set([
+  'id', 'nombre', 'apellido', 'cedula', 'created_at', 'race_id',
+]);
+let runnerAdminProjectionCache: string[] | null = null;
+
+type RunnerSelectError = {
+  code?: string;
+  message?: string;
+  details?: string | null;
+  hint?: string | null;
+};
+
+function missingRunnerOptionalColumn(error: RunnerSelectError, columns: string[]): string | null {
+  // 42703 = undefined_column (PostgreSQL); PGRST204 = esquema cache sin columna.
+  if (error.code !== '42703' && error.code !== 'PGRST204') return null;
+  const text = [error.message, error.details, error.hint].filter(Boolean).join(' ');
+  const column = columns.find((name) => {
+    if (RUNNER_ADMIN_REQUIRED_COLUMNS.has(name)) return false;
+    const boundary = new RegExp(`(^|[^a-zA-Z0-9_])${name}($|[^a-zA-Z0-9_])`, 'i');
+    return boundary.test(text);
+  });
+  return column ?? null;
+}
+
+function describeRunnerSelectError(error: RunnerSelectError): string {
+  return [
+    error.code ? `[${error.code}]` : '[sin código]',
+    error.message || 'Consulta de corredores rechazada',
+    error.details ? `Detalles: ${error.details}` : '',
+    error.hint ? `Sugerencia: ${error.hint}` : '',
+  ].filter(Boolean).join(' · ');
+}
 
 const BUCKET = 'comprobantes-pago';
 
@@ -1452,6 +1494,7 @@ const generateWeCanMovePDF = (inscritos: WeCanMoveRegistration[], raceName: stri
 const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount?: (n: number, verified: boolean) => void }) => {
   const [atletas, setAtletas]               = useState<Runner[]>([]);
   const [atletasError, setAtletasError]      = useState<string | null>(null);
+  const [atletasSchemaWarning, setAtletasSchemaWarning] = useState<string | null>(null);
   const atletasRequestSeq = useRef(0);
   const [loading, setLoading]               = useState(true);
   const [searchTerm, setSearchTerm]         = useState('');
@@ -1486,31 +1529,72 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
     const req = ++atletasRequestSeq.current;
     setLoading(true);
     setAtletasError(null);
+    setAtletasSchemaWarning(null);
     setAtletas([]);
+
+    // Se preservan TODOS los inscritos del evento y su orden estable.
+    // La primera consulta usa los 26 campos actuales; si PostgREST confirma
+    // una columna opcional inexistente, se elimina SOLO esa columna y se reintenta.
+    let columns = runnerAdminProjectionCache?.slice() ?? RUNNER_ADMIN_FIELDS.split(',');
+    const missingColumns: string[] = [];
     try {
-      // Se conservan TODOS los inscritos del scope, incluidas exportaciones PDF.
-      // Orden secundario estable para evitar duplicar u omitir filas en empates.
-      const all: Runner[] = [];
-      for (let offset = 0; ; offset += RUNNERS_PAGE_SIZE) {
-        let q = supabase.from('runners')
-          .select(RUNNER_ADMIN_FIELDS)
-          .order('created_at', { ascending: false })
-          .order('id', { ascending: false })
-          .range(offset, offset + RUNNERS_PAGE_SIZE - 1);
-        q = applyScopeFilter(q, scope);
-        const { data, error } = await q;
-        if (req !== atletasRequestSeq.current) return;
-        if (error) throw error;
-        const batch = (data ?? []) as Runner[];
-        all.push(...batch);
-        if (batch.length < RUNNERS_PAGE_SIZE) break;
+      for (let attempt = 0; attempt <= RUNNER_ADMIN_FIELDS.split(',').length; attempt += 1) {
+        const all: Runner[] = [];
+        let missing: string | null = null;
+
+        for (let offset = 0; ; offset += RUNNERS_PAGE_SIZE) {
+          let q = supabase.from('runners')
+            .select(columns.join(','))
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .range(offset, offset + RUNNERS_PAGE_SIZE - 1);
+          q = applyScopeFilter(q, scope);
+          const { data, error } = await q;
+          if (req !== atletasRequestSeq.current) return;
+
+          if (error) {
+            missing = missingRunnerOptionalColumn(error, columns);
+            if (!missing) throw new Error(describeRunnerSelectError(error));
+            break; // se reinicia la paginación completa con la nueva proyección
+          }
+          if (!Array.isArray(data)) {
+            throw new Error('Supabase no devolvió una lista válida de corredores.');
+          }
+          // Se validan campos mínimos; Supabase devuelve filas sin gps_track.
+          const batch = data as unknown as Runner[];
+          if (batch.some((r) => !r || typeof r.id !== 'string' ||
+            typeof r.nombre !== 'string' || typeof r.apellido !== 'string' ||
+            typeof r.cedula !== 'string')) {
+            throw new Error('La respuesta de runners no contiene los campos obligatorios.');
+          }
+          all.push(...batch);
+          if (batch.length < RUNNERS_PAGE_SIZE) break;
+        }
+
+        if (missing) {
+          columns = columns.filter((field) => field !== missing);
+          missingColumns.push(missing);
+          console.warn('[RAYOCERO] Columna opcional no encontrada en runners:', missing);
+          continue;
+        }
+
+        runnerAdminProjectionCache = columns.slice();
+        if (req === atletasRequestSeq.current) {
+          setAtletas(all);
+          if (missingColumns.length) {
+            setAtletasSchemaWarning(
+              `Tu tabla runners no tiene los campos opcionales ${missingColumns.join(', ')}. ` +
+              'El listado se recuperó sin descargar gps_track. Revisa las migraciones si necesitas esos datos.'
+            );
+          }
+        }
+        return;
       }
-      if (req === atletasRequestSeq.current) setAtletas(all);
-    } catch (err: any) {
-      console.error('[RAYOCERO] Error cargando inscritos:', err);
-      if (req === atletasRequestSeq.current) {
-        setAtletasError(err?.message || 'No fue posible consultar los inscritos.');
-      }
+      throw new Error('No se pudo obtener una proyección válida de runners. Verifica el esquema de la tabla.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[RAYOCERO] Error cargando inscritos:', message);
+      if (req === atletasRequestSeq.current) setAtletasError(message);
     } finally {
       if (req === atletasRequestSeq.current) setLoading(false);
     }
@@ -1800,6 +1884,11 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
 
   return (
     <div className="relative text-white">
+      {atletasSchemaWarning && !atletasError && (
+        <div role="status" className="mb-4 p-3 rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-200 text-[11px]">
+          {atletasSchemaWarning}
+        </div>
+      )}
       {atletasError && (
         <div role="alert" className="mb-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-200 text-xs">
           No se pudo cargar la lista completa de inscritos: {atletasError}
