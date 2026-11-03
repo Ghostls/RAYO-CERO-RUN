@@ -13,6 +13,12 @@
  * [V38.4-5] Retira imports/imágenes sin uso para reducir el bundle del registro.
  * [V38.4-6] Cashea, pago móvil, dorsal inmediato, mascotas y 3K: misma lógica.
  *
+ * CHANGELOG V38.5 (sobre V38.4):
+ * [V38.5-1] Cashea disponible exclusivamente en WE RUN RAYOCERO CORO 10K.
+ * [V38.5-2] 5K caminata usa únicamente pago móvil; 3K gratuito intacto.
+ * [V38.5-3] Cambio de modalidad restablece el pago móvil si se eligió Cashea.
+ * [V38.5-4] Mantiene comprobantes, dorsal inmediato y verificación administrativa.
+ *
  * CHANGELOG V38.3.4 (sobre V38.3.3):
  * [V38.3.4-1] Campo obligatorio Nombre completo del titular de Cashea.
  * [V38.3.4-2] Persiste el nombre en banco_origen solo cuando metodo=Cashea;
@@ -170,8 +176,8 @@ interface RaceStaticConfig {
 interface PetData { nombrePerro: string; razaPerro: string; }
 
 // Cashea envió este enlace de producto compartido; no es una orden única por participante.
-// IMPORTANTE: confirmar con RayoCero que los precios del producto corresponden
-// a la(s) modalidad(es) habilitadas. La app Cashea fija las cuotas y la inicial.
+// [V38.5] Exclusivo de la modalidad LED Coro 10K. El importe mostrado en
+// Cashea debe coincidir con el precio 10K; la app fija cuotas e inicial.
 const CASHEA_LINK = "https://mobile.cashea.app/products/226c2f83-35c8-4866-b10a-c0e0ba5423cb";
 type MetodoPago = "pago_movil" | "cashea";
 
@@ -811,10 +817,9 @@ function RegistrationFormActive({
   const isMascotaForm = (isCaninataRaceType && modalidad === "5K") || isWeCanMove3K;
   // [V37.4-2] 5K en carrera tipo "carrera" = caminata recreativa (LED Coro)
   const isCaminata5K = !isCaninataRaceType && modalidad === "5K";
-  // Disponible por defecto solo en el evento LED pago donde se recibió este link.
-  // NO ofrecer el mismo producto Cashea para carreras/precios distintos sin validar.
-  const casheaDisponible = isWeCanMoveRace(race.name) && !isWeCanMove3K
-    && (modalidad === "10K" || modalidad === "5K");
+  // [V38.5] Solo carrera WE RUN RAYOCERO CORO modalidad 10K.
+  // 5K caminata queda exclusivamente con pago móvil; 3K sigue gratis.
+  const casheaDisponible = isWeCanMoveRace(race.name) && modalidad === "10K";
   const esCashea = casheaDisponible && metodoPago === "cashea";
 
   const precio = usePrecioEvento(race.id, modalidad, isCaminata5K, isWeCanMove3K);
@@ -886,6 +891,13 @@ function RegistrationFormActive({
     e.preventDefault();
     if (submitLockRef.current || uploading || mutation.isPending) return;
     setFormError(null);
+
+    // [V38.5] Protección adicional contra un método Cashea residual
+    // si la modalidad cambió: jamás registrar 5K con ese método.
+    if (metodoPago === "cashea" && !casheaDisponible) {
+      setFormError("Cashea está disponible únicamente para la carrera 10K. Para esta modalidad utiliza pago móvil.");
+      return;
+    }
 
     if (!nombre.trim() || !apellido.trim() || !cedula.trim() || !email.trim() ||
         (!isWeCanMove3K && !esCashea && !referencia.trim())) {
@@ -1212,7 +1224,22 @@ function RegistrationFormActive({
                 const { label, Icon } = getModalidadMeta(m, cfg.tipo); // [V37.4-3]
                 return (
                   <button
-                    key={m} type="button" onClick={() => setModalidad(m)}
+                    key={m} type="button"
+                    disabled={uploading || mutation.isPending}
+                    onClick={() => {
+                      if (m === modalidad) return;
+                      // [V38.5] Evitar que un comprobante o selección de Cashea
+                      // persista al cambiar a una modalidad que no lo admite.
+                      if (metodoPago === "cashea") {
+                        setMetodoPago("pago_movil");
+                        setTitularCashea("");
+                        setCasheaAbierto(false);
+                        setCasheaPrimeraCuota(false);
+                        setFileComprobante(null);
+                      }
+                      setModalidad(m);
+                      setFormError(null);
+                    }}
                     className={`py-3.5 px-4 rounded-xl text-xs font-black uppercase border transition-all flex items-center justify-center gap-2 ${
                       isSelected
                         ? "border-transparent text-black shadow-lg"
