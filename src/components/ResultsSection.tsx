@@ -1,6 +1,44 @@
 /**
- * RAYOCERO — RESULTS SECTION V4.8.1 · MULTI-EVENTO · TACTICAL CERTIFICATE ENGINE
+ * RAYOCERO — RESULTS SECTION V5.0 · MULTI-EVENTO · TACTICAL CERTIFICATE ENGINE · EMERGENCY QR · HUD SKIN
  * CEO: Lualdo Sciscioli | Valkyron Group
+ *
+ * EVOLUCIÓN V5.0: Skin HUD futurista + responsive real (390 / 768 / 1440 verificados).
+ *   ─ CAPA EVOLUTIVA: los estilos V5.0 se APILAN al final de cada <style> sin borrar la base.
+ *     Eliminar los bloques "V5.0 — SKIN HUD" devuelve el aspecto V4.9.1 exacto.
+ *   ─ Certificado PNG (.rs-cert-*) intacto: cero cambios en el canvas 1080×1920.
+ *   ─ Selector de evento: cápsula glass alineada al Navbar V6.3, índice 01–04, sede, chip
+ *     "PRÓXIMA" pulsante y indicador activo con layoutId (desliza entre carreras).
+ *     Móvil 2×2 (antes 4 filas apiladas), ≥900px una fila de 4.
+ *   ─ Acento único cian #00f2ff vía token `--rx`: fuera el rosa #fd325b del selector.
+ *   ─ Fondo unificado #03070b con retícula táctica: elimina la costura de color entre
+ *     el selector (#070b09) y el hero, y el hueco vertical de ~150px.
+ *   ─ Hero: panel de TELEMETRÍA DEL EVENTO (evento, sede, fecha, distancias, criterio,
+ *     estado de resultados) ocupando la mitad derecha antes vacía.
+ *   ─ Tipografía de datos en JetBrains Mono; mínimo 10px (antes 7–8px ilegibles).
+ *   ─ Pestañas con iconos SVG (antes emoji) e indicador deslizante; sin salto de línea.
+ *   ─ Ficha de atleta como panel con esquinas HUD, tiempos y métricas en mosaicos,
+ *     botones de acción táctiles (≥42px) en rejilla 2×2 en móvil.
+ *   ─ FIX tabla móvil: el inline `display:flex` anulaba el `display:none` de la columna
+ *     categoría (cada fila ocupaba 3 líneas). Ahora fila compacta 2 columnas: atleta +
+ *     "#dorsal · modalidad · categoría" | tiempo + ritmo.
+ *   ─ Overlay de emergencia: etiquetas a ≥10px para lectura rápida del respondedor.
+ *
+ * EVOLUCIÓN V4.9.1: Evento WE RUN RAYOCERO LED 10K & 5K · CORO (28-11-2026).
+ *   ─ Evento NUEVO `ledcoro` (race_id 89e3604a-c7d8-473c-bfdc-54ecba9ff542), independiente
+ *     de la 499 RUN Coro. La 499 conserva su JSON, su race_id y sus textos intactos.
+ *   ─ QR de dorsal: /resultados?evento=ledcoro&bib=<dorsal>&emergencia=1
+ *   ─ Modalidad '5K' añadida (DIST_KM, MODALIDAD_LABEL, normModalidad case-insensitive).
+ *   ─ Guard UUID en la consulta: un race_id no-UUID ya no dispara HTTP 400 en PostgREST.
+ *   ─ Selector inicial: 4 eventos (2×2 en tablet, 4 columnas ≥1024px). LED Coro primero.
+ *
+ * EVOLUCIÓN V4.9: Panel de contacto de emergencia accesible por QR en dorsales.
+ *   ─ QR en dorsal apunta a /resultados?evento=<id>&bib=<dorsal>&emergencia=1
+ *   ─ Param `emergencia=1` auto-busca el dorsal y abre el panel de emergencia directo.
+ *   ─ Botón 🚨 EMERGENCIA en los action buttons de la consulta individual.
+ *   ─ Campos `contacto_emergencia` y `telefono_emergencia` de la tabla `runners`.
+ *   ─ Panel EmergencyOverlay: nombre corredor, dorsal, contacto, tel con href tel: (llamada directa).
+ *   ─ Overlay cierra con botón X o click fuera.
+ *   ─ Mobile first: el QR lo escanea cualquier persona con teléfono, la vista es fullscreen-friendly.
  *
  * EVOLUCIÓN V4.8: Selector inicial "¿Qué carrera quieres consultar?" + evento WE RUN RAYOCERO.
  * EVOLUCIÓN V4.7: Selector de evento Coro / Caninata. Coro V4.6 íntegro.
@@ -130,14 +168,44 @@ const WERUN_CITY       = 'BARQUISIMETO, LARA';
 const WERUN_CERT_BG_IMG   = mapImg;
 const WERUN_CERT_LOGO_IMG = logoImg;
 
-type Modalidad = '10K' | '4K';
+/* ────────────────────────────────────────────────────────────── */
+/* V4.9.1 — CONFIGURACIÓN DE CARRERA — WE RUN RAYOCERO LED CORO   */
+/* ────────────────────────────────────────────────────────────── */
+
+/**
+ * @brief V4.9.1 — race_id de "WE RUN RAYOCERO LED 10K - 5K CORO" (28-11-2026) en `races`.
+ * @note  Evento NUEVO e independiente de la 499 RUN Coro: dataset propio (vacío hasta
+ *        publicar resultados) y búsqueda Supabase scoped a este UUID. Un dorsal de la 499
+ *        jamás resuelve aquí, y viceversa. VITE_RACE_ID_LEDCORO sobrescribe el literal.
+ */
+const RACE_ID_LEDCORO: string = import.meta.env.VITE_RACE_ID_LEDCORO || '89e3604a-c7d8-473c-bfdc-54ecba9ff542';
+
+const LEDCORO_NAME_LONG  = 'WE RUN RAYOCERO LED · CORO, FALCÓN';
+const LEDCORO_NAME_SHORT = 'WE RUN LED CORO';
+const LEDCORO_DATE       = '28 NOV 2026';
+const LEDCORO_CITY       = 'CORO, FALCÓN';
+
+/** @brief V4.9.1 — Validador RFC 4122 (forma canónica 8-4-4-4-12 hex). */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * @brief V4.9.1 — true sólo si el valor es un UUID válido.
+ * @note  `runners.race_id` es columna `uuid`: enviar un literal no-UUID ('499-coro-2026')
+ *        provoca HTTP 400 en PostgREST. Con este guard la consulta se omite y se resuelve
+ *        desde el JSON oficial — mismo resultado final que V4.8, sin request fallido.
+ */
+const esUuid = (v: string | null): v is string => v !== null && UUID_RE.test(v);
+
+/** V4.9.1: + '5K' (WE RUN LED Coro corre 10K & 5K). */
+type Modalidad = '10K' | '4K' | '5K';
 
 /** Distancia oficial por modalidad [km]. Alimenta ritmo y velocidad media. */
-const DIST_KM: Record<Modalidad, number> = { '10K': 10, '4K': 4 };
+const DIST_KM: Record<Modalidad, number> = { '10K': 10, '4K': 4, '5K': 5 }; // V4.9.1: + 5K
 
 const MODALIDAD_LABEL: Record<Modalidad, string> = {
   '10K': '10K COMPETITIVA',
   '4K':  '4K CAMINATA RECREATIVA',
+  '5K':  '5K',                                                               // V4.9.1
 };
 
 /* ────────────────────────────────────────────────────────────── */
@@ -157,6 +225,10 @@ interface RunnerResult {
   finish_time: string | null;
   split_time_seconds: number | null;
   gps_track: string | null;
+  /** V4.9 — Nombre del contacto de emergencia (formulario de inscripción). */
+  contacto_emergencia: string | null;
+  /** V4.9 — Teléfono del contacto de emergencia (formulario de inscripción). */
+  telefono_emergencia: string | null;
 }
 
 interface RaceResult {
@@ -192,8 +264,8 @@ interface JsonAtleta {
  */
 type ClasificacionModo = 'chip' | 'oficial';
 
-/** @brief V4.8 — Eventos servidos por el motor JSON (Caninata usa RPC propia). */
-type EventoJsonId = 'coro' | 'werun';
+/** @brief V4.8 — Eventos servidos por el motor JSON (Caninata usa RPC propia). V4.9.1: + ledcoro. */
+type EventoJsonId = 'coro' | 'werun' | 'ledcoro';
 
 /**
  * @brief V4.8 — Dataset precalculado de un evento. Se construye UNA vez al cargar el
@@ -236,8 +308,17 @@ interface RaceConfig {
 /* ÍNDICE Y CONTEOS — POR MODALIDAD                               */
 /* ────────────────────────────────────────────────────────────── */
 
-/** Normaliza modalidad ausente en JSON legacy → '10K'. */
-const normModalidad = (m: unknown): Modalidad => (m === '4K' ? '4K' : '10K');
+/**
+ * Normaliza modalidad ausente en JSON legacy → '10K'.
+ * V4.9.1: reconoce '5K' y tolera minúsculas/espacios del enum de Supabase ('5k', ' 4K ').
+ *         Cualquier otro valor conserva el comportamiento previo → '10K'.
+ */
+const normModalidad = (m: unknown): Modalidad => {
+  const v = typeof m === 'string' ? m.trim().toUpperCase() : '';
+  if (v === '4K') return '4K';
+  if (v === '5K') return '5K';                                // V4.9.1
+  return '10K';
+};
 
 const RESULTADOS: JsonAtleta[] = (RESULTADOS_JSON as JsonAtleta[]).map(r => ({
   ...r,
@@ -383,7 +464,7 @@ const bib4 = (n: number) => String(n).padStart(4, '0');
 /* ────────────────────────────────────────────────────────────── */
 
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,300;0,400;1,400;1,700;1,800;1,900&family=Barlow:wght@300;400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;1,400;1,600;1,700;1,800;1,900&family=Barlow:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap'); /* V5.0: + JetBrains Mono, + pesos 600/700 */
 
   /* ══════════════════════════════════════════════════════════════
      BASE — MOBILE (≤380px)
@@ -449,6 +530,36 @@ const CSS = `
   .rs-share-btn:active:not(:disabled) { transform: scale(0.97); }
   .rs-share-btn:disabled { opacity: 0.45; cursor: wait; }
   .rs-share-btn.primary { background: rgba(0,242,255,0.08); border-color: rgba(0,242,255,0.3); color: #00f2ff; }
+
+  /* ── V4.9 · EMERGENCY BUTTON ──────────────────────────────── */
+  .rs-emergency-btn { border-color: rgba(255,60,60,0.35); color: rgba(255,80,80,0.85); background: rgba(255,40,40,0.06); }
+  .rs-emergency-btn:hover:not(:disabled) { border-color: rgba(255,60,60,0.6); color: #ff4444; background: rgba(255,40,40,0.12); }
+
+  /* ── V4.9 · EMERGENCY OVERLAY ─────────────────────────────── */
+  .rs-emer-backdrop { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.88); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .rs-emer-panel { width: 100%; max-width: 420px; background: linear-gradient(170deg, #1a1114 0%, #0d0a0c 100%); border: 1px solid rgba(255,60,60,0.2); border-radius: 12px; overflow: hidden; }
+  .rs-emer-header { display: flex; align-items: center; gap: 10px; padding: 16px 18px; background: rgba(255,40,40,0.08); border-bottom: 1px solid rgba(255,60,60,0.15); }
+  .rs-emer-icon-wrap { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,50,50,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .rs-emer-icon { width: 18px; height: 18px; stroke: #ff4444; }
+  .rs-emer-title { flex: 1; font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-style: italic; font-size: 11px; letter-spacing: 0.18em; color: #ff6b6b; }
+  .rs-emer-close { background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.3); padding: 4px; transition: color 0.15s; }
+  .rs-emer-close:hover { color: rgba(255,255,255,0.7); }
+  .rs-emer-runner { padding: 18px; }
+  .rs-emer-runner-label { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-style: italic; font-size: 8px; letter-spacing: 0.2em; color: rgba(255,255,255,0.3); margin-bottom: 6px; }
+  .rs-emer-runner-name { font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-style: italic; font-size: 22px; letter-spacing: 0.04em; color: #fff; line-height: 1.15; }
+  .rs-emer-runner-meta { font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-style: italic; font-size: 9px; letter-spacing: 0.15em; color: rgba(255,255,255,0.35); margin-top: 6px; }
+  .rs-emer-sep { height: 1px; background: rgba(255,60,60,0.12); margin: 0 18px; }
+  .rs-emer-contact { padding: 18px; }
+  .rs-emer-field { margin-bottom: 16px; }
+  .rs-emer-field:last-of-type { margin-bottom: 18px; }
+  .rs-emer-field-label { font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-style: italic; font-size: 8px; letter-spacing: 0.2em; color: rgba(255,255,255,0.3); margin-bottom: 4px; }
+  .rs-emer-field-value { font-family: 'Barlow Condensed', sans-serif; font-weight: 800; font-style: italic; font-size: 17px; letter-spacing: 0.03em; color: #fff; }
+  .rs-emer-phone { color: #ff6b6b; font-size: 20px; letter-spacing: 0.06em; }
+  .rs-emer-call-btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 14px; background: linear-gradient(135deg, #ff3333 0%, #cc2200 100%); border: none; border-radius: 8px; color: #fff; font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-style: italic; font-size: 13px; letter-spacing: 0.2em; text-decoration: none; cursor: pointer; transition: transform 0.12s, box-shadow 0.2s; box-shadow: 0 4px 20px rgba(255,40,40,0.25); }
+  .rs-emer-call-btn:active { transform: scale(0.97); }
+  .rs-emer-no-data { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 18px; text-align: center; font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 600; font-size: 12px; letter-spacing: 0.08em; color: rgba(255,255,255,0.3); }
+  .rs-emer-no-data-sub { font-size: 9px; font-weight: 500; color: rgba(255,255,255,0.18); letter-spacing: 0.1em; }
+  .rs-emer-footer { padding: 12px 18px; background: rgba(0,0,0,0.3); border-top: 1px solid rgba(255,255,255,0.04); font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-style: italic; font-size: 8px; letter-spacing: 0.15em; color: rgba(255,255,255,0.18); text-align: center; text-transform: uppercase; }
 
   .rs-time-hero { padding: 3rem 0; border-top: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 3rem; display: grid; grid-template-columns: 1fr; align-items: center; gap: 1.25rem; }
   .rs-time-label { font-size: 8px; font-weight: 700; letter-spacing: 0.4em; color: rgba(255,255,255,0.2); text-transform: uppercase; margin-bottom: 0.75rem; }
@@ -570,6 +681,10 @@ const CSS = `
     .rs-share-btn { padding: 10px 18px; font-size: 9px; letter-spacing: 0.18em; }
     .rs-share-btn:hover:not(:disabled) { border-color: rgba(0,242,255,0.3); color: #00f2ff; background: rgba(0,242,255,0.04); }
     .rs-share-btn.primary:hover:not(:disabled) { background: rgba(0,242,255,0.18); }
+    /* V4.9 */
+    .rs-emer-call-btn:hover { transform: scale(1.01); box-shadow: 0 6px 28px rgba(255,40,40,0.35); }
+    .rs-emer-runner-name { font-size: 26px; }
+    .rs-emer-phone { font-size: 24px; }
 
     .rs-time-value { font-size: clamp(4rem, 12vw, 8rem); }
     .rs-stat { padding: 1.5rem 0; padding-right: 1.5rem; margin-right: 1.5rem; }
@@ -693,6 +808,224 @@ const CSS = `
   @media (prefers-reduced-motion: reduce) {
     .rs-eyebrow-dot, .rs-status-badge.pending, .rs-loader-fill, .rs-map-skeleton { animation: none; }
     .rs-tab, .rs-share-btn, .rs-tbl-row, .rs-search-btn { transition: none; }
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     V5.0 — SKIN HUD FUTURISTA (capa evolutiva, mobile first)
+     Se apila SOBRE la base V4.5–V4.9 sin borrarla. Mismo orden de
+     especificidad: al ir después, gana. Breakpoints propios:
+       base ≤480 · ≥481 phablet · ≥769 escritorio · ≥1100 ancho.
+     NO toca .rs-cert-* (canvas del certificado).
+     ══════════════════════════════════════════════════════════════ */
+
+  /* ── Tokens ── */
+  .rs-root {
+    --rx: 0, 242, 255;                     /* acento cian (tripleta RGB para rgba()) */
+    --rx-hex: #00f2ff;
+    --rx-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    --rx-line: rgba(255,255,255,0.08);
+    --rx-panel: linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.012) 100%);
+    background: transparent;               /* el fondo + retícula lo pinta .rcres-layout */
+    isolation: isolate;
+  }
+
+  /* ── Esquinas HUD reutilizables ── */
+  .rx-corners::before, .rx-corners::after {
+    content: ''; position: absolute; width: 22px; height: 22px; pointer-events: none; z-index: 2;
+    border: 0 solid rgba(var(--rx), 0.8);
+  }
+  .rx-corners::before { top: 0; left: 0; border-top-width: 2px; border-left-width: 2px; border-top-left-radius: inherit; }
+  .rx-corners::after  { bottom: 0; right: 0; border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: inherit; }
+
+  @keyframes rx-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(var(--rx),0.55); } 70% { box-shadow: 0 0 0 7px rgba(var(--rx),0); } }
+  @keyframes rx-scan  { 0% { transform: translateY(-100%); opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { transform: translateY(2200%); opacity: 0; } }
+
+  /* ── Hero ── */
+  .rs-header { padding: 1.5rem 1.25rem 1.25rem; }
+  .rs-hero-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; align-items: end; }
+  .rs-hero-main { min-width: 0; }
+  .rs-eyebrow { max-width: 100%; margin-bottom: 1rem; padding: 7px 12px 7px 10px; background: rgba(var(--rx),0.06); border-color: rgba(var(--rx),0.22); }
+  .rs-eyebrow-dot { width: 6px; height: 6px; animation: rx-pulse 2.2s ease-out infinite; }
+  .rs-eyebrow-text { font-family: var(--rx-mono); font-size: 10px; font-weight: 500; letter-spacing: 0.12em; color: rgba(var(--rx),0.92); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rs-title { font-size: clamp(50px, 15vw, 76px); letter-spacing: -0.025em; }
+  .rs-title > span:first-child { background: linear-gradient(180deg, #fff 35%, rgba(255,255,255,0.62) 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .rs-title-line2 { -webkit-text-stroke: 1.5px rgba(var(--rx),0.62); filter: drop-shadow(0 0 14px rgba(var(--rx),0.28)); }
+
+  /* Panel de telemetría del evento */
+  .rs-hud { position: relative; overflow: hidden; border: 1px solid rgba(var(--rx),0.16); border-radius: 18px; padding: 12px 14px 14px; background: linear-gradient(160deg, rgba(var(--rx),0.07) 0%, rgba(255,255,255,0.015) 55%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 24px 60px rgba(0,0,0,0.35); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+  .rs-hud-scan { position: absolute; left: 0; right: 0; top: 0; height: 18px; pointer-events: none; background: linear-gradient(180deg, transparent, rgba(var(--rx),0.10), transparent); animation: rx-scan 5.5s linear infinite; }
+  .rs-hud-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed rgba(255,255,255,0.1); font-family: var(--rx-mono); font-size: 10px; letter-spacing: 0.14em; color: rgba(255,255,255,0.55); text-transform: uppercase; }
+  .rs-hud-code { margin-left: auto; color: rgba(var(--rx),0.85); }
+  .rs-hud-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; margin: 0; }
+  .rs-hud-grid > div { min-width: 0; }
+  .rs-hud-grid dt { margin-bottom: 3px; font-family: var(--rx-mono); font-size: 9.5px; letter-spacing: 0.1em; color: rgba(255,255,255,0.4); text-transform: uppercase; }
+  .rs-hud-grid dd { margin: 0; font-family: 'Barlow Condensed', sans-serif; font-style: italic; font-weight: 800; font-size: 15px; line-height: 1.05; letter-spacing: 0.01em; color: #fff; text-transform: uppercase; overflow-wrap: anywhere; }
+  .rs-hud-grid dd.ok   { color: #22c55e; }
+  .rs-hud-grid dd.wait { color: var(--rx-hex); }
+
+  /* ── Pestañas: segmentado glass con indicador deslizante ── */
+  .rs-tabs-wrap { max-width: 720px; padding: 0 1.25rem 1rem; }
+  .rs-tabs { gap: 4px; padding: 4px; border-radius: 14px; background: rgba(255,255,255,0.025); border-color: rgba(255,255,255,0.08); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); overflow: visible; }
+  .rs-tab { position: relative; isolation: isolate; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 10px; border-radius: 10px; border-bottom: none; white-space: nowrap; font-size: 0.86rem; letter-spacing: 0.08em; color: rgba(255,255,255,0.45); }
+  .rs-tab.active { background: transparent; color: #fff; }
+  .rs-tab svg { flex-shrink: 0; opacity: 0.75; }
+  .rs-tab.active svg { color: var(--rx-hex); opacity: 1; }
+  .rs-tab-ind { position: absolute; inset: 0; z-index: -1; border-radius: 10px; border: 1px solid rgba(var(--rx),0.38); background: linear-gradient(180deg, rgba(var(--rx),0.16), rgba(var(--rx),0.05)); box-shadow: 0 0 22px rgba(var(--rx),0.14), inset 0 1px 0 rgba(255,255,255,0.08); }
+
+  /* ── Aviso ── */
+  .rs-notice { width: calc(100% - 2.5rem); max-width: 720px; margin: 0 auto 1rem; padding: 12px 14px; border-radius: 14px; border-color: rgba(var(--rx),0.2); background: rgba(var(--rx),0.045); }
+  .rs-notice-text { font-family: var(--rx-mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0.06em; line-height: 1.6; color: rgba(var(--rx),0.88); }
+
+  /* ── Buscador ── */
+  .rs-search-wrap { max-width: 720px; padding: 0 1.25rem 2rem; }
+  .rs-search-label { display: flex; justify-content: space-between; gap: 12px; margin: 0 4px 8px; font-family: var(--rx-mono); font-size: 10px; letter-spacing: 0.12em; color: rgba(255,255,255,0.42); text-transform: uppercase; }
+  .rs-search-label b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; color: rgba(var(--rx),0.85); }
+  .rs-search-box { position: relative; overflow: visible; gap: 6px; padding: 6px; border-radius: 16px; border-color: rgba(255,255,255,0.1); background: var(--rx-panel); }
+  .rs-search-box:focus-within { border-color: rgba(var(--rx),0.45); box-shadow: 0 0 0 4px rgba(var(--rx),0.08), 0 0 40px rgba(var(--rx),0.12); }
+  .rs-search-input { padding: 8px 10px; font-size: 1.9rem; letter-spacing: 0.12em; font-variant-numeric: tabular-nums; }
+  .rs-search-input::placeholder { color: rgba(255,255,255,0.18); letter-spacing: 0.16em; }
+  .rs-search-btn { min-height: 52px; padding: 0 16px; border-radius: 11px; font-size: 0.78rem; letter-spacing: 0.14em; box-shadow: 0 0 24px rgba(var(--rx),0.3); }
+
+  /* ── Ficha de atleta ── */
+  .rs-card { padding: 0 1.25rem 3rem; }
+  .rs-card-inner { overflow: hidden; padding: 0 1rem 1rem; border: 1px solid rgba(255,255,255,0.09); border-radius: 22px; background: radial-gradient(120% 80% at 100% 0%, rgba(var(--rx),0.07), transparent 55%), var(--rx-panel); box-shadow: 0 30px 80px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06); }
+  .rs-card-strip { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 -1rem 1.25rem; padding: 11px 1rem; border-bottom: 1px solid rgba(255,255,255,0.07); background: rgba(0,0,0,0.28); font-family: var(--rx-mono); font-size: 10px; letter-spacing: 0.12em; color: rgba(255,255,255,0.45); text-transform: uppercase; }
+  .rs-card-strip-l { display: flex; align-items: center; gap: 8px; flex-shrink: 0; color: rgba(var(--rx),0.92); }
+  .rs-card-strip-r { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rs-strip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--rx-hex); animation: rx-pulse 2.2s ease-out infinite; }
+
+  .rs-athlete-row { gap: 1rem; margin-bottom: 1.25rem; }
+  .rs-athlete-meta { gap: 6px 8px; margin-bottom: 0.75rem; font-family: var(--rx-mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0.1em; color: rgba(var(--rx),0.78); }
+  .rs-mod-chip { padding: 3px 9px; border-radius: 999px; font-family: var(--rx-mono); font-size: 9.5px; font-weight: 500; letter-spacing: 0.1em; }
+  .rs-athlete-name-first, .rs-athlete-name-last { font-size: clamp(2rem, 11vw, 3.2rem); }
+
+  .rs-status-col { width: 100%; }
+  .rs-status-badge { padding: 8px 14px; border-radius: 999px; font-size: 11px; letter-spacing: 0.16em; }
+  .rs-notime-note { font-family: var(--rx-mono); font-size: 10px; letter-spacing: 0.06em; color: rgba(255,255,255,0.4); }
+  .rs-action-btns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; margin-top: 4px; }
+  .rs-share-btn { justify-content: center; min-height: 42px; padding: 0 12px; border-radius: 11px; border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.72); font-size: 11px; letter-spacing: 0.12em; }
+  .rs-share-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+  /* El reset genérico de .rs-share-btn (0,1,0) iba después de .rs-emergency-btn (0,1,0) y le
+     quitaba el rojo: se reafirma con especificidad (0,2,0). */
+  .rs-share-btn.rs-emergency-btn { border-color: rgba(255,60,60,0.4); background: rgba(255,40,40,0.08); color: #ff6b6b; }
+
+  /* Tiempos en mosaicos */
+  .rs-time-hero { align-items: stretch; gap: 10px; margin-bottom: 10px; padding: 0; border: none; }
+  .rs-time-hero > div { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; padding: 16px 18px; border: 1px solid var(--rx-line); border-radius: 16px; background: rgba(0,0,0,0.28); }
+  .rs-time-hero > div:first-child { border-color: rgba(var(--rx),0.26); background: linear-gradient(135deg, rgba(var(--rx),0.11) 0%, rgba(var(--rx),0.02) 60%); }
+  .rs-time-chip { text-align: left; }
+  .rs-time-sub { margin-top: 6px; font-family: var(--rx-mono); font-size: 10px; letter-spacing: 0.1em; color: rgba(255,255,255,0.38); text-transform: uppercase; }
+  .rs-time-label { margin-bottom: 0.5rem; font-family: var(--rx-mono); font-size: 10px; font-weight: 500; letter-spacing: 0.12em; color: rgba(255,255,255,0.45); }
+  .rs-time-value { font-size: clamp(2.6rem, 14vw, 4.4rem); font-variant-numeric: tabular-nums; }
+  .rs-time-value.has-time { text-shadow: 0 0 32px rgba(var(--rx),0.35); }
+
+  .rs-stats-grid { gap: 10px; margin-bottom: 0.25rem; }
+  .rs-stat, .rs-stat:last-child { margin: 0; padding: 14px 16px; border: 1px solid var(--rx-line); border-radius: 16px; background: rgba(0,0,0,0.22); }
+  .rs-stat-label { margin-bottom: 0.45rem; font-family: var(--rx-mono); font-size: 10px; font-weight: 500; letter-spacing: 0.12em; color: rgba(255,255,255,0.45); }
+  .rs-stat-value { font-size: 1.9rem; font-variant-numeric: tabular-nums; }
+  .rs-stat-unit { font-family: var(--rx-mono); font-style: normal; font-size: 0.7rem; color: rgba(255,255,255,0.4); }
+
+  .rs-map-section { margin: 12px 0 0; padding-top: 0; border-top: none; }
+  .rs-map-label { font-family: var(--rx-mono); font-size: 10px; letter-spacing: 0.12em; color: rgba(255,255,255,0.45); }
+
+  .rs-error { border-radius: 18px; border-color: rgba(239,68,68,0.22); background: rgba(239,68,68,0.04); }
+  .rs-error-text { font-family: var(--rx-mono); font-size: 11px; letter-spacing: 0.08em; }
+
+  /* ── Podio ── */
+  .rs-podio { gap: 1.25rem; margin-bottom: 1.5rem; padding-bottom: 1.5rem; }
+  .rs-podio-title { font-family: var(--rx-mono); font-size: 10px; font-weight: 500; letter-spacing: 0.14em; }
+  .rs-podio-card { gap: 0 12px; margin-bottom: 8px; padding: 10px 12px; border-radius: 14px; border-color: rgba(255,255,255,0.08); background: linear-gradient(90deg, rgba(255,255,255,0.035), rgba(255,255,255,0.01)); }
+  .rs-podio-card::before { top: 12px; bottom: 12px; width: 3px; border-radius: 0 3px 3px 0; }
+  .rs-podio-card.p1 { background: linear-gradient(90deg, rgba(251,191,36,0.09), rgba(251,191,36,0.01)); border-color: rgba(251,191,36,0.22); }
+  .rs-podio-medal { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); font-size: 1.05rem; }
+  .rs-podio-card.p1 .rs-podio-medal { border-color: rgba(251,191,36,0.4); box-shadow: 0 0 18px rgba(251,191,36,0.2); }
+  .rs-podio-meta, .rs-podio-pace { font-family: var(--rx-mono); font-size: 10px; letter-spacing: 0.04em; color: rgba(255,255,255,0.4); }
+  .rs-podio-time { font-variant-numeric: tabular-nums; text-shadow: 0 0 18px rgba(var(--rx),0.3); }
+
+  /* ── Tabla ── */
+  .rs-tabla-section { padding: 0 1.25rem 3rem; }
+  .rs-tabla-search-wrap { margin-bottom: 1rem; }
+  .rs-tabla-search-box { border-radius: 14px; border-color: rgba(255,255,255,0.1); background: var(--rx-panel); }
+  .rs-tabla-search-box:focus-within { border-color: rgba(var(--rx),0.45); box-shadow: 0 0 0 4px rgba(var(--rx),0.08); }
+  .rs-tabla-search-input { padding: 0.85rem 0; font-size: 1.05rem; }
+  .rs-tbl-nombre { font-weight: 800; font-size: 1.02rem; }
+  .rs-tbl-dorsal-lbl { margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--rx-mono); font-size: 10px; letter-spacing: 0.03em; color: rgba(255,255,255,0.4); }
+  .rs-tbl-cat-inline { display: none; }
+  .rs-tbl-time { font-variant-numeric: tabular-nums; }
+  .rs-tabla-empty { font-size: 1.15rem; color: rgba(255,255,255,0.28); }
+
+  /* Móvil/tablet vertical: fila compacta 2 columnas (atleta | tiempo + ritmo) */
+  @media (max-width: 768px) {
+    .rs-tbl-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 2px 12px; margin-bottom: 4px; padding: 10px 12px; border-radius: 12px; border-color: rgba(255,255,255,0.05); background: rgba(255,255,255,0.022); }
+    .rs-tbl-atleta { grid-column: 1; grid-row: 1 / span 2; align-self: center; }
+    .rs-tbl-time   { grid-column: 2; grid-row: 1; align-self: end; text-align: right; font-size: 1.05rem; }
+    .rs-tbl-pace   { display: block; grid-column: 2; grid-row: 2; text-align: right; font-family: var(--rx-mono); font-size: 10px; color: rgba(255,255,255,0.35); }
+    .rs-tbl-cat-inline { display: inline; }
+  }
+
+  /* ── Overlay de emergencia: legibilidad para el respondedor ── */
+  .rs-emer-panel { border-radius: 20px; box-shadow: 0 30px 90px rgba(0,0,0,0.6), 0 0 60px rgba(255,40,40,0.12); }
+  .rs-emer-title { font-size: 12px; }
+  .rs-emer-runner-label, .rs-emer-field-label { font-family: var(--rx-mono); font-style: normal; font-weight: 500; font-size: 10px; letter-spacing: 0.14em; color: rgba(255,255,255,0.45); }
+  .rs-emer-runner-meta { font-size: 11px; color: rgba(255,255,255,0.5); }
+  .rs-emer-no-data-sub { font-size: 11px; color: rgba(255,255,255,0.35); }
+  .rs-emer-footer { font-family: var(--rx-mono); font-style: normal; font-size: 10px; letter-spacing: 0.1em; color: rgba(255,255,255,0.3); }
+
+  /* ── ≥481px ── */
+  @media (min-width: 481px) {
+    .rs-time-chip { text-align: right; }
+    .rs-podio { gap: 1rem; }
+  }
+
+  /* ── ≥769px — escritorio ── */
+  @media (min-width: 769px) {
+    .rs-header { padding: 2.5rem 2rem 2rem; }
+    .rs-hero-grid { grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); gap: 2.5rem; }
+    .rs-title { font-size: clamp(84px, 9.5vw, 132px); }
+    .rs-eyebrow { margin-bottom: 1.5rem; }
+    .rs-eyebrow-text { font-size: 11px; }
+    .rs-hud { padding: 16px 18px 18px; }
+    .rs-hud-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
+    .rs-hud-grid dd { font-size: 19px; }
+
+    .rs-tabs-wrap { padding: 0 2rem 1.25rem; }
+    .rs-notice { max-width: 656px; }          /* = ancho útil de pestañas/buscador (720 − 2·2rem) */
+    .rs-search-wrap { padding: 0 2rem 3rem; }
+    .rs-search-input { padding: 12px 20px; font-size: 2.6rem; }
+    .rs-search-btn { min-height: 64px; padding: 0 30px; font-size: 0.9rem; }
+
+    .rs-card { padding: 0 2rem 5rem; }
+    .rs-card-inner { padding: 0 2.25rem 2.25rem; }
+    .rs-card-strip { margin: 0 -2.25rem 2rem; padding: 12px 2.25rem; font-size: 10.5px; }
+    .rs-bib-watermark { top: 58%; right: 1rem; -webkit-text-stroke: 1px rgba(var(--rx),0.08); }
+    .rs-athlete-row { gap: 2rem; margin-bottom: 2rem; }
+    .rs-athlete-name-first, .rs-athlete-name-last { font-size: clamp(3.2rem, 7vw, 5.6rem); }
+    .rs-status-col { width: auto; }
+    .rs-action-btns { display: flex; justify-content: flex-end; width: auto; gap: 8px; }
+    .rs-share-btn { min-height: 40px; padding: 0 16px; font-size: 11px; }
+    .rs-time-hero { gap: 12px; margin-bottom: 12px; }
+    .rs-time-hero > div { padding: 22px 26px; }
+    .rs-time-value { font-size: clamp(3.6rem, 7vw, 6.4rem); }
+    .rs-stats-grid { gap: 12px; }
+    .rs-stat, .rs-stat:last-child { padding: 18px 22px; }
+    .rs-stat-value { font-size: 2.4rem; }
+
+    .rs-tabla-section { padding: 0 2rem 5rem; }
+    .rs-tbl-head { padding: 0 1rem 0.7rem; }
+    .rs-th { font-family: var(--rx-mono); font-size: 10px; font-weight: 500; letter-spacing: 0.12em; color: rgba(255,255,255,0.4); }
+    .rs-tbl-row { margin-bottom: 3px; border-radius: 10px; }
+    .rs-tbl-row:hover { background: rgba(var(--rx),0.035); border-color: rgba(var(--rx),0.14); }
+    .rs-tbl-pace { font-family: var(--rx-mono); font-size: 0.75rem; }
+  }
+
+  /* ── ≥1100px — escritorio ancho ── */
+  @media (min-width: 1100px) {
+    .rs-hud-grid dd { font-size: 20px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rs-hud-scan, .rs-strip-dot { animation: none; }
+    .rs-eyebrow-dot { animation: none; }
   }
 `;
 
@@ -883,10 +1216,37 @@ const WERUN_CONFIG: RaceConfig = {
   data: WERUN_DATASET,
 };
 
-/** @brief V4.8 — Registro de eventos del motor JSON. */
+/**
+ * @brief V4.9.1 — Dataset WE RUN LED Coro. Vacío (published=false) hasta la carrera:
+ *        la consulta individual resuelve en vivo desde Supabase (estado + contacto de
+ *        emergencia) y la tabla muestra "Resultados en procesamiento".
+ * @note  Post-carrera: importar el JSON oficial y sustituir `[]` por él. Nada más cambia.
+ */
+const LEDCORO_DATASET: RaceDataset = construirDataset([], 'chip');
+
+/** @brief V4.9.1 — WE RUN RAYOCERO LED 10K & 5K · Coro, Falcón · 28-11-2026. */
+const LEDCORO_CONFIG: RaceConfig = {
+  id: 'ledcoro',
+  raceId: RACE_ID_LEDCORO,
+  nameLong: LEDCORO_NAME_LONG,
+  nameShort: LEDCORO_NAME_SHORT,
+  date: LEDCORO_DATE,
+  city: LEDCORO_CITY,
+  distanciasLabel: '10K & 5K',
+  certBg: CERT_BG_IMG,
+  certLogo: CERT_LOGO_IMG,
+  certWatermark: 'RAYOCERO · WE RUN LED',
+  filePrefix: 'WERUNLEDCORO',
+  clasificacion: 'chip',
+  carreraCerrada: false,
+  data: LEDCORO_DATASET,
+};
+
+/** @brief V4.8 — Registro de eventos del motor JSON. V4.9.1: + ledcoro. */
 const RACE_CONFIGS: Record<EventoJsonId, RaceConfig> = {
   coro: CORO_CONFIG,
   werun: WERUN_CONFIG,
+  ledcoro: LEDCORO_CONFIG,
 };
 
 /**
@@ -946,9 +1306,14 @@ const TablaRow = ({ r }: { r: JsonAtleta }) => {
     <div className="rs-tbl-row">
       <div className="rs-tbl-atleta">
         <div className="rs-tbl-nombre">{r.nombre_completo}</div>
-        <div className="rs-tbl-dorsal-lbl">#{bib4(r.dorsal)} · {r.modalidad}</div>
+        <div className="rs-tbl-dorsal-lbl">
+          #{bib4(r.dorsal)} · {r.modalidad}
+          <span className="rs-tbl-cat-inline"> · {r.categoria}</span>{/* V5.0 — categoría inline solo en móvil */}
+        </div>
       </div>
-      <div className="rs-tbl-cat-col" style={{ display:'flex', alignItems:'center' }}>
+      {/* V5.0 FIX — el inline display:'flex' anulaba el display:none móvil de .rs-tbl-cat-col
+          (base V4.6). El display lo decide ahora solo el CSS (flex desde ≥769px). */}
+      <div className="rs-tbl-cat-col" style={{ alignItems:'center' }}>
         <span className="rs-tbl-cat-badge" style={{ color:accent, borderColor:`${accent}30`, background:`${accent}0d` }}>
           {r.categoria}
         </span>
@@ -1064,10 +1429,44 @@ function ResultsSectionCoroOriginal({ config = CORO_CONFIG }: { config?: RaceCon
   const [searched, setSearched]     = useState(false);
   const [copied, setCopied]         = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [showEmergency, setShowEmergency] = useState(false);       // V4.9 — overlay de contacto de emergencia
+  const [emergencyAutoOpen, setEmergencyAutoOpen] = useState(false); // V4.9 — bandera para auto-apertura desde QR
   const certRef = useRef<HTMLDivElement>(null);
   const searchSequenceRef = useRef(0);
 
   useEffect(() => () => { searchSequenceRef.current += 1; }, []);
+
+  /**
+   * V4.9 — Auto-búsqueda desde QR: si la URL tiene `?bib=XXXX&emergencia=1`,
+   * ejecuta la búsqueda al montar y abre el panel de emergencia cuando llega el runner.
+   * El QR del dorsal genera exactamente esta URL.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const bibParam = params.get('bib');
+    const emergParam = params.get('emergencia');
+    if (bibParam && emergParam === '1') {
+      setBib(bibParam);
+      setEmergencyAutoOpen(true);
+    }
+  }, []);
+
+  /** V4.9 — Dispara búsqueda automática cuando emergencyAutoOpen está activo y hay bib. */
+  useEffect(() => {
+    if (emergencyAutoOpen && bib.trim()) {
+      handleSearch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emergencyAutoOpen]);
+
+  /** V4.9 — Abre el overlay de emergencia automáticamente cuando el runner llega desde QR. */
+  useEffect(() => {
+    if (emergencyAutoOpen && runner && !loading) {
+      setShowEmergency(true);
+      setEmergencyAutoOpen(false); // una sola vez
+    }
+  }, [emergencyAutoOpen, runner, loading]);
 
   /**
    * Búsqueda de dorsal — SCOPED AL EVENTO ACTIVO.
@@ -1084,14 +1483,14 @@ function ResultsSectionCoroOriginal({ config = CORO_CONFIG }: { config?: RaceCon
 
     const jsonData = race.data.index.get(bibNum) ?? null;    // V4.8
     setJsonAtleta(jsonData);
-    const raceId = race.raceId;                               // V4.8
+    const raceId = esUuid(race.raceId) ? race.raceId : null;  // V4.8 · V4.9.1: guard UUID → sin HTTP 400
 
     try {
       // V4.8 — sin race_id configurado se omite Supabase: el JSON oficial es la única fuente.
       const { data: runnerData, error: runnerErr } = raceId
         ? await supabase
             .from('runners')
-            .select('bib_number, nombre, apellido, categoria, genero, modalidad, race_status, finish_time_seconds, start_time, finish_time, split_time_seconds, gps_track')
+            .select('bib_number, nombre, apellido, categoria, genero, modalidad, race_status, finish_time_seconds, start_time, finish_time, split_time_seconds, gps_track, contacto_emergencia, telefono_emergencia') // V4.9: + contacto_emergencia, telefono_emergencia
             .eq('bib_number', bibNum)
             .eq('race_id', raceId)
             .maybeSingle()
@@ -1117,6 +1516,7 @@ function ResultsSectionCoroOriginal({ config = CORO_CONFIG }: { config?: RaceCon
             finish_time_seconds,
             start_time: null, finish_time: null,
             split_time_seconds: null, gps_track: null,
+            contacto_emergencia: null, telefono_emergencia: null, // V4.9 — JSON no tiene contacto; solo Supabase
           });
           setRaceResult({
             ranking_general: jsonData.posicion_general || null,
@@ -1220,7 +1620,7 @@ function ResultsSectionCoroOriginal({ config = CORO_CONFIG }: { config?: RaceCon
   /* ── Derivados ── */
   const modalidad = runner?.modalidad ?? jsonAtleta?.modalidad ?? '10K';
   const distKm    = DIST_KM[modalidad];
-  const modColor  = modalidad === '4K' ? '#facc15' : '#00f2ff';
+  const modColor  = modalidad === '10K' ? '#00f2ff' : '#facc15'; // V4.9.1: 4K y 5K → acento corto
 
   const status    = runner ? statusLabel(runner.race_status) : null;
   const hasTime   = runner?.finish_time_seconds != null;
@@ -1259,21 +1659,58 @@ function ResultsSectionCoroOriginal({ config = CORO_CONFIG }: { config?: RaceCon
 
         {/* Header */}
         <div className="rs-header">
-          <div className="rs-eyebrow">
-            <span className="rs-eyebrow-dot"/>
-            <span className="rs-eyebrow-text">{race.nameLong} · {race.distanciasLabel} · {race.date}</span>{/* V4.8 */}
+          {/* V5.0 — rejilla hero: título a la izquierda, telemetría del evento a la derecha */}
+          <div className="rs-hero-grid">
+            <div className="rs-hero-main">
+              <div className="rs-eyebrow">
+                <span className="rs-eyebrow-dot"/>
+                <span className="rs-eyebrow-text">{race.nameLong}</span>{/* V4.8 · V5.0: distancias y fecha pasan al panel HUD */}
+              </div>
+              <h1 className="rs-title">
+                <span style={{ display:'block' }}>MIS</span>
+                <span className="rs-title-line2" style={{ display:'block' }}>TIEMPOS</span>
+              </h1>
+            </div>
+
+            {/* V5.0 — Panel de telemetría del evento (datos 100% derivados de RaceConfig) */}
+            <aside className="rs-hud rx-corners" aria-label="Datos del evento">
+              <span className="rs-hud-scan" aria-hidden="true"/>
+              <div className="rs-hud-head">
+                <span className="rs-strip-dot"/>
+                Telemetría del evento
+                <span className="rs-hud-code">{race.id.toUpperCase()}</span>
+              </div>
+              <dl className="rs-hud-grid">
+                <div><dt>Evento</dt><dd>{race.nameShort}</dd></div>
+                <div><dt>Sede</dt><dd>{race.city}</dd></div>
+                <div><dt>Fecha</dt><dd>{race.date}</dd></div>
+                <div><dt>Distancias</dt><dd>{race.distanciasLabel}</dd></div>
+                <div><dt>Criterio</dt><dd>{race.clasificacion === 'oficial' ? 'Tiempo oficial' : 'Tiempo chip'}</dd></div>
+                <div>
+                  <dt>Resultados</dt>
+                  <dd className={race.data.published ? 'ok' : 'wait'}>
+                    {race.data.published ? `${race.data.resultados.length} atletas` : 'Pendientes'}
+                  </dd>
+                </div>
+              </dl>
+            </aside>
           </div>
-          <h1 className="rs-title">
-            <span style={{ display:'block' }}>MIS</span>
-            <span className="rs-title-line2" style={{ display:'block' }}>TIEMPOS</span>
-          </h1>
         </div>
 
         {/* Tabs */}
         <div className="rs-tabs-wrap">
           <div className="rs-tabs">
-            <button className={`rs-tab ${tab === 'individual' ? 'active' : ''}`} onClick={() => setTab('individual')}>🔍 Buscar mi tiempo</button>
-            <button className={`rs-tab ${tab === 'tabla' ? 'active' : ''}`} onClick={() => setTab('tabla')}>🏁 Tabla general</button>
+            {/* V5.0 — iconos SVG (antes emoji) + indicador deslizante compartido (layoutId) */}
+            <button className={`rs-tab ${tab === 'individual' ? 'active' : ''}`} onClick={() => setTab('individual')} aria-pressed={tab === 'individual'}>
+              {tab === 'individual' && <motion.span layoutId="rs-tab-ind" className="rs-tab-ind" transition={{ type:'spring', stiffness:420, damping:36 }}/>}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <span>Buscar mi tiempo</span>
+            </button>
+            <button className={`rs-tab ${tab === 'tabla' ? 'active' : ''}`} onClick={() => setTab('tabla')} aria-pressed={tab === 'tabla'}>
+              {tab === 'tabla' && <motion.span layoutId="rs-tab-ind" className="rs-tab-ind" transition={{ type:'spring', stiffness:420, damping:36 }}/>}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="M4 20V11"/><path d="M10 20V5"/><path d="M16 20v-6"/><path d="M2 20h20"/></svg>
+              <span>Tabla general</span>
+            </button>
           </div>
         </div>
 
@@ -1293,7 +1730,12 @@ function ResultsSectionCoroOriginal({ config = CORO_CONFIG }: { config?: RaceCon
               )}
 
               <div className="rs-search-wrap">
-                <div className="rs-search-box">
+                {/* V5.0 — rótulo HUD sobre el buscador */}
+                <div className="rs-search-label">
+                  <span>Número de dorsal</span>
+                  <b>{race.nameShort}</b>
+                </div>
+                <div className="rs-search-box rx-corners">{/* V5.0: + rx-corners */}
                   <input className="rs-search-input" type="number" inputMode="numeric" placeholder="# DORSAL"
                     value={bib} onChange={e => setBib(e.target.value)} onKeyDown={handleKeyDown} min={1} max={9999}/>
                   <button className="rs-search-btn" onClick={handleSearch} disabled={loading || !bib.trim()}>
@@ -1326,8 +1768,14 @@ function ResultsSectionCoroOriginal({ config = CORO_CONFIG }: { config?: RaceCon
                   <motion.div key={`runner-${runner.bib_number}`} className="rs-card"
                     initial={{ opacity:0,y:30 }} animate={{ opacity:1,y:0 }}
                     exit={{ opacity:0,y:-20 }} transition={{ duration:0.4, ease:[0.16,1,0.3,1] }}>
-                    <div className="rs-card-inner">
+                    <div className="rs-card-inner rx-corners">{/* V5.0: + rx-corners */}
                       <div className="rs-bib-watermark">{bib4(runner.bib_number)}</div>
+
+                      {/* V5.0 — franja de cabecera HUD de la ficha */}
+                      <div className="rs-card-strip">
+                        <span className="rs-card-strip-l"><span className="rs-strip-dot"/>Ficha de atleta</span>
+                        <span className="rs-card-strip-r">{race.nameShort} · {modalidad} · #{bib4(runner.bib_number)}</span>
+                      </div>
 
                       {/* V4.0 — fila de atleta sin columna de sponsors */}
                       <div className="rs-athlete-row">
@@ -1358,6 +1806,14 @@ function ResultsSectionCoroOriginal({ config = CORO_CONFIG }: { config?: RaceCon
                                 <polyline points="16,6 12,2 8,6"/><line x1="12" y1="2" x2="12" y2="15"/>
                               </svg>
                               {copied ? 'COPIADO ✓' : 'COMPARTIR'}
+                            </button>
+                            {/* V4.9 — Botón de emergencia: abre overlay con contacto de emergencia */}
+                            <button className="rs-share-btn rs-emergency-btn" onClick={() => setShowEmergency(true)}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                <path d="M12 9v4"/><path d="M12 17h.01"/>
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                              </svg>
+                              EMERGENCIA
                             </button>
                             {certDisponible && (/* V4.8 — certificado solo con marca de meta */
                               <>
@@ -1393,12 +1849,12 @@ function ResultsSectionCoroOriginal({ config = CORO_CONFIG }: { config?: RaceCon
                             {gunTime}
                           </div>
                         </div>
-                        <div style={{ textAlign:'right' }}>
+                        <div className="rs-time-chip">{/* V5.0: textAlign inline → clase responsive (izq. en móvil, der. ≥481px) */}
                           <div className="rs-time-label">TIEMPO CHIP</div>
                           <div style={{ fontFamily:"'Barlow Condensed',sans-serif", fontStyle:'italic', fontWeight:900, fontSize:'clamp(2rem,5vw,3.5rem)', color:'#00f2ff', lineHeight:1, textShadow:'0 0 20px rgba(0,242,255,0.3)' }}>
                             {chipTime}
                           </div>
-                          <div style={{ fontSize:'7px', color:'rgba(255,255,255,0.2)', letterSpacing:'0.3em', textTransform:'uppercase', marginTop:4 }}>
+                          <div className="rs-time-sub">{/* V5.0: 7px inline → clase legible (10px) */}
                             tiempo neto oficial
                           </div>
                         </div>
@@ -1567,6 +2023,104 @@ function ResultsSectionCoroOriginal({ config = CORO_CONFIG }: { config?: RaceCon
             </div>
           </div>
         )}
+
+        {/* ═══════════════════════════════════════════════════════ */}
+        {/* V4.9 — EMERGENCY OVERLAY · CONTACTO DE EMERGENCIA     */}
+        {/* Accesible por QR en dorsal o botón en action buttons.  */}
+        {/* El overlay se renderiza sobre toda la página para que  */}
+        {/* un respondedor de emergencia vea la info sin scroll.   */}
+        {/* ═══════════════════════════════════════════════════════ */}
+        <AnimatePresence>
+          {showEmergency && runner && (
+            <motion.div
+              className="rs-emer-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setShowEmergency(false)}
+            >
+              <motion.div
+                className="rs-emer-panel"
+                initial={{ opacity: 0, y: 40, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 20, scale: 0.97 }}
+                transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Header de emergencia */}
+                <div className="rs-emer-header">
+                  <div className="rs-emer-icon-wrap">
+                    <svg className="rs-emer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 9v4"/><path d="M12 17h.01"/>
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    </svg>
+                  </div>
+                  <span className="rs-emer-title">CONTACTO DE EMERGENCIA</span>
+                  <button className="rs-emer-close" onClick={() => setShowEmergency(false)} aria-label="Cerrar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Datos del corredor */}
+                <div className="rs-emer-runner">
+                  <div className="rs-emer-runner-label">CORREDOR</div>
+                  <div className="rs-emer-runner-name">{runner.nombre} {runner.apellido}</div>
+                  <div className="rs-emer-runner-meta">
+                    DORSAL #{bib4(runner.bib_number)} · {runner.categoria} · {runner.genero === 'M' ? 'MASCULINO' : 'FEMENINO'} · {modalidad}
+                  </div>
+                </div>
+
+                {/* Separador */}
+                <div className="rs-emer-sep"/>
+
+                {/* Datos del contacto de emergencia */}
+                {runner.contacto_emergencia || runner.telefono_emergencia ? (
+                  <div className="rs-emer-contact">
+                    {runner.contacto_emergencia && (
+                      <div className="rs-emer-field">
+                        <div className="rs-emer-field-label">NOMBRE DEL CONTACTO</div>
+                        <div className="rs-emer-field-value">{runner.contacto_emergencia}</div>
+                      </div>
+                    )}
+                    {runner.telefono_emergencia && (
+                      <>
+                        <div className="rs-emer-field">
+                          <div className="rs-emer-field-label">TELÉFONO DE EMERGENCIA</div>
+                          <div className="rs-emer-field-value rs-emer-phone">{runner.telefono_emergencia}</div>
+                        </div>
+                        <a
+                          href={`tel:${runner.telefono_emergencia.replace(/\s/g, '')}`}
+                          className="rs-emer-call-btn"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                          </svg>
+                          LLAMAR AHORA
+                        </a>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rs-emer-no-data">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5">
+                      <circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>
+                    </svg>
+                    <span>No se registró contacto de emergencia para este dorsal.</span>
+                    <span className="rs-emer-no-data-sub">El corredor no completó los campos de emergencia en su inscripción.</span>
+                  </div>
+                )}
+
+                {/* Footer con evento */}
+                <div className="rs-emer-footer">
+                  {race.nameShort} · {race.city} · {race.date}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
       </div>
     </RaceCtx.Provider>
@@ -1813,8 +2367,8 @@ const CANINATA_RESULTS_STYLES = `
  * El orden de EVENTOS define tanto el selector inicial como la navegación.
  * ═══════════════════════════════════════════════════════════════════════ */
 
-/** @brief V4.8 — Identificador de evento consultable. */
-type EventoId = 'coro' | 'caninata' | 'werun';
+/** @brief V4.8 — Identificador de evento consultable. V4.9.1: + ledcoro. */
+type EventoId = 'coro' | 'caninata' | 'werun' | 'ledcoro';
 
 /** @brief V4.8 — Metadatos de presentación de cada evento. */
 interface EventoMeta {
@@ -1825,9 +2379,12 @@ interface EventoMeta {
   nombre: string;
   lugar: string;
   distancias: string;
+  /** V5.0 — Fecha corta si el evento aún no se corre: muestra el chip "PRÓXIMA · <fecha>". */
+  proxima?: string;
 }
 
 const EVENTOS: EventoMeta[] = [
+  { id: 'ledcoro',  label: 'WE RUN LED · CORO',     nombre: 'WE RUN Rayocero LED',   lugar: 'Coro, Falcón',       distancias: '10K y 5K', proxima: '28 NOV' }, // V4.9.1 — evento activo primero · V5.0: fecha → chip proxima
   { id: 'coro',     label: '499 RUN · CORO',        nombre: '499 RUN Coro',          lugar: 'Coro, Falcón',       distancias: '10K y 4K' },
   { id: 'caninata', label: 'CANINATA BARQUISIMETO', nombre: 'Caninata Barquisimeto', lugar: 'Barquisimeto, Lara', distancias: '5K y 10K' },
   { id: 'werun',    label: 'WE RUN RAYOCERO',       nombre: 'WE RUN Rayocero',       lugar: 'Barquisimeto, Lara', distancias: '10K' },
@@ -1835,7 +2392,7 @@ const EVENTOS: EventoMeta[] = [
 
 /** @brief V4.8 — Type guard para el parámetro `?evento=` de la URL. */
 const isEventoId = (v: string | null): v is EventoId =>
-  v === 'coro' || v === 'caninata' || v === 'werun';
+  v === 'coro' || v === 'caninata' || v === 'werun' || v === 'ledcoro'; // V4.9.1: + ledcoro
 
 /**
  * Página de resultados única. La sección original 499 RUN Coro V4.6 NO se modifica en su
@@ -1879,8 +2436,10 @@ export default function ResultsSectionCoro() {
           <h2 id="rcres-picker-title" className="rcres-picker-title">¿Qué carrera quieres consultar?</h2>
           <p className="rcres-picker-sub">Elige el evento para buscar tu dorsal, ver la clasificación general y descargar tu certificado.</p>
           <div className="rcres-picker-grid">
-            {EVENTOS.map(ev => (
+            {EVENTOS.map((ev, i) => (
               <button key={ev.id} type="button" className="rcres-picker-card" onClick={() => elegirEvento(ev.id)}>
+                <span className="rcres-picker-idx">{String(i + 1).padStart(2, '0')}</span>{/* V5.0 */}
+                {ev.proxima && <span className="rcres-picker-live">Próxima · {ev.proxima}</span>}{/* V5.0 */}
                 <span className="rcres-picker-dist">{ev.distancias}</span>
                 <span className="rcres-picker-name">{ev.nombre}</span>
                 <span className="rcres-picker-place">{ev.lugar}</span>
@@ -1892,8 +2451,15 @@ export default function ResultsSectionCoro() {
       ) : (
         <>
           <nav className="rcres-event-nav" aria-label="Seleccionar evento de resultados">
-            {EVENTOS.map(ev => (/* V4.8 — botones generados desde EVENTOS (+ WE RUN RAYOCERO) */
-              <button key={ev.id} type="button" className={event===ev.id?'active':''} aria-current={event===ev.id?'page':undefined} onClick={()=>elegirEvento(ev.id)}>{ev.label}</button>
+            {EVENTOS.map((ev, i) => (/* V4.8 — botones generados desde EVENTOS (+ WE RUN RAYOCERO) */
+              <button key={ev.id} type="button" className={event===ev.id?'active':''} aria-current={event===ev.id?'page':undefined} onClick={()=>elegirEvento(ev.id)}>
+                {/* V5.0 — indicador activo compartido: desliza entre carreras */}
+                {event === ev.id && <motion.span layoutId="rcres-ev-ind" className="rcres-ev-ind" transition={{ type:'spring', stiffness:420, damping:36 }}/>}
+                <span className="rcres-ev-idx">{String(i + 1).padStart(2, '0')}</span>
+                {ev.proxima && <span className="rcres-ev-live">Próxima · {ev.proxima}</span>}
+                <span className="rcres-ev-name">{ev.label}</span>
+                <span className="rcres-ev-place">{ev.lugar}</span>
+              </button>
             ))}
           </nav>
           {event==='caninata'
@@ -1903,6 +2469,9 @@ export default function ResultsSectionCoro() {
       )}
     </div>
     <style>{`
+      /* V5.0 — fuentes del selector disponibles también cuando se monta Caninata
+         (el CSS principal no está montado en ese caso). Misma URL → caché del navegador. */
+      @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,300;0,400;0,600;0,700;1,400;1,600;1,700;1,800;1,900&family=Barlow:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap');
       /* Sólo el contenedor de resultados: no afecta al navbar global. */
       .rcres-layout {
         position: relative;
@@ -2006,7 +2575,7 @@ export default function ResultsSectionCoro() {
       }
       @media (min-width: 720px) {
         .rcres-picker { padding: 44px; margin-bottom: 72px; }
-        .rcres-picker-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+        .rcres-picker-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; } /* V4.9.1: 4 eventos → 2×2 */
         .rcres-picker-card {
           grid-template-columns: minmax(0, 1fr);
           grid-template-areas: "dist" "name" "place" "cta";
@@ -2018,6 +2587,10 @@ export default function ResultsSectionCoro() {
         .rcres-picker-dist { justify-self: start; }
         .rcres-picker-cta { justify-self: start; align-self: end; margin-top: 22px; }
       }
+      /* V4.9.1 — 4 eventos en una fila en escritorio */
+      @media (min-width: 1024px) {
+        .rcres-picker-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      }
 
       @media (max-width: 600px) {
         .rcres-layout { padding-top: 118px; }
@@ -2027,6 +2600,160 @@ export default function ResultsSectionCoro() {
       @media (prefers-reduced-motion: reduce) {
         .rcres-event-nav button { transition: none; }
         .rcres-picker-card { transition: none; }
+      }
+
+      /* ══════════════════════════════════════════════════════════════
+         V5.0 — SKIN HUD: lienzo + selector de evento + selector inicial
+         Capa evolutiva apilada sobre V4.7.1/V4.8 (gana por orden).
+         ══════════════════════════════════════════════════════════════ */
+      .rcres-layout {
+        --rx: 0, 242, 255;
+        --rx-hex: #00f2ff;
+        --rx-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+        isolation: isolate;
+        padding-top: 112px;                 /* altura del Navbar V6.3 en reposo (py-7 + 48px) */
+        background: #03070b;                /* mismo tono que .rs-root: sin costura */
+        overflow-x: hidden;                 /* halo decorativo nunca genera scroll horizontal */
+        overflow-x: clip;                   /* navegadores modernos: recorta sin crear scroll container */
+      }
+      /* Retícula táctica + halo superior, detrás de todo el contenido */
+      .rcres-layout::before {
+        content: ''; position: absolute; z-index: -1; inset: 0 0 auto 0; height: 1100px; pointer-events: none;
+        background-image:
+          linear-gradient(rgba(var(--rx), 0.05) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(var(--rx), 0.05) 1px, transparent 1px);
+        background-size: 48px 48px;
+        background-position: center top;
+        -webkit-mask-image: radial-gradient(ellipse 75% 60% at 50% 0%, #000 0%, transparent 78%);
+                mask-image: radial-gradient(ellipse 75% 60% at 50% 0%, #000 0%, transparent 78%);
+      }
+      .rcres-layout::after {
+        content: ''; position: absolute; z-index: -1; top: 0; left: 50%; width: min(1200px, 100%); height: 520px; transform: translateX(-50%); pointer-events: none;
+        background: radial-gradient(ellipse at 50% 0%, rgba(var(--rx), 0.10) 0%, transparent 65%);
+      }
+      .rcres-layout .rcres-page { background: transparent; } /* Caninata: hereda el lienzo, conserva su paleta */
+
+      /* ── Selector de evento: cápsula glass del Navbar V6.3 ── */
+      .rcres-event-nav {
+        display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;
+        width: min(100% - 24px, 1100px); margin: 0 auto 4px; padding: 6px;
+        border: 1px solid rgba(255, 255, 255, .08); border-radius: 18px;
+        background: rgba(255, 255, 255, .025);
+        -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .05);
+      }
+      .rcres-event-nav button {
+        position: relative; isolation: isolate;
+        display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "idx live" "name name" "place place";
+        align-content: start; gap: 3px 8px;
+        min-width: 0; min-height: 66px; padding: 10px 12px;
+        border: 1px solid transparent; border-radius: 12px; background: transparent; box-shadow: none;
+        color: rgba(255, 255, 255, .62); font: inherit; letter-spacing: normal; text-align: left;
+        transition: color .2s ease, background .2s ease, border-color .2s ease;
+      }
+      .rcres-event-nav button.active { background: transparent; border-color: transparent; color: #fff; box-shadow: none; }
+      .rcres-ev-ind {
+        position: absolute; inset: 0; z-index: -1; border-radius: 12px;
+        border: 1px solid rgba(var(--rx), .38);
+        background: linear-gradient(180deg, rgba(var(--rx), .15) 0%, rgba(var(--rx), .04) 100%);
+        box-shadow: 0 0 26px rgba(var(--rx), .16), inset 0 1px 0 rgba(255, 255, 255, .08);
+      }
+      .rcres-ev-ind::after {
+        content: ''; position: absolute; left: 18%; right: 18%; bottom: -1px; height: 2px; border-radius: 2px;
+        background: var(--rx-hex); box-shadow: 0 0 12px rgba(var(--rx), .9);
+      }
+      .rcres-ev-idx { grid-area: idx; font-family: var(--rx-mono); font-size: 10px; font-weight: 500; letter-spacing: .1em; color: rgba(255, 255, 255, .35); }
+      .rcres-event-nav button.active .rcres-ev-idx { color: var(--rx-hex); }
+      .rcres-ev-live {
+        grid-area: live; justify-self: end; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+        font-family: var(--rx-mono); font-size: 9px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--rx-hex);
+      }
+      .rcres-ev-live::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--rx-hex); animation: rcres-pulse 2.2s ease-out infinite; }
+      @keyframes rcres-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(var(--rx), .55); } 70% { box-shadow: 0 0 0 6px rgba(var(--rx), 0); } }
+      .rcres-ev-name {
+        grid-area: name; min-width: 0; overflow-wrap: anywhere;
+        font-family: 'Barlow Condensed', Inter, sans-serif; font-style: italic; font-weight: 800; font-size: 15px; line-height: 1.05;
+        letter-spacing: .02em; text-transform: uppercase;
+      }
+      .rcres-ev-place { grid-area: place; min-width: 0; font-size: 11px; color: rgba(255, 255, 255, .4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .rcres-event-nav button.active .rcres-ev-place { color: rgba(255, 255, 255, .62); }
+      .rcres-event-nav button:focus-visible { outline: 2px solid var(--rx-hex); outline-offset: 2px; }
+      @media (hover: hover) {
+        .rcres-event-nav button:hover { background: rgba(255, 255, 255, .04); color: #fff; }
+        .rcres-event-nav button.active:hover { background: transparent; }
+      }
+
+      /* ── Selector inicial ── */
+      .rcres-picker {
+        position: relative;
+        width: min(100% - 24px, 1100px); margin: 8px auto 56px; padding: 24px 16px;
+        border: 1px solid rgba(255, 255, 255, .08); border-radius: 22px;
+        background: radial-gradient(120% 90% at 0% 0%, rgba(var(--rx), .08), transparent 55%), rgba(255, 255, 255, .02);
+        -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+        box-shadow: 0 30px 80px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .05);
+        font-family: 'Barlow', Inter, system-ui, sans-serif;
+      }
+      .rcres-picker-kicker {
+        display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+        font-family: var(--rx-mono); font-size: 10.5px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: var(--rx-hex);
+      }
+      .rcres-picker-kicker::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--rx-hex); animation: rcres-pulse 2.2s ease-out infinite; }
+      .rcres-picker-title {
+        font-family: 'Barlow Condensed', Inter, sans-serif; font-style: italic; font-weight: 900; text-transform: uppercase;
+        font-size: clamp(36px, 10vw, 68px); line-height: .9; letter-spacing: -.02em;
+      }
+      .rcres-picker-sub { margin: 12px 0 22px; font-size: 14px; color: rgba(255, 255, 255, .55); }
+      .rcres-picker-grid { gap: 8px; }
+      .rcres-picker-card {
+        position: relative; isolation: isolate; overflow: hidden;
+        grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto auto auto;
+        grid-template-areas: "idx live" "name name" "place place" "dist cta";
+        align-items: center; gap: 6px 10px; min-height: 0; padding: 16px;
+        border: 1px solid rgba(255, 255, 255, .08); border-radius: 16px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(255, 255, 255, .01));
+      }
+      .rcres-picker-idx { grid-area: idx; font-family: var(--rx-mono); font-size: 10px; letter-spacing: .1em; color: rgba(255, 255, 255, .35); }
+      .rcres-picker-live {
+        grid-area: live; justify-self: end; display: inline-flex; align-items: center; gap: 6px;
+        font-family: var(--rx-mono); font-size: 9.5px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--rx-hex);
+      }
+      .rcres-picker-live::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--rx-hex); animation: rcres-pulse 2.2s ease-out infinite; }
+      .rcres-picker-name {
+        margin-top: 0; font-family: 'Barlow Condensed', Inter, sans-serif; font-style: italic; font-weight: 800;
+        font-size: 24px; line-height: 1; letter-spacing: .01em; text-transform: uppercase;
+      }
+      .rcres-picker-place { font-size: 12.5px; color: rgba(255, 255, 255, .5); }
+      .rcres-picker-dist {
+        justify-self: start; padding: 3px 9px; border-color: rgba(var(--rx), .3); background: rgba(var(--rx), .06);
+        font-family: var(--rx-mono); font-size: 10px; font-weight: 500; color: var(--rx-hex);
+      }
+      .rcres-picker-cta {
+        justify-self: end; align-self: center; margin-top: 0;
+        font-family: var(--rx-mono); font-size: 10.5px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--rx-hex);
+      }
+      .rcres-picker-cta::after { content: ' →'; }
+      .rcres-picker-card:focus-visible { outline: 2px solid var(--rx-hex); }
+      .rcres-picker-card:active { background: rgba(var(--rx), .08); border-color: rgba(var(--rx), .45); }
+      @media (hover: hover) {
+        .rcres-picker-card:hover { background: rgba(var(--rx), .06); border-color: rgba(var(--rx), .4); box-shadow: 0 0 30px rgba(var(--rx), .12); }
+      }
+
+      @media (min-width: 720px) {
+        .rcres-picker { padding: 40px; }
+        .rcres-picker-card { grid-template-rows: auto auto 1fr auto; grid-template-areas: "idx live" "name name" "place place" "dist cta"; align-content: stretch; min-height: 180px; padding: 20px; }
+        .rcres-picker-place { align-self: start; }
+        .rcres-picker-name { font-size: 26px; margin-top: 10px; }
+      }
+      @media (min-width: 900px) {
+        .rcres-event-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .rcres-event-nav button { min-height: 70px; padding: 11px 16px; }
+        .rcres-ev-name { font-size: 17px; }
+      }
+      @media (min-width: 1024px) {
+        .rcres-layout { padding-top: 124px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .rcres-ev-live::before, .rcres-picker-live::before, .rcres-picker-kicker::before { animation: none; }
       }
     `}</style>
   </>;
