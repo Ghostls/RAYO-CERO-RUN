@@ -1,5 +1,5 @@
 /**
- * RAYOCERO — RESULTS SECTION V5.0 · MULTI-EVENTO · TACTICAL CERTIFICATE ENGINE · EMERGENCY QR · HUD SKIN
+ * RAYOCERO — RESULTS SECTION V5.1 · MULTI-EVENTO · TACTICAL CERTIFICATE ENGINE · EMERGENCY QR · HUD SKIN
  * CEO: Lualdo Sciscioli | Valkyron Group
  *
  * EVOLUCIÓN V5.0: Skin HUD futurista + responsive real (390 / 768 / 1440 verificados).
@@ -22,6 +22,17 @@
  *     categoría (cada fila ocupaba 3 líneas). Ahora fila compacta 2 columnas: atleta +
  *     "#dorsal · modalidad · categoría" | tiempo + ritmo.
  *   ─ Overlay de emergencia: etiquetas a ≥10px para lectura rápida del respondedor.
+ *
+ * EVOLUCIÓN V5.1: Caninata (CaninataResults) alineada al skin HUD V5.0.
+ *   ─ Capa "V5.1 — SKIN HUD CANINATA" al final de CANINATA_RESULTS_STYLES, prefijada con
+ *     .rcres-page (gana sin !important). Fuera el rosa #ff3159: acento cian `--rx`.
+ *   ─ Hero con panel de telemetría (sede, distancias, criterio, estado del cronometraje
+ *     derivado de board.session_status, finishers en meta). Cero llamadas extra.
+ *   ─ Pestañas con iconos + indicador deslizante (layoutId propio "rcres-cn-tab-ind").
+ *   ─ Buscador y ficha con esquinas HUD; tiempo en meta destacado; métricas en mosaicos.
+ *   ─ Tabla: filas-tarjeta en ≤760px (antes tabla de 780px con scroll horizontal).
+ *   ─ Certificado PNG Caninata (.rcres-offscreen / .rcres-cert*) intacto. Lógica de RPC,
+ *     reintentos, búsqueda y exportación sin cambios.
  *
  * EVOLUCIÓN V4.9.1: Evento WE RUN RAYOCERO LED 10K & 5K · CORO (28-11-2026).
  *   ─ Evento NUEVO `ledcoro` (race_id 89e3604a-c7d8-473c-bfdc-54ecba9ff542), independiente
@@ -2289,28 +2300,69 @@ function CaninataResults() {
   };
   const podium=(modalidad:string)=>finishers.filter(r=>r.modalidad.toUpperCase().trim()===modalidad).slice(0,3);
 
+  /** V5.1 — Estado del cronometraje para el panel HUD (sin llamadas extra: sale del board). */
+  const cronoLabel = !board ? (loadingBoard ? 'Sincronizando' : '—')
+    : board.session_status === 'closed' ? 'Cerrado'
+    : board.session_status === 'open' ? 'En curso'
+    : (board.session_status || '—');
+
   return <section className="rcres-page">
     <div className="rcres-shell">
       <header className="rcres-hero">
-        <div className="rcres-kicker">RAYOCERO / VALKYRON GROUP · 2026</div>
-        <h1>CANINATA <span>RESULTS.</span></h1>
-        <p>Caninata 5K y Carrera 10K · Clasificación de meta por tiempo oficial validado.</p>
-        <button type="button" className="rcres-refresh" onClick={()=>void refresh()} disabled={loadingBoard}>{loadingBoard?'Actualizando…':'Actualizar resultados ↻'}</button>
+        {/* V5.1 — rejilla hero HUD: título a la izquierda, telemetría a la derecha (misma estética que V5.0) */}
+        <div className="rcres-hero-grid">
+          <div className="rcres-hero-main">
+            <div className="rcres-kicker">RAYOCERO / VALKYRON GROUP · 2026</div>
+            <h1><span className="rcres-h1-a">CANINATA</span> <span className="rcres-h1-b">RESULTS.</span></h1>{/* V5.1: spans con clase (relleno degradado / contorno) */}
+            <p>Caninata 5K y Carrera 10K · Clasificación de meta por tiempo oficial validado.</p>
+            <button type="button" className="rcres-refresh" onClick={()=>void refresh()} disabled={loadingBoard}>{loadingBoard?'Actualizando…':'Actualizar resultados ↻'}</button>
+          </div>
+          {/* V5.1 — Panel de telemetría del evento */}
+          <aside className="rcres-hud rx-corners" aria-label="Datos del evento">
+            <span className="rcres-hud-scan" aria-hidden="true"/>
+            <div className="rcres-hud-head"><span className="rcres-dot"/>Telemetría del evento<span className="rcres-hud-code">CANINATA</span></div>
+            <dl className="rcres-hud-grid">
+              <div><dt>Evento</dt><dd>Caninata</dd></div>
+              <div><dt>Sede</dt><dd>Barquisimeto, Lara</dd></div>
+              <div><dt>Distancias</dt><dd>5K &amp; 10K</dd></div>
+              <div><dt>Criterio</dt><dd>Tiempo oficial</dd></div>
+              <div><dt>Cronometraje</dt><dd>{cronoLabel}</dd></div>
+              <div>
+                <dt>Resultados</dt>
+                <dd className={board?.published ? 'ok' : 'wait'}>{board?.published ? `${finishers.length} en meta` : 'Pendientes'}</dd>
+              </div>
+            </dl>
+          </aside>
+        </div>
       </header>
       <nav className="rcres-tabs" aria-label="Vista de resultados de Caninata">
-        <button type="button" className={section==='individual'?'active':''} onClick={()=>setSection('individual')}>Consulta por dorsal</button>
-        <button type="button" className={section==='tabla'?'active':''} onClick={()=>setSection('tabla')}>Clasificación general</button>
+        {/* V5.1 — iconos SVG + indicador deslizante (layoutId propio de Caninata) */}
+        <button type="button" className={section==='individual'?'active':''} onClick={()=>setSection('individual')} aria-pressed={section==='individual'}>
+          {section==='individual' && <motion.span layoutId="rcres-cn-tab-ind" className="rcres-tab-ind" transition={{ type:'spring', stiffness:420, damping:36 }}/>}
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <span>Consulta por dorsal</span>
+        </button>
+        <button type="button" className={section==='tabla'?'active':''} onClick={()=>setSection('tabla')} aria-pressed={section==='tabla'}>
+          {section==='tabla' && <motion.span layoutId="rcres-cn-tab-ind" className="rcres-tab-ind" transition={{ type:'spring', stiffness:420, damping:36 }}/>}
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="M4 20V11"/><path d="M10 20V5"/><path d="M16 20v-6"/><path d="M2 20h20"/></svg>
+          <span>Clasificación general</span>
+        </button>
       </nav>
       {boardError&&<p className="rcres-alert" role="alert">{boardError}. Los resultados de Coro permanecen independientes.</p>}
       {!board?.published&&<div className="rcres-pending"><strong>RESULTADOS AÚN NO PUBLICADOS</strong><p>{board?.session_status==='closed'?'Dirección debe revisar las marcas y autorizar la publicación.':'Los resultados aparecerán después del cierre oficial y la aprobación de Dirección.'}</p></div>}
       {section==='individual'&&<div className="rcres-panel">
         <form className="rcres-form" onSubmit={search}>
-          <label htmlFor="rcres-bib">BUSCA TU DORSAL</label>
-          <div className="rcres-search"><input id="rcres-bib" type="text" inputMode="numeric" value={bib} placeholder="0001" onChange={e=>setBib(e.target.value)} maxLength={10}/><button type="submit" disabled={!board?.published}>CONSULTAR</button></div>
+          <label htmlFor="rcres-bib"><span>BUSCA TU DORSAL</span><b>CANINATA</b></label>{/* V5.1: rótulo HUD a dos lados */}
+          <div className="rcres-search rx-corners"><input id="rcres-bib" type="text" inputMode="numeric" value={bib} placeholder="0001" onChange={e=>setBib(e.target.value)} maxLength={10}/><button type="submit" disabled={!board?.published}>CONSULTAR</button></div>
         </form>
         {downloadError&&<p className="rcres-alert" role="alert">{downloadError}</p>}
-        {selected&&board?.published&&<div className="rcres-result">
-          <div className="rcres-athlete"><div><small>RESULTADO OFICIAL / {selected.modalidad}</small><h2>{selected.nombre} {selected.apellido}</h2><p>{selected.categoria||'Participante'} · Dorsal #{showCaninataBib(selected.bib)}</p></div><b>#{showCaninataBib(selected.bib)}</b></div>
+        {selected&&board?.published&&<div className="rcres-result rx-corners">{/* V5.1: + rx-corners */}
+          {/* V5.1 — franja de cabecera HUD de la ficha */}
+          <div className="rcres-strip">
+            <span className="rcres-strip-l"><span className="rcres-dot"/>Ficha de atleta</span>
+            <span className="rcres-strip-r">CANINATA · {selected.modalidad} · #{showCaninataBib(selected.bib)}</span>
+          </div>
+          <div className="rcres-athlete"><div><small>RESULTADO OFICIAL / {selected.modalidad}</small><h2><span>{selected.nombre}</span> <span>{selected.apellido}</span></h2>{/* V5.1: nombre / apellido en dos pesos */}<p>{selected.categoria||'Participante'} · Dorsal #{showCaninataBib(selected.bib)}</p></div><b>#{showCaninataBib(selected.bib)}</b></div>
           <div className="rcres-metrics">
             <div><small>TIEMPO EN META</small><strong>{caninataTime(selected.finish_ms)}</strong></div>
             <div><small>RITMO MEDIO</small><strong>{caninataPace(selected)}</strong></div>
@@ -2360,6 +2412,206 @@ const CANINATA_RESULTS_STYLES = `
 .rcres-offscreen{position:fixed;left:-12000px;top:0;width:1080px;height:1350px;pointer-events:none;z-index:-1}.rcres-cert{width:1080px;height:1350px;position:relative;background:#fff;overflow:hidden;color:#141414;font-family:Inter,Arial,sans-serif}.rcres-cert-template{position:absolute;inset:0;width:1080px;height:1350px;object-fit:fill}.rcres-cert-name{position:absolute;top:183px;left:80px;width:920px;text-align:center;font-size:39px;line-height:1.15;font-weight:900;text-transform:uppercase;overflow-wrap:anywhere}.rcres-cert-bib{position:absolute;top:238px;left:80px;width:920px;text-align:center;font-size:19px;font-weight:850;color:#414141}.rcres-cert-value{position:absolute;left:40px;width:1000px;text-align:center;font-size:42px;font-weight:900;color:#191919;white-space:nowrap}.rcres-cert-position{position:absolute;top:1017px;left:50px;width:980px;text-align:center;font-weight:850;font-size:23px;color:#fe2752}
 @media(max-width:750px){.rcres-podiums{grid-template-columns:1fr}.rcres-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:440px){.rcres-search{flex-direction:column}.rcres-search button{min-height:46px}.rcres-metrics{grid-template-columns:1fr}.rcres-tabs button{font-size:11px}.rcres-podium-row{grid-template-columns:30px minmax(0,1fr);}.rcres-podium-row strong{grid-column:2}.rcres-hero h1{overflow-wrap:anywhere}}
 @media(prefers-reduced-motion:reduce){.rcres-page *{animation:none!important;transition:none!important}}
+
+/* ══════════════════════════════════════════════════════════════════════
+   V5.1 — SKIN HUD CANINATA (capa evolutiva, mobile first)
+   Misma estética que el skin V5.0 de 499/WE RUN. Todo va prefijado con
+   .rcres-page (especificidad 0,2,0+) para ganar a la base sin !important.
+   NO toca .rcres-offscreen / .rcres-cert / .rcres-cert-* (certificado PNG).
+   Eliminar este bloque devuelve el aspecto V4.7 exacto.
+   ══════════════════════════════════════════════════════════════════════ */
+.rcres-page{
+  --rx:0,242,255; --rx-hex:#00f2ff;
+  --rx-mono:'JetBrains Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
+  --rx-line:rgba(255,255,255,.08);
+  --rx-panel:linear-gradient(180deg,rgba(255,255,255,.04) 0%,rgba(255,255,255,.012) 100%);
+  padding:0 0 56px; font-family:'Barlow',Inter,system-ui,sans-serif;
+}
+.rcres-page .rcres-shell{max-width:1100px;padding:0 1.25rem}
+
+/* Esquinas HUD + animaciones */
+.rcres-page .rx-corners{position:relative}
+.rcres-page .rx-corners::before,.rcres-page .rx-corners::after{content:'';position:absolute;width:22px;height:22px;pointer-events:none;z-index:2;border:0 solid rgba(var(--rx),.8)}
+.rcres-page .rx-corners::before{top:0;left:0;border-top-width:2px;border-left-width:2px;border-top-left-radius:inherit}
+.rcres-page .rx-corners::after{bottom:0;right:0;border-bottom-width:2px;border-right-width:2px;border-bottom-right-radius:inherit}
+@keyframes rcres-cn-pulse{0%,100%{box-shadow:0 0 0 0 rgba(var(--rx),.55)}70%{box-shadow:0 0 0 7px rgba(var(--rx),0)}}
+@keyframes rcres-cn-scan{0%{transform:translateY(-100%);opacity:0}12%{opacity:1}88%{opacity:1}100%{transform:translateY(2200%);opacity:0}}
+.rcres-page .rcres-dot{width:6px;height:6px;border-radius:50%;background:var(--rx-hex);flex-shrink:0;animation:rcres-cn-pulse 2.2s ease-out infinite}
+
+/* Hero */
+.rcres-page .rcres-hero{padding:1.5rem 0 1.25rem;border:0;border-radius:0;background:transparent}
+.rcres-page .rcres-hero-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:1.25rem;align-items:end}
+.rcres-page .rcres-hero-main{min-width:0}
+.rcres-page .rcres-kicker{display:inline-flex;align-items:center;gap:8px;max-width:100%;margin-bottom:1rem;padding:7px 12px 7px 10px;border:1px solid rgba(var(--rx),.22);border-radius:999px;background:rgba(var(--rx),.06);font-family:var(--rx-mono);font-size:10px;font-weight:500;letter-spacing:.12em;color:rgba(var(--rx),.92);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rcres-page .rcres-kicker::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--rx-hex);flex-shrink:0;animation:rcres-cn-pulse 2.2s ease-out infinite}
+.rcres-page .rcres-hero h1{margin:0;font-family:'Barlow Condensed',sans-serif;font-style:italic;font-weight:900;font-size:clamp(50px,15vw,76px);line-height:.85;letter-spacing:-.025em;text-transform:uppercase;color:#fff;overflow-wrap:normal}
+.rcres-page .rcres-hero h1 span{display:block}
+.rcres-page .rcres-hero h1 .rcres-h1-a{background:linear-gradient(180deg,#fff 35%,rgba(255,255,255,.62) 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.rcres-page .rcres-hero h1 .rcres-h1-b{color:transparent;-webkit-text-stroke:1.5px rgba(var(--rx),.62);filter:drop-shadow(0 0 14px rgba(var(--rx),.28))}
+.rcres-page .rcres-hero p{margin:1rem 0 0;max-width:52ch;font-size:13.5px;line-height:1.6;color:rgba(255,255,255,.55)}
+.rcres-page .rcres-refresh{display:inline-flex;align-items:center;gap:8px;min-height:40px;margin-top:14px;padding:0 14px;border:1px solid rgba(var(--rx),.3);border-radius:11px;background:rgba(var(--rx),.06);color:var(--rx-hex);font-family:var(--rx-mono);font-size:10.5px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:background .2s,box-shadow .2s}
+.rcres-page .rcres-refresh:disabled{opacity:.55;cursor:wait}
+
+/* Panel de telemetría */
+.rcres-page .rcres-hud{position:relative;overflow:hidden;padding:12px 14px 14px;border:1px solid rgba(var(--rx),.16);border-radius:18px;background:linear-gradient(160deg,rgba(var(--rx),.07) 0%,rgba(255,255,255,.015) 55%);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 24px 60px rgba(0,0,0,.35);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.rcres-page .rcres-hud-scan{position:absolute;left:0;right:0;top:0;height:18px;pointer-events:none;background:linear-gradient(180deg,transparent,rgba(var(--rx),.10),transparent);animation:rcres-cn-scan 5.5s linear infinite}
+.rcres-page .rcres-hud-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed rgba(255,255,255,.1);font-family:var(--rx-mono);font-size:10px;letter-spacing:.14em;color:rgba(255,255,255,.55);text-transform:uppercase}
+.rcres-page .rcres-hud-code{margin-left:auto;color:rgba(var(--rx),.85)}
+.rcres-page .rcres-hud-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 12px;margin:0}
+.rcres-page .rcres-hud-grid>div{min-width:0}
+.rcres-page .rcres-hud-grid dt{margin-bottom:3px;font-family:var(--rx-mono);font-size:9.5px;letter-spacing:.1em;color:rgba(255,255,255,.4);text-transform:uppercase}
+.rcres-page .rcres-hud-grid dd{margin:0;font-family:'Barlow Condensed',sans-serif;font-style:italic;font-weight:800;font-size:15px;line-height:1.05;letter-spacing:.01em;color:#fff;text-transform:uppercase;overflow-wrap:anywhere}
+.rcres-page .rcres-hud-grid dd.ok{color:#22c55e}
+.rcres-page .rcres-hud-grid dd.wait{color:var(--rx-hex)}
+
+/* Pestañas: segmentado glass con indicador deslizante */
+.rcres-page .rcres-tabs{display:flex;gap:4px;max-width:656px;margin:0 auto 1rem;padding:4px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.025);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.rcres-page .rcres-tabs button{position:relative;isolation:isolate;display:flex;align-items:center;justify-content:center;gap:8px;flex:1;min-width:0;min-height:46px;padding:0 10px;border:0;border-radius:10px;background:transparent;color:rgba(255,255,255,.45);font-family:'Barlow Condensed',sans-serif;font-style:italic;font-weight:900;font-size:.86rem;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;cursor:pointer;transition:color .2s}
+.rcres-page .rcres-tabs .active{background:transparent;border-color:transparent;color:#fff}
+.rcres-page .rcres-tabs svg{flex-shrink:0;opacity:.75}
+.rcres-page .rcres-tabs .active svg{color:var(--rx-hex);opacity:1}
+.rcres-page .rcres-tab-ind{position:absolute;inset:0;z-index:-1;border-radius:10px;border:1px solid rgba(var(--rx),.38);background:linear-gradient(180deg,rgba(var(--rx),.16),rgba(var(--rx),.05));box-shadow:0 0 22px rgba(var(--rx),.14),inset 0 1px 0 rgba(255,255,255,.08)}
+
+/* Avisos */
+.rcres-page .rcres-alert{max-width:656px;margin:0 auto 1rem;padding:12px 14px;border:1px solid rgba(255,73,98,.3);border-radius:14px;background:rgba(255,73,98,.07);color:#ffb8c3;font-family:var(--rx-mono);font-size:11px;line-height:1.6;letter-spacing:.02em}
+.rcres-page .rcres-pending{max-width:656px;margin:0 auto 1rem;padding:14px 16px;border:1px solid rgba(var(--rx),.2);border-radius:14px;background:rgba(var(--rx),.045)}
+.rcres-page .rcres-pending strong{display:flex;align-items:center;gap:8px;font-family:var(--rx-mono);font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--rx-hex)}
+.rcres-page .rcres-pending strong::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--rx-hex);flex-shrink:0;animation:rcres-cn-pulse 2.2s ease-out infinite}
+.rcres-page .rcres-pending p{margin:6px 0 0;font-size:12.5px;line-height:1.6;color:rgba(255,255,255,.6)}
+
+/* Paneles: sin caja propia, como la vista 499/WE RUN */
+.rcres-page .rcres-panel{padding:0;border:0;border-radius:0;background:transparent}
+
+/* Buscador */
+.rcres-page .rcres-form{max-width:656px;margin:0 auto 1.5rem}
+.rcres-page .rcres-form label{display:flex;justify-content:space-between;gap:12px;margin:0 4px 8px;font-family:var(--rx-mono);font-size:10px;font-weight:500;letter-spacing:.12em;color:rgba(255,255,255,.42);text-transform:uppercase}
+.rcres-page .rcres-form label b{font-weight:500;color:rgba(var(--rx),.85)}
+.rcres-page .rcres-search{flex-direction:row;align-items:center;gap:6px;padding:6px;border:1px solid rgba(255,255,255,.1);border-radius:16px;background:var(--rx-panel);transition:border-color .2s,box-shadow .2s}
+.rcres-page .rcres-search:focus-within{border-color:rgba(var(--rx),.45);box-shadow:0 0 0 4px rgba(var(--rx),.08),0 0 40px rgba(var(--rx),.12)}
+.rcres-page .rcres-search input{flex:1;min-width:0;padding:8px 10px;border:0;border-radius:10px;background:transparent;outline:none;color:#fff;font-family:'Barlow Condensed',sans-serif;font-style:italic;font-weight:900;font-size:1.9rem;letter-spacing:.12em;text-align:center;font-variant-numeric:tabular-nums}
+.rcres-page .rcres-search input::placeholder{color:rgba(255,255,255,.18)}
+.rcres-page .rcres-search button{display:flex;align-items:center;justify-content:center;min-height:52px;padding:0 16px;border:0;border-radius:11px;background:var(--rx-hex);color:#03070b;font-family:'Barlow Condensed',sans-serif;font-style:italic;font-weight:900;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;box-shadow:0 0 24px rgba(var(--rx),.3);transition:background .15s,letter-spacing .15s}
+.rcres-page .rcres-search button:disabled{opacity:.4;box-shadow:none}
+
+/* Ficha de atleta */
+.rcres-page .rcres-result{overflow:hidden;margin-top:0;padding:0 1rem 1rem;border:1px solid rgba(255,255,255,.09);border-radius:22px;background:radial-gradient(120% 80% at 100% 0%,rgba(var(--rx),.07),transparent 55%),var(--rx-panel);box-shadow:0 30px 80px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.06)}
+.rcres-page .rcres-strip{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 -1rem 1.25rem;padding:11px 1rem;border-bottom:1px solid rgba(255,255,255,.07);background:rgba(0,0,0,.28);font-family:var(--rx-mono);font-size:10px;letter-spacing:.12em;color:rgba(255,255,255,.45);text-transform:uppercase}
+.rcres-page .rcres-strip-l{display:flex;align-items:center;gap:8px;flex-shrink:0;color:rgba(var(--rx),.92)}
+.rcres-page .rcres-strip-r{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rcres-page .rcres-athlete{align-items:flex-start;margin-bottom:1.25rem}
+.rcres-page .rcres-athlete small{font-family:var(--rx-mono);font-size:10.5px;font-weight:500;letter-spacing:.1em;color:rgba(var(--rx),.78)}
+.rcres-page .rcres-athlete h2{margin:.6rem 0 .6rem;font-family:'Barlow Condensed',sans-serif;font-style:italic;font-weight:900;font-size:clamp(2rem,11vw,3.2rem);line-height:.88;letter-spacing:-.02em;text-transform:uppercase;color:#fff}
+.rcres-page .rcres-athlete h2 span{display:block}
+.rcres-page .rcres-athlete h2 span+span{font-weight:300;color:rgba(255,255,255,.42)}
+.rcres-page .rcres-athlete p{margin:0;font-family:var(--rx-mono);font-size:10.5px;letter-spacing:.06em;color:rgba(255,255,255,.5);text-transform:uppercase}
+.rcres-page .rcres-athlete>b{display:none;font-family:'Barlow Condensed',sans-serif;font-style:italic;font-weight:900;font-size:clamp(3rem,7vw,5rem);line-height:1;letter-spacing:-.02em;color:transparent;-webkit-text-stroke:1px rgba(var(--rx),.45)}
+
+/* Métricas en mosaicos (la primera = tiempo en meta, destacada) */
+.rcres-page .rcres-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:0 0 1rem}
+.rcres-page .rcres-metrics>div{padding:14px 16px;border:1px solid var(--rx-line);border-radius:16px;background:rgba(0,0,0,.24)}
+.rcres-page .rcres-metrics>div:first-child,.rcres-page .rcres-metrics>div:last-child{grid-column:1/-1}
+.rcres-page .rcres-metrics>div:first-child{border-color:rgba(var(--rx),.26);background:linear-gradient(135deg,rgba(var(--rx),.11) 0%,rgba(var(--rx),.02) 60%)}
+.rcres-page .rcres-metrics small{font-family:var(--rx-mono);font-size:10px;font-weight:500;letter-spacing:.1em;color:rgba(255,255,255,.45)}
+.rcres-page .rcres-metrics strong{margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-style:italic;font-weight:900;font-size:clamp(19px,5.4vw,26px);line-height:1;letter-spacing:.01em;color:#fff}
+.rcres-page .rcres-metrics>div:first-child strong{font-size:clamp(2.3rem,11vw,4rem);color:var(--rx-hex);text-shadow:0 0 32px rgba(var(--rx),.35)}
+.rcres-page .rcres-cert-btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;padding:0 18px;border:1px solid rgba(var(--rx),.35);border-radius:12px;background:rgba(var(--rx),.1);color:var(--rx-hex);font-family:'Barlow Condensed',sans-serif;font-style:italic;font-weight:900;font-size:.9rem;letter-spacing:.14em;text-transform:uppercase;box-shadow:0 0 24px rgba(var(--rx),.12)}
+.rcres-page .rcres-note{font-family:var(--rx-mono);font-size:10.5px;line-height:1.6;letter-spacing:.03em;color:rgba(255,255,255,.45)}
+
+/* Podios */
+.rcres-page .rcres-podiums{grid-template-columns:1fr;gap:1.25rem;margin-bottom:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid rgba(255,255,255,.06)}
+.rcres-page .rcres-podium{padding:0;border:0;border-radius:0;background:transparent}
+.rcres-page .rcres-podium h3{display:flex;align-items:center;gap:10px;margin:0 0 .9rem;font-family:var(--rx-mono);font-style:normal;font-size:10px;font-weight:500;line-height:1;letter-spacing:.14em;text-transform:uppercase;color:rgba(var(--rx),.7)}
+.rcres-page .rcres-podium h3::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.07)}
+.rcres-page .rcres-podium p{font-family:var(--rx-mono);font-size:10.5px;color:rgba(255,255,255,.3)}
+.rcres-page .rcres-podium-row{position:relative;overflow:hidden;grid-template-columns:34px minmax(0,1fr) auto;gap:0 12px;margin-bottom:8px;padding:10px 12px;border:1px solid rgba(255,255,255,.08);border-top:1px solid rgba(255,255,255,.08);border-radius:14px;background:linear-gradient(90deg,rgba(255,255,255,.035),rgba(255,255,255,.01))}
+.rcres-page .rcres-podium-row::before{content:'';position:absolute;left:0;top:12px;bottom:12px;width:3px;border-radius:0 3px 3px 0;background:rgba(255,255,255,.45)}
+.rcres-page .rcres-podium-row:nth-of-type(1){border-color:rgba(251,191,36,.22);background:linear-gradient(90deg,rgba(251,191,36,.09),rgba(251,191,36,.01))}
+.rcres-page .rcres-podium-row:nth-of-type(1)::before{background:#fbbf24}
+.rcres-page .rcres-podium-row:nth-of-type(3)::before{background:#d97706}
+.rcres-page .rcres-podium-row>b{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(255,255,255,.1);border-radius:10px;background:rgba(255,255,255,.04);font-family:var(--rx-mono);font-size:12px;font-weight:700;color:rgba(255,255,255,.85)}
+.rcres-page .rcres-podium-row:nth-of-type(1)>b{border-color:rgba(251,191,36,.4);color:#fbbf24;box-shadow:0 0 18px rgba(251,191,36,.2)}
+.rcres-page .rcres-podium-row:nth-of-type(3)>b{border-color:rgba(217,119,6,.4);color:#f59e0b}
+.rcres-page .rcres-podium-row span{font-family:'Barlow Condensed',sans-serif;font-style:italic;font-weight:900;font-size:1rem;letter-spacing:-.005em;text-transform:uppercase;color:#fff}
+.rcres-page .rcres-podium-row small{margin-top:3px;font-family:var(--rx-mono);font-style:normal;font-weight:400;font-size:10px;letter-spacing:.04em;text-transform:none;color:rgba(255,255,255,.4)}
+.rcres-page .rcres-podium-row strong{grid-column:auto;font-family:'Barlow Condensed',sans-serif;font-style:italic;font-weight:900;font-size:1.15rem;color:var(--rx-hex);text-shadow:0 0 18px rgba(var(--rx),.3)}
+
+/* Filtro + tabla */
+.rcres-page .rcres-filter{display:block;margin:0 0 1rem;font-family:var(--rx-mono);font-size:10px;font-weight:500;letter-spacing:.12em;color:rgba(255,255,255,.42);text-transform:uppercase}
+.rcres-page .rcres-filter input{display:block;width:100%;margin-top:8px;padding:.85rem 1rem;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:var(--rx-panel);outline:none;color:#fff;font-family:'Barlow Condensed',sans-serif;font-style:italic;font-weight:700;font-size:1.05rem;letter-spacing:.06em;text-transform:none}
+.rcres-page .rcres-filter input:focus{border-color:rgba(var(--rx),.45);box-shadow:0 0 0 4px rgba(var(--rx),.08)}
+.rcres-page .rcres-filter input::placeholder{color:rgba(255,255,255,.22)}
+.rcres-page .rcres-scroll table{min-width:0;border-collapse:separate;border-spacing:0 3px}
+.rcres-page .rcres-scroll th{padding:0 1rem .7rem;border-bottom:1px solid rgba(255,255,255,.06);font-family:var(--rx-mono);font-size:10px;font-weight:500;letter-spacing:.12em;color:rgba(255,255,255,.4)}
+.rcres-page .rcres-scroll td{padding:.8rem 1rem;border-bottom:0;font-size:12.5px;color:rgba(255,255,255,.72);transition:background .12s}
+.rcres-page .rcres-scroll td:first-child{border-radius:10px 0 0 10px;font-family:var(--rx-mono);color:rgba(255,255,255,.45)}
+.rcres-page .rcres-scroll td:last-child{border-radius:0 10px 10px 0;font-family:var(--rx-mono);font-size:11.5px;color:rgba(255,255,255,.4)}
+.rcres-page .rcres-scroll td strong{font-family:'Barlow Condensed',sans-serif;font-style:italic;font-weight:800;font-size:1.02rem;text-transform:uppercase;color:#fff}
+.rcres-page .rcres-scroll td small{display:inline;margin:0 0 0 8px;font-family:var(--rx-mono);font-size:10px;color:rgba(255,255,255,.4)}
+.rcres-page .rcres-scroll td:nth-child(3),.rcres-page .rcres-scroll td:nth-child(4){font-family:var(--rx-mono);font-size:11px;letter-spacing:.03em;color:rgba(255,255,255,.55)}
+.rcres-page .rcres-scroll td:nth-child(5){font-family:'Barlow Condensed',sans-serif;font-style:italic;font-weight:900;font-size:1rem;white-space:nowrap;font-variant-numeric:tabular-nums;color:var(--rx-hex)}
+.rcres-page .rcres-scroll tbody tr:hover{background:transparent}
+.rcres-page .rcres-scroll tbody tr:hover td{background:rgba(var(--rx),.045)}
+.rcres-page .rcres-footer{margin-top:2rem;font-family:var(--rx-mono);font-size:10px;letter-spacing:.12em;color:rgba(255,255,255,.3)}
+
+@media(hover:hover){
+  .rcres-page .rcres-refresh:hover:not(:disabled){background:rgba(var(--rx),.14);box-shadow:0 0 22px rgba(var(--rx),.18)}
+  .rcres-page .rcres-tabs button:not(.active):hover{color:rgba(255,255,255,.75)}
+  .rcres-page .rcres-search button:hover:not(:disabled){background:#fff;letter-spacing:.2em}
+  .rcres-page .rcres-cert-btn:hover:not(:disabled){background:rgba(var(--rx),.18)}
+}
+
+/* Móvil estrecho: pestañas sin icono para que "CLASIFICACIÓN GENERAL" quepa en una línea */
+@media(max-width:420px){
+  .rcres-page .rcres-tabs button{gap:0;font-size:.76rem;letter-spacing:.04em}
+  .rcres-page .rcres-tabs svg{display:none}
+}
+
+/* Móvil / tablet vertical: la tabla pasa a filas-tarjeta (sin scroll horizontal de 780px) */
+@media(max-width:760px){
+  .rcres-page .rcres-scroll table,.rcres-page .rcres-scroll tbody{display:block}
+  .rcres-page .rcres-scroll thead{display:none}
+  .rcres-page .rcres-scroll tr{display:grid;grid-template-columns:28px auto minmax(0,1fr) auto;grid-template-areas:"pos name name time" "pos mod cat pace";align-items:center;gap:2px 8px;margin-bottom:4px;padding:10px 12px;border:1px solid rgba(255,255,255,.05);border-radius:12px;background:rgba(255,255,255,.022)}
+  .rcres-page .rcres-scroll td{display:block;min-width:0;padding:0;border-radius:0}
+  .rcres-page .rcres-scroll tbody tr:hover td{background:transparent}
+  .rcres-page .rcres-scroll td:nth-child(1){grid-area:pos;font-size:11px;text-align:center}
+  .rcres-page .rcres-scroll td:nth-child(2){grid-area:name;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rcres-page .rcres-scroll td:nth-child(2) small{display:inline;margin-left:6px}
+  .rcres-page .rcres-scroll td:nth-child(3){grid-area:mod;font-family:var(--rx-mono);font-size:10px;color:rgba(255,255,255,.45)}
+  .rcres-page .rcres-scroll td:nth-child(4){grid-area:cat;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--rx-mono);font-size:10px;color:rgba(255,255,255,.4)}
+  .rcres-page .rcres-scroll td:nth-child(5){grid-area:time;text-align:right;font-size:1.05rem}
+  .rcres-page .rcres-scroll td:nth-child(6){grid-area:pace;text-align:right;font-size:10px}
+  .rcres-page .rcres-scroll td[colspan]{grid-area:auto;grid-column:1/-1;text-align:center}
+}
+
+/* ≥769px — escritorio */
+@media(min-width:769px){
+  .rcres-page .rcres-shell{padding:0 2rem}
+  .rcres-page .rcres-hero{padding:2.5rem 0 2rem}
+  .rcres-page .rcres-hero-grid{grid-template-columns:minmax(0,1fr) minmax(320px,400px);gap:2.5rem}
+  .rcres-page .rcres-hero h1{font-size:clamp(84px,9.5vw,132px)}
+  .rcres-page .rcres-kicker{margin-bottom:1.5rem;font-size:11px}
+  .rcres-page .rcres-hud{padding:16px 18px 18px}
+  .rcres-page .rcres-hud-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 16px}
+  .rcres-page .rcres-hud-grid dd{font-size:19px}
+  .rcres-page .rcres-tabs{margin-bottom:1.25rem}
+  .rcres-page .rcres-form{margin-bottom:2rem}
+  .rcres-page .rcres-search input{padding:12px 20px;font-size:2.6rem}
+  .rcres-page .rcres-search button{min-height:64px;padding:0 30px;font-size:.9rem}
+  .rcres-page .rcres-result{padding:0 2.25rem 2.25rem}
+  .rcres-page .rcres-strip{margin:0 -2.25rem 2rem;padding:12px 2.25rem;font-size:10.5px}
+  .rcres-page .rcres-athlete{margin-bottom:2rem}
+  .rcres-page .rcres-athlete h2{font-size:clamp(3.2rem,7vw,5.6rem)}
+  .rcres-page .rcres-athlete>b{display:block}
+  .rcres-page .rcres-metrics{grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+  .rcres-page .rcres-metrics>div{grid-column:span 2;padding:18px 22px}
+  .rcres-page .rcres-metrics>div:first-child{grid-column:1/-1;padding:22px 26px}
+  .rcres-page .rcres-metrics>div:nth-child(5),.rcres-page .rcres-metrics>div:nth-child(6){grid-column:span 3}
+  .rcres-page .rcres-metrics strong{font-size:clamp(24px,2.6vw,34px)}
+  .rcres-page .rcres-metrics>div:first-child strong{font-size:clamp(3.6rem,7vw,6.4rem)}
+  .rcres-page .rcres-cert-btn{display:inline-flex;width:auto;min-height:44px}
+  .rcres-page .rcres-podiums{grid-template-columns:repeat(2,minmax(0,1fr));gap:1.5rem}
+}
+@media(min-width:1100px){.rcres-page .rcres-hud-grid dd{font-size:20px}}
 `;
 
 /* ═══════════════════════════════════════════════════════════════════════
