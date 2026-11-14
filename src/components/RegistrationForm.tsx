@@ -1,9 +1,35 @@
 /**
- * RAYOCERO — REGISTRATION TERMINAL (V38.4 — ESTABILIDAD Y EFICIENCIA)
+ * RAYOCERO — REGISTRATION TERMINAL (V38.7 — SELECCIÓN DE EVENTO ANTES DEL FORMULARIO)
  * Senior Dev: MIA (Valkyron Group)
  * CEO: Lualdo Sciscioli
  * Architecture: React / TypeScript / Supabase / React Query / Framer Motion
  * REGLA DE ORO: Evolución sin Destrucción. Código completo. Copy-paste ready.
+ *
+ * CHANGELOG V38.7 (sobre V38.6, por instrucción del CEO):
+ * [V38.7-1] Entrada directa /registro?race=<id> de WE RUN RAYOCERO CORO (botón
+ *           "Inscribirme" de RacesSection / RaceDetail) muestra primero
+ *           "SELECCIONA TU EVENTO" con las dos tarjetas de esa carrera:
+ *           WE RUN LED 10K / 5K y WE CAN MOVE 3K MASCOTAS GRATIS.
+ *           Nunca se abre el formulario sin que la persona elija.
+ * [V38.7-2] La tarjeta LED fija ?modo=led (explícito). Sin modo → selector;
+ *           modo=led → formulario 10K/5K; modo=wecanmove → formulario 3K.
+ * [V38.7-3] Se retira el botón interno de cambio de modo de V38.6-2/3: la
+ *           elección vuelve a hacerse solo en el selector, como antes.
+ * [V38.7-4] 499 Coro, Caninata y otras carreras: entrada directa sin cambios.
+ *           Precios, Cashea, pago móvil, dorsal, RLS y SQL intactos.
+ *
+ * CHANGELOG V38.6 (sobre V38.5):
+ * [V38.6-1] BUG FIX: desde V38.1 el 3K WE CAN MOVE solo existía como tarjeta
+ *           en "SELECCIONA TU EVENTO" (/registro sin parámetros). Los botones
+ *           "Inscribirme" de RacesSection y RaceDetail navegan a
+ *           /registro?race=<id> → saltan el selector → el formulario LED solo
+ *           ofrecía 10K/5K y la caminata con mascotas no aparecía.
+ * [V38.6-2] [RETIRADO en V38.7] Botón "3K MASCOTAS · GRATIS" dentro del
+ *           selector de modalidad del formulario LED.
+ * [V38.6-3] [RETIRADO en V38.7] Botón simétrico 3K → 10K / 5K.
+ * [V38.6-4] modoWeCanMove se sincroniza con la URL: atrás/adelante del navegador
+ *           ya no deja un formulario 3K con URL de 10K/5K ni viceversa.
+ * [V38.6-5] Sin cambios en precios, Cashea, pago móvil, dorsal, RLS ni SQL.
  *
  * CHANGELOG V38.4 (sobre V38.3.4):
  * [V38.4-1] Bloqueo sincrónico anti doble envío para 3K y carreras pagas.
@@ -618,6 +644,17 @@ export default function RegistrationForm() {
     searchParams.get("modo") === "wecanmove",
   );
 
+  // [V38.6-4] La URL es la fuente de verdad del modo: atrás/adelante del
+  // navegador remonta el formulario correcto (key incluye el modo).
+  const modoUrlWeCanMove = searchParams.get("modo") === "wecanmove";
+  useEffect(() => {
+    setModoWeCanMove(modoUrlWeCanMove);
+  }, [modoUrlWeCanMove]);
+
+  // [V38.7-2] Modo explícito en URL: "led" (10K/5K) o "wecanmove" (3K).
+  const modoUrl = searchParams.get("modo");
+  const modoElegido = modoUrl === "wecanmove" || modoUrl === "led";
+
   if (race === undefined) {
     return (
       <div className="min-h-screen bg-[#03070b] flex items-center justify-center">
@@ -626,9 +663,16 @@ export default function RegistrationForm() {
     );
   }
 
-  if (!race) {
+  // [V38.7-1] WE RUN RAYOCERO CORO sin modo elegido (botón "Inscribirme" →
+  // /registro?race=<id>): primero las tarjetas, nunca el formulario directo.
+  const requiereSeleccionEvento = !!race && isWeCanMoveRace(race.name) && !modoElegido;
+
+  if (!race || requiereSeleccionEvento) {
+    // [V38.7-1] Con ?race=<id> solo se ofrecen las dos tarjetas de esa carrera;
+    // sin parámetros se listan todas las carreras con inscripciones abiertas.
+    const racesSeleccionables: ActiveRace[] = race ? [race] : activeRaces;
     // [V38.1-1] Una carrera WE RUN Coro se expande en dos tarjetas de selección.
-    const cards: { r: ActiveRace; wcm: boolean }[] = activeRaces.flatMap((r) =>
+    const cards: { r: ActiveRace; wcm: boolean }[] = racesSeleccionables.flatMap((r) =>
       isWeCanMoveRace(r.name)
         ? [{ r, wcm: false }, { r, wcm: true }]
         : [{ r, wcm: false }],
@@ -671,7 +715,15 @@ export default function RegistrationForm() {
                 onClick={() => {
                   setModoWeCanMove(wcm);
                   setRace(r);
-                  setSearchParams(wcm ? { race: r.id, modo: "wecanmove" } : { race: r.id });
+                  // [V38.7-2] WE RUN Coro siempre con modo explícito para que el
+                  // selector no reaparezca; las demás carreras conservan su URL.
+                  setSearchParams(
+                    wcm
+                      ? { race: r.id, modo: "wecanmove" }
+                      : isWeCanMoveRace(r.name)
+                      ? { race: r.id, modo: "led" }
+                      : { race: r.id },
+                  );
                 }}
                 className="cursor-pointer bg-white/[0.02] border border-white/10 hover:border-white/20 rounded-3xl p-6 transition-all flex flex-col justify-between"
               >
