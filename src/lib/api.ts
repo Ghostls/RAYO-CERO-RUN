@@ -112,6 +112,29 @@ export function calcularCategoria(
   return `Master D ${g}`; // 70+
 }
 
+export function isLedCoroRace(name: string = ""): boolean {
+  return /\bcoro\b/i.test(name) && /\bwe\s*run\s*(?:rayocero\b|led\b)/i.test(name);
+}
+
+export function calcularCategoriaLedCoro(
+  edad: number,
+  genero: "M" | "F",
+  movilidadReducida: boolean = false,
+): string {
+  if (movilidadReducida) return "Movilidad Reducida";
+
+  const g = genero === "M" ? "Masculino" : "Femenino";
+  if (edad >= 30 && edad <= 34) return `Sub Master A ${g}`;
+  if (edad >= 35 && edad <= 39) return `Sub Master B ${g}`;
+  if (edad >= 40 && edad <= 44) return `Master A ${g}`;
+  if (edad >= 45 && edad <= 49) return `Master B ${g}`;
+
+  // Mantener los tramos existentes sin mezclar 50-59 con Master B del afiche.
+  if (edad >= 50 && edad <= 59) return `50-59 ${g}`;
+  if (edad >= 80) return `80+ ${g}`;
+  return calcularCategoria(edad, genero, movilidadReducida);
+}
+
 // ─── SCHEMA ZOD ─────────────────────────────────────────────────────────────
 
 export const registrationSchema = z.object({
@@ -172,6 +195,7 @@ export const registrationSchema = z.object({
   // Carrera y Modalidad
   race_id:   z.string().uuid("race_id inválido").optional(),
   modalidad: z.enum(["10K", "4K", "5K"]).optional(),
+  raceName:  z.string().optional(), // Contexto para calcular la categoría; no se guarda.
 
   // Representante (doble nomenclatura para compatibilidad)
   nombreRepresentante: z.string().optional(),
@@ -214,15 +238,13 @@ export async function registerRunner(
   const parsed = registrationSchema.parse(formData);
   const edad   = calcularEdad(parsed.fechaNacimiento);
 
-  /**
-   * Resolución de categoría — prioridad:
-   * 1. Si el form ya calculó y envió `categoria` → se respeta
-   * 2. Modalidad 4K  → "Caminata Recreativa 4K"
-   * 3. Modalidad 5K  → "Caminata Canina / Familiar"
-   * 4. Modalidad 10K → calcularCategoria() con 9 rangos granulares
-   */
+  // LED Coro 10K usa la regla oficial también si el formulario envía otro valor.
+  const aplicaCategoriaLedCoro = parsed.race_id && (parsed.modalidad ?? "10K") === "10K"
+    && isLedCoroRace(parsed.raceName);
   let categoria = parsed.categoria?.trim() || "";
-  if (!categoria) {
+  if (aplicaCategoriaLedCoro) {
+    categoria = calcularCategoriaLedCoro(edad, parsed.genero, parsed.movilidadReducida);
+  } else if (!categoria) {
     if (parsed.modalidad === "4K") {
       categoria = "Caminata Recreativa 4K";
     } else if (parsed.modalidad === "5K") {

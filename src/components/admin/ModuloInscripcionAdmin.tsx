@@ -23,6 +23,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { calcularCategoriaLedCoro, calcularEdad as calcularEdadCivil, isLedCoroRace } from '../../lib/api';
 import type { RaceScope } from '../../pages/AdminDashboard';
 import {
   User, Trophy, Shield, CheckCircle, AlertCircle,
@@ -49,7 +50,9 @@ const calcularCategoria = (
   genero: 'M' | 'F',
   movilidadReducida: boolean,
   modalidad: '10K' | '4K',
+  aplicaCategoriaLedCoro: boolean,
 ): string => {
+  if (aplicaCategoriaLedCoro) return calcularCategoriaLedCoro(edad, genero, movilidadReducida);
   if (movilidadReducida) return 'Movilidad Reducida';
   // [V2-5] Caminata 4K = categoría fija independiente de edad/genero
   if (modalidad === '4K')  return 'Caminata Recreativa 4K';
@@ -120,10 +123,14 @@ export default function ModuloInscripcionAdmin({ scope }: Props) {
   const update = (field: keyof FormData, value: string | boolean) =>
     setForm(f => ({ ...f, [field]: value }));
 
-  const age      = form.fechaNacimiento ? calcularEdad(form.fechaNacimiento) : null;
+  const aplicaCategoriaLedCoro = !scope.legacy && form.modalidad === '10K' && isLedCoroRace(scope.name);
+  const resolverEdad = aplicaCategoriaLedCoro ? calcularEdadCivil : calcularEdad;
+  const age      = form.fechaNacimiento ? resolverEdad(form.fechaNacimiento) : null;
   const esMenor  = age !== null && age < 13;   // [V2-5] mínimo 13 para Junior
   const categoria = (age !== null && form.genero && form.modalidad)
-    ? calcularCategoria(age, form.genero as 'M' | 'F', form.movilidadReducida, form.modalidad as Modalidad)
+    ? calcularCategoria(
+      age, form.genero as 'M' | 'F', form.movilidadReducida, form.modalidad, aplicaCategoriaLedCoro,
+    )
     : null;
 
   const canSubmit =

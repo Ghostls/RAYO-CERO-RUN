@@ -172,7 +172,10 @@ import { useMutation } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import imageCompression from "browser-image-compression";
 
-import { registerRunner, calcularEdad, type RegistrationFormData } from "@/lib/api";
+import {
+  registerRunner, calcularEdad, calcularCategoriaLedCoro, isLedCoroRace,
+  type RegistrationFormData,
+} from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 
 // El dorsal se renderiza exclusivamente en /dorsal. No descargar sus
@@ -881,6 +884,8 @@ function RegistrationFormActive({
     [fechaNacimiento],
   );
 
+  const aplicaCategoriaLedCoro = modalidad === "10K" && isLedCoroRace(race.name);
+
   const categoria = useMemo(() => {
     if (isWeCanMove3K) return "Caminata con Mascotas WE CAN MOVE 3K";
     if (modalidad === "5K") {
@@ -888,8 +893,9 @@ function RegistrationFormActive({
       if (isCaninataRaceType) return "Caminata Canina / Familiar";
       return "Caminata Recreativa 5K";
     }
+    if (aplicaCategoriaLedCoro) return calcularCategoriaLedCoro(edad, genero, movilidadReducida);
     return calcularCategoria(edad, genero, movilidadReducida);
-  }, [edad, genero, movilidadReducida, modalidad, isCaninataRaceType, isWeCanMove3K]);
+  }, [edad, genero, movilidadReducida, modalidad, aplicaCategoriaLedCoro, isCaninataRaceType, isWeCanMove3K]);
 
   const genderMismatchWarning = useMemo(
     () => validateGenderCategory(genero, categoria),
@@ -1140,6 +1146,7 @@ function RegistrationFormActive({
         telefonoEmergencia: telefonoEmergencia || "N/A",
         aceptaDeslinde:     true,
         race_id:            race.id,
+        raceName:           race.name,
         modalidad,
         ...petFields,
       } as RegistrationFormData & Partial<PetData>;
