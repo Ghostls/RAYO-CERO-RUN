@@ -639,6 +639,7 @@ const calcularCategoria = (
 // COMPONENTE RAÍZ
 // ---------------------------------------------------------------------------
 
+// [V38.8] Cierre exclusivo de WE CAN MOVE 3K.
 export default function RegistrationForm() {
   const { race, setRace, activeRaces } = useTargetRace();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -716,6 +717,7 @@ export default function RegistrationForm() {
                 key={`${r.id}-${wcm ? "wcm" : "std"}`}
                 whileHover={{ scale: 1.02 }}
                 onClick={() => {
+                  if (wcm) return; // WE CAN MOVE cerrado; LED conserva su flujo.
                   setModoWeCanMove(wcm);
                   setRace(r);
                   // [V38.7-2] WE RUN Coro siempre con modo explícito para que el
@@ -728,7 +730,8 @@ export default function RegistrationForm() {
                       : { race: r.id },
                   );
                 }}
-                className="cursor-pointer bg-white/[0.02] border border-white/10 hover:border-white/20 rounded-3xl p-6 transition-all flex flex-col justify-between"
+                aria-disabled={wcm || undefined}
+                className={`${wcm ? "cursor-default opacity-70" : "cursor-pointer hover:border-white/20"} bg-white/[0.02] border border-white/10 rounded-3xl p-6 transition-all flex flex-col justify-between`}
               >
                 <div>
                   <div className="flex justify-between items-start mb-4">
@@ -761,16 +764,41 @@ export default function RegistrationForm() {
                   </div>
                 </div>
                 <button
-                  className="w-full py-3 rounded-xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 transition-all"
+                  type="button"
+                  disabled={wcm}
+                  className="disabled:cursor-not-allowed disabled:opacity-60 w-full py-3 rounded-xl font-black uppercase text-xs tracking-wider flex items-center justify-center gap-2 transition-all"
                   style={{ background: color, color: "#03070b" }}
                 >
-                  {wcm ? "INSCRIBIRME GRATIS" : "INICIAR REGISTRO"} <ChevronRight className="h-4 w-4" />
+                  {wcm ? "INSCRIPCIONES CERRADAS" : "INICIAR REGISTRO"} <ChevronRight className="h-4 w-4" />
                 </button>
               </motion.div>
             );
           })}
         </div>
       </div>
+    );
+  }
+
+
+  // [V38.8] También bloquea enlaces guardados y navegación atrás/adelante.
+  if (isWeCanMoveRace(race.name) && modoUrl === "wecanmove") {
+    return (
+      <main className="min-h-screen bg-[#03070b] text-white pt-28 pb-20 px-4 flex justify-center">
+        <section role="status" className="w-full max-w-xl h-fit rounded-3xl border border-amber-400/30 bg-white/[0.03] p-6 sm:p-10 text-center space-y-5">
+          <Dog className="h-12 w-12 mx-auto text-[#FCD34D]" />
+          <p className="text-xs font-black uppercase tracking-widest text-[#FCD34D]">WE CAN MOVE · 3K MASCOTAS</p>
+          <h1 className="text-3xl sm:text-4xl font-black uppercase break-words">Inscripciones cerradas</h1>
+          <p className="text-sm text-white/70 leading-relaxed">El registro para WE CAN MOVE ha finalizado. Las inscripciones realizadas previamente se mantienen registradas.</p>
+          <button type="button" onClick={() => setSearchParams({ race: race.id, modo: "led" })}
+            className="w-full rounded-xl bg-[#FCD34D] px-4 py-4 text-xs font-black uppercase text-[#03070b]">
+            Ver inscripción LED 10K / 5K
+          </button>
+          <button type="button" onClick={() => { setModoWeCanMove(false); setRace(null); setSearchParams({}); }}
+            className="w-full py-3 text-xs font-bold uppercase text-white/60 hover:text-white">
+            Volver a eventos
+          </button>
+        </section>
+      </main>
     );
   }
 
@@ -949,6 +977,11 @@ function RegistrationFormActive({
     e.preventDefault();
     if (submitLockRef.current || uploading || mutation.isPending) return;
     setFormError(null);
+    // [V38.8] Defensa adicional: nunca enviar un nuevo registro 3K.
+    if (isWeCanMove3K) {
+      setFormError("Las inscripciones de WE CAN MOVE 3K están cerradas.");
+      return;
+    }
 
     // [V38.5] Protección adicional contra un método Cashea residual
     // si la modalidad cambió: jamás registrar 5K con ese método.
