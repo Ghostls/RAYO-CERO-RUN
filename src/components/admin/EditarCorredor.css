@@ -1,0 +1,43 @@
+dialog.rc-profile {
+  --rc-border: #2b3641; --rc-accent: #7ce7dc;
+  position:fixed; inset:0; margin:auto; padding:0; box-sizing:border-box;
+  width:min(49rem,calc(100% - 2rem)); max-width:none;
+  height:min(51rem,calc(100vh - 2rem)); height:min(51rem,calc(100dvh - 2rem));
+  max-height:none; overflow:hidden; border:1px solid var(--rc-border); border-radius:18px;
+  background:#10161c; color:#ebeff2; color-scheme:dark;
+  font:400 15px/1.45 system-ui,sans-serif; text-align:left;
+  box-shadow:0 24px 90px #0008;
+}
+.rc-profile::backdrop {background:rgb(2 6 10 / 82%)}
+.rc-profile *, .rc-profile *::before {box-sizing:border-box}
+.rc-profile .rc-profile-form {display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:100%;width:100%;margin:0;padding:0;overflow:hidden}
+.rc-profile .rc-profile-header,.rc-profile .rc-profile-footer {position:static;display:flex;align-items:center;gap:.65rem;margin:0;padding:1rem 1.5rem;background:#161e26}
+.rc-profile .rc-profile-header {justify-content:space-between;border-bottom:1px solid var(--rc-border)}
+.rc-profile h2 {margin:0;font:680 1.45rem/1.2 system-ui,sans-serif;letter-spacing:-.025em}
+.rc-profile-header p {margin:.25rem 0 0;color:#a6b9c5;font-size:.82rem;overflow-wrap:anywhere}
+.rc-profile button {appearance:none;cursor:pointer;border-radius:8px;font:600 .9rem/1.1 system-ui,sans-serif}
+.rc-profile .rc-profile-close {display:grid;place-items:center;flex:none;width:44px;height:44px;border:1px solid var(--rc-border);background:transparent;color:#d0dde1}
+.rc-profile .rc-profile-scroll {min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;touch-action:pan-y pinch-zoom;scrollbar-gutter:stable;scrollbar-color:#526574 #10161c;scroll-padding:1rem;padding:1.25rem 1.5rem}
+.rc-profile fieldset {min-inline-size:0;margin:0;padding:0;border:0}
+.rc-profile fieldset + fieldset {margin-top:1.65rem}
+.rc-profile legend {float:none;width:100%;margin:0 0 .8rem;padding:0 0 .45rem;border-bottom:1px solid var(--rc-border);color:var(--rc-accent);font:650 .93rem/1.4 system-ui,sans-serif}
+.rc-profile-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.85rem 1rem}
+.rc-profile-field {display:grid;align-content:start;gap:.32rem;min-width:0;color:#c1cdd4;font-size:.83rem}
+.rc-profile small {color:var(--rc-accent)}
+.rc-profile .rc-profile-input {position:static;width:100%;min-width:0;max-width:100%;margin:0;min-height:44px;padding:.55rem .7rem;border:1px solid #3c4a57;border-radius:8px;background:#1b252e;color:#f1f4f5;font:400 1rem/1.35 system-ui,sans-serif}
+.rc-profile-check {align-self:end;display:flex;align-items:center;justify-content:space-between;gap:.5rem;min-height:44px;padding:.5rem .75rem;border:1px solid var(--rc-border);border-radius:8px;font-size:.86rem}
+.rc-profile-check input {width:18px;height:18px;flex:none;accent-color:var(--rc-accent)}
+.rc-profile :focus-visible {outline:2px solid var(--rc-accent);outline-offset:2px}
+.rc-profile .rc-profile-footer {justify-content:flex-end;flex-wrap:wrap;border-top:1px solid var(--rc-border);padding-block:.75rem}
+.rc-profile-footer p {flex-basis:100%;max-height:4.5em;overflow:auto;margin:0;color:#ffb0b9;font-size:.83rem}
+.rc-profile-footer button {padding:.65rem 1rem;min-height:44px;border:1px solid var(--rc-border);background:transparent;color:#dce7ec}
+.rc-profile-footer button[type=submit] {background:var(--rc-accent);color:#072527;border-color:transparent}
+.rc-profile button:disabled {opacity:.55;cursor:wait}
+@media(max-width:580px) {
+  dialog.rc-profile {width:100%;height:100vh;height:100dvh;border:0;border-radius:0}
+  .rc-profile-grid {grid-template-columns:minmax(0,1fr)}
+  .rc-profile .rc-profile-header {padding:max(.8rem,env(safe-area-inset-top)) 1rem .8rem}
+  .rc-profile .rc-profile-scroll {padding:1rem}
+  .rc-profile .rc-profile-footer {padding:.6rem 1rem max(.6rem,env(safe-area-inset-bottom))}
+  .rc-profile-footer button[type=submit] {flex:1}
+}

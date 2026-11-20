@@ -123,6 +123,8 @@ import { RouteConfig } from '../components/admin/RouteConfig';
 import { ResultsTable } from '../components/admin/ResultsTable';
 import logoPrincipal from '../assets/logo.png';
 import PreRaceButton from '../components/Preracebutton';
+import './RunnerRoster.css';
+import EditarCorredor from '../components/admin/EditarCorredor';
 import ModuloInscripcionAdmin from '../components/admin/ModuloInscripcionAdmin';
 
 /* ────────────────────────────────────────────────────────────── */
@@ -1498,6 +1500,25 @@ const generateWeCanMovePDF = (inscritos: WeCanMoveRegistration[], raceName: stri
 };
 
 const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount?: (n: number, verified: boolean) => void }) => {
+  const [editing, setEditing] = useState<string | null>(null);
+  const [editNotice, setEditNotice] = useState('');
+  const [checking, setChecking] = useState<string | null>(null);
+  const [editFailure, setEditFailure] = useState<{id: string; message: string} | null>(null);
+  const requestEdit = async (id: string) => {
+    setChecking(id);
+    setEditNotice('');
+    setEditFailure(null);
+    try {
+      const { data, error } = await supabase.rpc('rc_can_edit_runner');
+      if (error) throw new Error(error.message);
+      if (data !== true) throw new Error('La cuenta de esta sesión no tiene permiso de edición.');
+      setEditing(id);
+    } catch (cause) {
+      setEditFailure({ id, message: cause instanceof Error ? cause.message : 'No se pudo verificar el permiso. Vuelve a pulsar Editar.' });
+    } finally {
+      setChecking(null);
+    }
+  };
   const [atletas, setAtletas]               = useState<Runner[]>([]);
   const [atletasError, setAtletasError]      = useState<string | null>(null);
   const [atletasSchemaWarning, setAtletasSchemaWarning] = useState<string | null>(null);
@@ -1890,6 +1911,7 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
 
   return (
     <div className="relative text-white">
+      {editNotice && <p role="status" className="mb-3 text-cyan-300">{editNotice}</p>}
       {atletasSchemaWarning && !atletasError && (
         <div role="status" className="mb-4 p-3 rounded-xl border border-amber-500/25 bg-amber-500/10 text-amber-200 text-[11px]">
           {atletasSchemaWarning}
@@ -1903,11 +1925,11 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
           </button>
         </div>
       )}
-      <div className="bg-black/40 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
+      <div className="rc-roster bg-black/40 border border-white/10 rounded-2xl overflow-hidden shadow-2xl">
 
         {/* Tabs de modalidad */}
-        <div className="px-6 pt-6 pb-0 border-b border-white/5">
-          <div className="flex flex-wrap gap-1 mb-0">
+        <div className="border-b border-white/5">
+          <div className="rc-tabs">
             {modalidadTabs.map(([val, lbl, color]) => (
               <button key={val} onClick={() => setModalidadTab(val)}
                 className={`px-5 py-3 rounded-t-xl font-black uppercase text-[10px] tracking-widest transition-all border-b-2 ${modalidadTab === val ? 'bg-white/[0.04] border-current' : 'bg-transparent border-transparent text-gray-500 hover:text-gray-300'}`}
@@ -1929,7 +1951,7 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
           </div>
         </div>
 
-        <div className="p-6 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="rc-tools border-b border-white/5">
           <div className="flex flex-wrap items-center gap-3">
             {modalidadTab !== '3K' && (
               <button onClick={() => setShowPDFModal(true)}
@@ -1974,9 +1996,9 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
               </select>
             </label>
           )}
-          <div className="relative w-full md:w-64">
+          <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
-            <input type="text" placeholder="Filtrar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+            <input type="text" aria-label="Buscar inscripción" placeholder="Buscar inscripción…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
               className="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-10 pr-4 text-[10px] uppercase font-bold outline-none focus:border-cyan-500/30" />
           </div>
         </div>
@@ -2035,7 +2057,7 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
           </div>
         )}
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="rc-table">
             <thead>
               <tr className="bg-white/5">
                 <th className="p-4 text-left text-[9px] uppercase text-gray-400">{modalidadTab === '3K' ? 'Participante / Mascota' : 'Atleta / Categoría'}</th>
@@ -2090,7 +2112,7 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
                       {a.referencia_pago === 'NINO_GRATIS' && <span className="text-[8px] bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 rounded font-black uppercase">GRATIS</span>}
                     </div>
                   </td>
-                  <td className="p-4">
+                  <td data-label="Modalidad" className="p-4">
                     {a.modalidad === '10K' && (
                       <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full border"
                         style={{ background: 'rgba(0,212,200,0.07)', borderColor: 'rgba(0,212,200,0.2)', color: '#00d4c8' }}>🏃 10K</span>
@@ -2109,26 +2131,28 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
                         style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)', color: 'rgba(255,255,255,0.25)' }}>—</span>
                     )}
                   </td>
-                  <td className="p-4"><div className="flex items-center gap-2 text-cyan-400 text-[10px] font-mono"><Phone size={12} />{a.telefono || 'SIN_TLF'}</div></td>
-                  <td className="p-4"><span className="text-xs font-mono bg-white/5 px-2 py-1 rounded border border-white/10 text-white">{a.talla_camiseta || 'N/A'}</span></td>
-                  <td className="p-4">
+                  <td data-label="Teléfono" className="p-4"><div className="flex items-center gap-2 text-cyan-400 text-[10px] font-mono"><Phone size={12} />{a.telefono || 'SIN_TLF'}</div></td>
+                  <td data-label="Talla" className="p-4"><span className="text-xs font-mono bg-white/5 px-2 py-1 rounded border border-white/10 text-white">{a.talla_camiseta || 'N/A'}</span></td>
+                  <td data-label="Dorsal" className="p-4">
                     <div className="flex flex-col">
                       <span className="font-bold text-white">{a.bib_number ? `#${a.bib_number}` : <Clock size={14} className="text-yellow-500/50" />}</span>
                       {a.rfid_epc && <span className="text-[8px] text-cyan-400 font-mono mt-1">RFID ✓</span>}
                     </div>
                   </td>
                   <td className="p-4">
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="rc-actions">
+                      <button type="button" disabled={checking !== null} onClick={() => void requestEdit(a.id)} className="rc-edit" aria-label={`Editar a ${a.nombre} ${a.apellido}`}>{checking === a.id ? 'Verificando…' : 'Editar'}</button>
                       <button onClick={() => inspectComprobante(a)} className="p-2 rounded-lg bg-white/5 hover:bg-cyan-500 hover:text-black transition-all" title="Ver comprobante"><Eye size={16} /></button>
-                      <button onClick={() => togglePago(a.id, a.pago_verificado)} disabled={isTogglingPayment === a.id}
+                      <button title="Cambiar verificación de pago" onClick={() => togglePago(a.id, a.pago_verificado)} disabled={isTogglingPayment === a.id}
                         className={`p-2 rounded-lg transition-all border ${a.pago_verificado ? 'bg-green-500/10 text-green-500 border-green-500/30 hover:bg-green-500 hover:text-black' : 'bg-white/5 text-gray-500 border-transparent hover:bg-white/10'}`}>
                         {isTogglingPayment === a.id ? <RefreshCw size={16} className="animate-spin" /> : <CheckSquare size={16} />}
                       </button>
-                      <button onClick={() => toggleKit(a.id, a.kit_entregado)} disabled={isTogglingKit === a.id}
+                      <button title="Cambiar entrega de kit" onClick={() => toggleKit(a.id, a.kit_entregado)} disabled={isTogglingKit === a.id}
                         className={`p-2 rounded-lg transition-all border ${a.kit_entregado ? 'bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500 hover:text-black' : 'bg-white/5 text-gray-500 border-transparent hover:bg-amber-500/20 hover:text-amber-400'}`}>
                         {isTogglingKit === a.id ? <RefreshCw size={16} className="animate-spin" /> : <Gift size={16} />}
                       </button>
-                      <button onClick={() => setAthleteToDelete(a)} className="p-2 rounded-lg bg-white/5 hover:bg-red-500 hover:text-black text-red-500 transition-all"><Trash2 size={16} /></button>
+                      <button title="Eliminar inscripción" onClick={() => setAthleteToDelete(a)} className="p-2 rounded-lg bg-white/5 hover:bg-red-500 hover:text-black text-red-500 transition-all"><Trash2 size={16} /></button>
+                      {editFailure?.id === a.id && <p role="alert" className="rc-edit-error">{editFailure.message}</p>}
                     </div>
                   </td>
                 </tr>
@@ -2145,16 +2169,16 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
                       <span className="text-[9px] text-violet-300">🐾 {a.nombre_mascota}</span>
                     </div>
                   </td>
-                  <td className="p-4"><span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full border border-violet-400/25 bg-violet-500/10 text-violet-300">🐾 3K GRATIS</span></td>
-                  <td className="p-4">
+                  <td data-label="Modalidad" className="p-4"><span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-full border border-violet-400/25 bg-violet-500/10 text-violet-300">🐾 3K GRATIS</span></td>
+                  <td data-label="Contacto" className="p-4">
                     <div className="text-cyan-400 text-[10px] font-mono flex items-center gap-1"><Phone size={12} />{a.telefono}</div>
                     <div className="text-[9px] text-gray-500 mt-1 break-all">{a.email}</div>
                   </td>
-                  <td className="p-4">
+                  <td data-label="Mascota" className="p-4">
                     <div className="text-white text-xs font-bold">{a.nombre_mascota}</div>
                     <div className="text-[9px] text-gray-400">{a.tipo_mascota} · {a.raza_mascota}</div>
                   </td>
-                  <td className="p-4">
+                  <td data-label="Estado" className="p-4">
                     <span className="text-[9px] text-green-400 font-black uppercase flex items-center gap-1"><CheckCircle size={12} /> Confirmado</span>
                     <span className="block text-[9px] text-gray-500 mt-1">Sin dorsal · Sin kit</span>
                   </td>
@@ -2224,6 +2248,10 @@ const AtletasList = ({ scope, onUpdateCount }: { scope: RaceScope; onUpdateCount
       )}
 
       {/* Panel de inspección */}
+      {editing && createPortal(<EditarCorredor key={editing} id={editing} scope={scope} led={isLed}
+        onClose={() => setEditing(null)} onSaved={() => {
+          setEditing(null); setEditNotice('Ficha actualizada.'); void fetchAtletas();
+        }} />, document.body)}
       {selectedAtleta && createPortal(
         <div onClick={() => { setSelectedAtleta(null); setIsAdminInscripcion(false); }}
           className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/95 p-4 backdrop-blur-sm">
@@ -3156,25 +3184,12 @@ export default function AdminDashboard() {
             {activeTab === 'overview' && (
               <>
                 <TasaConfig scope={raceScope} />
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className="lg:col-span-2"><AtletasList scope={raceScope} onUpdateCount={updateTotals} /></div>
-                  <div>
-                    <div className="rounded-3xl p-8 text-black shadow-2xl relative overflow-hidden group"
-                      style={isCoroScope(raceScope)
-                        ? { background: 'linear-gradient(135deg,#dc2626,#991b1b)', boxShadow: '0 0 60px rgba(220,38,38,0.3)' }
-                        : { background: 'linear-gradient(135deg,#06b6d4,#3b82f6)' }
-                      }>
-                      <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform"><Activity size={80} /></div>
-                      <h4 className="text-xs font-black uppercase">
-                        Participación · {isCoroScope(raceScope) ? 'CORO 499' : raceScope.name}
-                      </h4>
-                      <p className="text-7xl font-black italic">{totalVerificado ? totalAtletas.toString().padStart(3, '0') : `${totalAtletas}+`}</p>
-                      <p className="text-[10px] font-bold uppercase mt-4 opacity-70">
-                        {totalVerificado ? (raceScope.isActive ? 'Carrera Activa' : 'Archivo Histórico') : 'Total parcial · 3K pendiente de validación'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <section className="rc-summary" style={{ background: isCoroScope(raceScope) ? '#ff909a' : '#69dce5' }}>
+                  <h4>Participación · {raceScope.name}</h4>
+                  <strong>{totalVerificado ? totalAtletas : `${totalAtletas}+`}</strong>
+                  <p>{totalVerificado ? (raceScope.isActive ? 'Carrera activa' : 'Archivo histórico') : 'Total parcial · 3K pendiente de validación'}</p>
+                </section>
+                <AtletasList key={raceScope.raceId ?? raceScope.name} scope={raceScope} onUpdateCount={updateTotals} />
               </>
             )}
             {activeTab === 'kit_delivery' && <ModuloEntregaKits scope={raceScope} />}
