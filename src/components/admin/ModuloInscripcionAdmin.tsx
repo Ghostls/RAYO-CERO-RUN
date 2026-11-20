@@ -105,7 +105,15 @@ interface Props {
 
 /* ─── Component ──────────────────────────────────────────────── */
 
+import AltaWeCanMoveAdmin from './AltaWeCanMoveAdmin';
+
 export default function ModuloInscripcionAdmin({ scope }: Props) {
+  return <AltaWeCanMoveAdmin key={scope.raceId ?? scope.name} scope={scope}>
+    <InscripcionDeCorredor scope={scope}/>
+  </AltaWeCanMoveAdmin>;
+}
+
+function InscripcionDeCorredor({ scope }: Props) {
   const [form, setForm]           = useState<FormData>(initialForm);
   const [isSubmitting, setIsSub]  = useState(false);
   const [success, setSuccess]     = useState<{
@@ -142,7 +150,7 @@ export default function ModuloInscripcionAdmin({ scope }: Props) {
 
   /* ── isCoroRace para label visual ── */
   const isCoroRace = scope.name.toLowerCase().includes('coro') || scope.name.includes('499');
-  const raceLabel  = isCoroRace ? 'CORO 499' : scope.name.toUpperCase();
+  const raceLabel = scope.name.toUpperCase();
 
   /* ── Submit ── */
   const handleSubmit = useCallback(async () => {
